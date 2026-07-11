@@ -1,14 +1,14 @@
 # デモ
 
-サンプルデータを使った `vz` の実際の出力です。
+同梱のサンプルデータで実際に動かした出力です。
 
-## 折れ線グラフ — マルチシリーズ時系列
+## 折れ線グラフ — 時系列 × マルチシリーズ
 
 ```bash
 $ vz sales.csv
 ```
 
-時系列X、数値Y、カテゴリカラーを自動検出:
+日付列、数値列、カテゴリ列を自動検出して、色分けされた折れ線を描く:
 
 ```
 Line │ x=date │ y=revenue (800–2.0k) ▂▅▃▁█▇ │ ↑ +80% │ color=city │ 6 rows
@@ -29,13 +29,13 @@ Line │ x=date │ y=revenue (800–2.0k) ▂▅▃▁█▇ │ ↑ +80% │ c
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 棒グラフ — カテゴリ集計
+## 棒グラフ — カテゴリ別集計
 
 ```bash
 $ vz sales.csv -x city -y revenue -t bar
 ```
 
-カテゴリ別に値を集計してカラーバーで表示:
+都市ごとに売上を合算して、大きい順にバーを並べる:
 
 ```
 Bar │ x=city │ y=revenue (800–4.2k) │ 6 rows
@@ -50,7 +50,7 @@ Bar │ x=city │ y=revenue (800–4.2k) │ 6 rows
      ──────────────────────────────────────────────────────────────┘
 ```
 
-## スパークライン — パイプライン向け
+## スパークライン — 1行で傾向を把握
 
 ```bash
 $ vz sales.csv --spark
@@ -58,12 +58,15 @@ $ vz sales.csv --spark
 
 $ vz stock.csv --spark
 ▁▂▂▃▄▇▇█
-
-$ echo "売上推移: $(vz sales.csv --spark)"
-売上推移: ▂▅▃▁█▇
 ```
 
-## カラム情報
+シェルスクリプトに組み込むとこんな使い方も:
+```bash
+$ echo "売上: $(vz sales.csv --spark)  株価: $(vz stock.csv --spark)"
+売上: ▂▅▃▁█▇  株価: ▁▂▂▃▄▇▇█
+```
+
+## カラム情報 — データの素性を確認
 
 ```bash
 $ vz sales.csv --info
@@ -84,7 +87,7 @@ profit               Quantitative         0  Min=150  Max=500  Mean=313.33
 Recommendation: Line (x=date, y=revenue, color=city)
 ```
 
-## フィルタリング
+## フィルタリング — 必要な行だけ抽出
 
 ```bash
 $ vz sales.csv --where "city=Tokyo" -o table

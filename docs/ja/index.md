@@ -3,38 +3,38 @@ layout: home
 
 hero:
   name: vz
-  text: ターミナルデータ可視化
-  tagline: "ゼロコンフィグ。スマートなチャート選択。即座に出力。vz data.csv だけ。"
+  text: ターミナルで、データを見る
+  tagline: "CSV を渡すだけ。型を読み取り、最適なチャートを即座に描画。設定ファイル不要。"
   image:
     src: /demo-placeholder.svg
-    alt: vz ターミナル出力 — マルチシリーズ折れ線グラフ
+    alt: vz の出力例 — 売上データの折れ線グラフ
   actions:
     - theme: brand
-      text: はじめる →
+      text: 使ってみる →
       link: /ja/guide/getting-started
     - theme: alt
-      text: GitHub で見る
+      text: GitHub
       link: https://github.com/r-hsnin/vz
 
 features:
   - icon: 🧠
-    title: スマート自動検出
-    details: カラム型（時系列・数値・カテゴリ）を推論し、最適なチャートを自動選択。フラグ不要。
+    title: データ型を自動認識
+    details: 日付・数値・カテゴリを自動判定し、折れ線/棒/散布図/ヒストグラムを選び分ける。指定不要。
   - icon: ⚡
-    title: ゼロコンフィグ
-    details: CSV, TSV, JSON, NDJSON に対応。拡張子やコンテンツから自動的にフォーマットを検出。
+    title: 設定なしで動く
+    details: CSV, TSV, JSON, NDJSON — 拡張子や中身を見て判別するので、フォーマット指定すら不要。
   - icon: 🎨
-    title: マルチシリーズ & カラー
-    details: カテゴリ別に自動グループ化＋凡例表示。-c フラグで色分け、カンマ区切りで複数Y軸。
+    title: 複数系列を色分け表示
+    details: カテゴリ列で自動グループ化。凡例付き。-c で色分け、カンマ区切りで複数指標を重ねて表示。
   - icon: 🔍
-    title: インタラクティブ TUI
-    details: Explore モード — vim風ナビゲーションで軸切替、チャート種別変更、テーブル表示。
+    title: 対話的に探索
+    details: Explore モードで TUI を起動。vim キーバインドで軸やチャートを即座に切り替え。
   - icon: 🎬
-    title: スライドプレゼン
-    details: Present モード — Markdown内にライブチャートを埋め込んだターミナルスライド。
+    title: ターミナルでプレゼン
+    details: Markdown にチャートを埋め込んでスライド発表。データの話をターミナルだけで完結。
   - icon: 📈
-    title: リッチサマリー
-    details: スパークライン、トレンド(↑ +80%)、レンジ、凡例、追加カラム提案を1行で表示。
+    title: 1行に情報を凝縮
+    details: スパークライン・トレンド・レンジ・凡例・「この列も試してみては？」を1行のサマリーに。
 ---
 
 <style>
@@ -50,15 +50,13 @@ features:
 }
 </style>
 
-## デモ
-
-コマンド一つで:
+## 動作イメージ
 
 ```bash
 $ vz sales.csv
 ```
 
-出力:
+これだけで、こうなる:
 
 ```
 Line │ x=date │ y=revenue (800–2.0k) ▂▅▃▁█▇ │ ↑ +80% │ color=city │ 6 rows
@@ -78,19 +76,21 @@ Line │ x=date │ y=revenue (800–2.0k) ▂▅▃▁█▇ │ ↑ +80% │ c
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## チャート選択ルール
+## チャートの自動選択
 
-データ型に基づいて自動的にチャートを選択:
+列の型の組み合わせで、描画するチャートが決まる:
 
-| X カラム | Y カラム | チャート | 例 |
-|----------|----------|----------|------|
-| 時系列 | 数値 | 📈 折れ線 | `date × revenue` |
-| カテゴリ | 数値 | 📊 棒 | `city × sales` |
-| 数値 | 数値 | 🔵 散布図 | `height × weight` |
-| — (単一) | 数値 | 📶 ヒストグラム | `exam scores` |
-| カテゴリ | カテゴリ | 🟦 ヒートマップ | `dept × level` |
+| X 列 | Y 列 | チャート | よくあるデータ |
+|------|------|----------|---------------|
+| 日付 | 数値 | 📈 折れ線 | 売上推移、株価 |
+| カテゴリ | 数値 | 📊 棒 | 都市別売上、部門比較 |
+| 数値 | 数値 | 🔵 散布図 | 身長×体重、価格×面積 |
+| — | 数値 | 📶 ヒストグラム | 試験点数の分布 |
+| カテゴリ | カテゴリ | 🟦 ヒートマップ | 部門×スキルレベル |
 
-## クイックスタート
+もちろん `-t bar` のように手動指定もできる。
+
+## すぐに始める
 
 ::: code-group
 
@@ -98,25 +98,25 @@ Line │ x=date │ y=revenue (800–2.0k) ▂▅▃▁█▇ │ ↑ +80% │ c
 cargo install --git https://github.com/r-hsnin/vz
 ```
 
-```bash [基本操作]
-# 自動可視化
+```bash [よく使うコマンド]
+# とりあえず見る
 vz data.csv
 
-# 軸指定 + チャート種別
-vz sales.csv -x month -y revenue -t bar
+# 軸を指定して棒グラフ
+vz sales.csv -x city -y revenue -t bar
 
-# マルチシリーズ
+# 都市ごとに色分け
 vz sales.csv -y revenue -c city
 
-# パイプライン
+# パイプで受け取って1行スパークライン
 cat data.json | vz --spark
 ```
 
 ```bash [対話モード]
-# インタラクティブ TUI
+# TUI で探索（vim キーバインド）
 vz explore data.csv
 
-# プレゼンテーション
+# Markdown スライドでプレゼン
 vz present slides.md
 ```
 
