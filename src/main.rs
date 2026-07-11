@@ -8,6 +8,8 @@ pub mod oneshot;
 pub mod output;
 pub mod present;
 pub mod render;
+pub mod sparkline;
+pub mod table;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
@@ -261,140 +263,9 @@ fn run(cli: &Cli) -> Result<()> {
 }
 
 /// Print data as a formatted text table (used by `--output table`).
-fn print_table(
-    recommendation: &chart::selector::ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-    cli: &Cli,
-) -> Result<()> {
-    use chart::data_builder;
-
-    let x_idx = headers.iter().position(|h| h == &recommendation.x_column);
-    let y_idx = recommendation
-        .y_column
-        .as_ref()
-        .and_then(|y| headers.iter().position(|h| h == y));
-
-    let chart_type = oneshot::resolve_chart_type(recommendation, cli.chart_type);
-
-    // For bar charts, show aggregated data
-    if chart_type == chart::selector::ChartType::Bar
-        && let (Some(xi), Some(yi)) = (x_idx, y_idx)
-    {
-        let agg = cli.agg.unwrap_or(cli::AggFunction::Sum);
-        let y_label = recommendation.y_column.as_deref().unwrap_or("value");
-        let (bar_data, _) =
-            data_builder::aggregate_bar(rows, xi, yi, None, y_label.to_string(), agg);
-        print_two_col_values(
-            &recommendation.x_column,
-            y_label,
-            &bar_data.labels,
-            &bar_data.values,
-        );
-        return Ok(());
-    }
-
-    // For other chart types: show raw x, y data
-    match (x_idx, y_idx) {
-        (Some(xi), Some(yi)) => {
-            let x_label = &recommendation.x_column;
-            let y_label = recommendation.y_column.as_deref().unwrap_or("value");
-            print_xy_table(x_label, y_label, rows, xi, yi);
-        }
-        _ => print_all_columns(headers, rows),
-    }
-    Ok(())
-}
-
-/// Print a two-column table: labels + numeric values.
-fn print_two_col_values(x_label: &str, y_label: &str, labels: &[String], values: &[f64]) {
-    let col_w = labels
-        .iter()
-        .map(|l| l.len())
-        .max()
-        .unwrap_or(5)
-        .max(x_label.len());
-    let val_w = 12;
-    println!("{:<col_w$}  {:>val_w$}", x_label, y_label);
-    println!("{:-<col_w$}  {:-<val_w$}", "", "");
-    for (label, value) in labels.iter().zip(values.iter()) {
-        println!("{:<col_w$}  {:>val_w$.2}", label, value);
-    }
-}
-
-/// Print a two-column table from raw row data.
-fn print_xy_table(x_label: &str, y_label: &str, rows: &[Vec<String>], xi: usize, yi: usize) {
-    let col_w = col_width(rows, xi, x_label.len());
-    let val_w = col_width(rows, yi, y_label.len());
-    println!("{:<col_w$}  {:>val_w$}", x_label, y_label);
-    println!("{:-<col_w$}  {:-<val_w$}", "", "");
-    for row in rows {
-        let x_val = row.get(xi).map_or("", |v| v.as_str());
-        let y_val = row.get(yi).map_or("", |v| v.as_str());
-        println!("{:<col_w$}  {:>val_w$}", x_val, y_val);
-    }
-}
-
-/// Print all columns as a table (fallback).
-fn print_all_columns(headers: &[String], rows: &[Vec<String>]) {
-    let widths: Vec<usize> = headers
-        .iter()
-        .enumerate()
-        .map(|(i, h)| col_width(rows, i, h.len()))
-        .collect();
-    for (i, h) in headers.iter().enumerate() {
-        if i > 0 {
-            print!("  ");
-        }
-        print!("{:<width$}", h, width = widths[i]);
-    }
-    println!();
-    for w in &widths {
-        print!("{:-<width$}  ", "", width = w);
-    }
-    println!();
-    for row in rows {
-        for (i, val) in row.iter().enumerate() {
-            if i > 0 {
-                print!("  ");
-            }
-            print!(
-                "{:<width$}",
-                val,
-                width = widths.get(i).copied().unwrap_or(5)
-            );
-        }
-        println!();
-    }
-}
-
-/// Compute column display width from data.
-fn col_width(rows: &[Vec<String>], idx: usize, min: usize) -> usize {
-    rows.iter()
-        .map(|r| r.get(idx).map_or(0, |v| v.len()))
-        .max()
-        .unwrap_or(min)
-        .max(min)
-}
-
 /// Generate a sparkline string from values, mapping to 8 Unicode block characters.
 fn make_sparkline(values: &[f64]) -> String {
-    if values.is_empty() {
-        return String::new();
-    }
-    let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
-    let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let blocks = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-    if (max - min).abs() < f64::EPSILON {
-        return "▄".repeat(values.len());
-    }
-    values
-        .iter()
-        .map(|&v| {
-            let idx = ((v - min) / (max - min) * 7.0).round() as usize;
-            blocks[idx.min(7)]
-        })
-        .collect()
+    sparkline::sparkline_from_values(values)
 }
 
 /// Print sparkline output: single-line or grouped by color column.
@@ -463,6 +334,7 @@ fn expand_all_y(
 fn run_oneshot(cli: &Cli) -> Result<()> {
     let file = resolve_input_file(cli)?;
     let data = loader::load_data_full(&file, cli.no_header, format_override(cli))?;
+    let pre_filter_count = data.rows.len();
     let data = apply_filters(data, &cli.filter)?;
     let data = if let Some(max_rows) = cli.sample {
         loader::apply_sampling(data, max_rows)
@@ -471,6 +343,12 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
     };
 
     if data.rows.is_empty() {
+        if !cli.filter.is_empty() && pre_filter_count > 0 {
+            anyhow::bail!(
+                "No rows remain after filtering. All {} rows were excluded by --where predicates.",
+                pre_filter_count,
+            );
+        }
         anyhow::bail!(
             "No data rows found in '{}'. The file appears to contain only headers.",
             file.display(),
@@ -502,21 +380,29 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
         expand_all_y(&recommendation, &schema, &mut y_opts);
     }
 
-    // --output table: print aggregated/raw data as formatted text table
-    if cli.output == Some(cli::OutputFormat::Table) {
-        print_table(&recommendation, &data.headers, &data.rows, cli)?;
-        return Ok(());
+    dispatch_output(cli, &recommendation, &data.headers, &data.rows, &y_opts)
+}
+
+/// Dispatch to the appropriate output renderer based on CLI flags.
+fn dispatch_output(
+    cli: &Cli,
+    recommendation: &chart::ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    y_opts: &YOptions,
+) -> Result<()> {
+    match cli.output {
+        Some(cli::OutputFormat::Table) => {
+            table::print_table(recommendation, headers, rows, cli)?;
+        }
+        Some(cli::OutputFormat::Spark) => {
+            print_spark(recommendation, headers, rows, cli);
+        }
+        _ => {
+            let opts = build_render_options(cli, y_opts);
+            oneshot::render_oneshot(recommendation, headers, rows, &opts)?;
+        }
     }
-
-    // --output spark: single-line sparkline for pipeline embedding
-    if cli.output == Some(cli::OutputFormat::Spark) {
-        print_spark(&recommendation, &data.headers, &data.rows, cli);
-        return Ok(());
-    }
-
-    let opts = build_render_options(cli, &y_opts);
-    oneshot::render_oneshot(&recommendation, &data.headers, &data.rows, &opts)?;
-
     Ok(())
 }
 
@@ -759,5 +645,96 @@ mod tests {
     fn test_format_stat_large() {
         let result = format_stat(1_500_000.0);
         assert!(result.contains("e") || result.contains("E"));
+    }
+
+    fn make_schema(cols: &[(&str, DataType)]) -> infer::types::Schema {
+        infer::types::Schema::new(
+            cols.iter()
+                .map(|(name, dt)| infer::types::ColumnMeta {
+                    name: name.to_string(),
+                    data_type: *dt,
+                    null_count: 0,
+                    sample_size: 10,
+                })
+                .collect(),
+        )
+    }
+
+    fn make_recommendation(
+        x: &str,
+        y: Option<&str>,
+        color: Option<&str>,
+    ) -> chart::ChartRecommendation {
+        chart::ChartRecommendation {
+            chart_type: chart::selector::ChartType::Bar,
+            x_column: x.to_string(),
+            y_column: y.map(|s| s.to_string()),
+            color_column: color.map(|s| s.to_string()),
+        }
+    }
+
+    #[test]
+    fn test_adjust_bar_x_already_categorical_is_noop() {
+        let schema = make_schema(&[
+            ("city", DataType::Categorical),
+            ("revenue", DataType::Quantitative),
+        ]);
+        let mut rec = make_recommendation("city", Some("revenue"), None);
+        adjust_bar_recommendation(&mut rec, &schema);
+        assert_eq!(rec.x_column, "city");
+    }
+
+    #[test]
+    fn test_adjust_bar_no_categorical_cols_no_change() {
+        let schema = make_schema(&[
+            ("date", DataType::Temporal),
+            ("revenue", DataType::Quantitative),
+            ("profit", DataType::Quantitative),
+        ]);
+        let mut rec = make_recommendation("date", Some("revenue"), None);
+        adjust_bar_recommendation(&mut rec, &schema);
+        // No categorical column to swap to, so X stays
+        assert_eq!(rec.x_column, "date");
+    }
+
+    #[test]
+    fn test_adjust_bar_swaps_temporal_to_categorical() {
+        let schema = make_schema(&[
+            ("date", DataType::Temporal),
+            ("city", DataType::Categorical),
+            ("revenue", DataType::Quantitative),
+        ]);
+        let mut rec = make_recommendation("date", Some("revenue"), None);
+        adjust_bar_recommendation(&mut rec, &schema);
+        assert_eq!(rec.x_column, "city");
+    }
+
+    #[test]
+    fn test_adjust_bar_clears_color_when_matches_new_x() {
+        let schema = make_schema(&[
+            ("date", DataType::Temporal),
+            ("city", DataType::Categorical),
+            ("revenue", DataType::Quantitative),
+        ]);
+        // color=city, and city becomes the new X → color should be cleared
+        let mut rec = make_recommendation("date", Some("revenue"), Some("city"));
+        adjust_bar_recommendation(&mut rec, &schema);
+        assert_eq!(rec.x_column, "city");
+        assert_eq!(rec.color_column, None);
+    }
+
+    #[test]
+    fn test_adjust_bar_preserves_color_when_different() {
+        let schema = make_schema(&[
+            ("date", DataType::Temporal),
+            ("region", DataType::Categorical),
+            ("city", DataType::Categorical),
+            ("revenue", DataType::Quantitative),
+        ]);
+        // color=city, but region is first categorical → becomes X, color preserved
+        let mut rec = make_recommendation("date", Some("revenue"), Some("city"));
+        adjust_bar_recommendation(&mut rec, &schema);
+        assert_eq!(rec.x_column, "region");
+        assert_eq!(rec.color_column, Some("city".to_string()));
     }
 }

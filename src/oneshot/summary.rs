@@ -155,27 +155,8 @@ fn sparkline(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
     if values.len() < 2 {
         return None;
     }
-    let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
-    let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    if (max - min).abs() < f64::EPSILON {
-        return Some("▄".repeat(values.len().min(8)));
-    }
-    // Sample to at most 8 points
-    let sampled: Vec<f64> = if values.len() <= 8 {
-        values
-    } else {
-        let step = values.len() as f64 / 8.0;
-        (0..8).map(|i| values[(i as f64 * step) as usize]).collect()
-    };
-    let blocks = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-    let spark: String = sampled
-        .iter()
-        .map(|&v| {
-            let idx = ((v - min) / (max - min) * 7.0).round() as usize;
-            blocks[idx.min(7)]
-        })
-        .collect();
-    Some(spark)
+    let sampled = crate::sparkline::sample_values(&values, 8);
+    Some(crate::sparkline::sparkline_from_values(&sampled))
 }
 
 /// Format and print parts with optional ANSI coloring.

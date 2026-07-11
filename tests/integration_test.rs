@@ -2242,3 +2242,50 @@ fn test_completions_fish() {
         "Expected fish completion script"
     );
 }
+
+#[test]
+fn test_where_filter_eliminates_all_rows_gives_clear_message() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--where", "city=Nonexistent"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(
+        !output.status.success(),
+        "Should fail when filter eliminates all rows"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Should NOT say "appears to contain only headers" — that's misleading
+    assert!(
+        !stderr.contains("only headers"),
+        "Error should not misleadingly mention 'only headers' when filter eliminated all rows. Got: {}",
+        stderr
+    );
+    // Should indicate that filtering removed all data
+    assert!(
+        stderr.contains("filter") && stderr.contains("0"),
+        "Error should mention filter as cause. Got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_json_array_of_primitives_gives_helpful_error() {
+    use std::io::Write;
+    let mut child = vz_binary()
+        .args(["-", "-f", "json"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn vz");
+
+    child.stdin.take().unwrap().write_all(b"[1, 2, 3]").unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("object"),
+        "Expected helpful error about objects, got: {}",
+        stderr
+    );
+}

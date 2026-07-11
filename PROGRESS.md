@@ -2115,3 +2115,54 @@ Tokyo   ▁▂█
 - テスト追加: +3 integration (test_completions_bash, test_completions_zsh, test_completions_fish)
 - 検証: PASS (440 tests: 334 unit + 102 integration + 4 snapshot)
 - 次の候補: sparkline DRY (RICE 22.8) or STOP evaluation
+
+---
+
+## STOP — 2026-07-11T21:15 (Session 14 Final — CLI Quality Focus)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 440 tests (334 unit + 102 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 6 サイクル記録 (Cycles 114-119)
+4. ✅ 全残存アイテム RICE < 100 → STOP
+
+**Session 14 全体 (Cycles 114-119):**
+
+| Cycle | RICE | 種別 | 内容 |
+|-------|------|------|------|
+| 114 | 324 | 機能 | `--output spark` / `--spark` パイプライン用スパークライン |
+| 115 | 157.5 | リファクタ | `ChartData::set_title()` タイトル重複排除 |
+| 116 | 144 | リファクタ | `build_summary_parts` 分割 (74→46+41行) |
+| 117 | 125+216 | リファクタ+機能 | `DATA_EXTENSIONS` DRY + `--spark` ショートハンド |
+| 118 | 245 | 品質 | `-t` ValueEnum化（parse段階検証） |
+| 119 | 30.4 | 機能 | `vz completions <shell>` タブ補完 |
+
+**テスト数推移:** 435 → 440 (このセッションで +5)
+**通算:** 119 実装サイクル完了、440 テスト
+**コミット:** `16ae6cd` on main
+
+---
+
+## Cycle 123 — 2026-07-11T21:30
+- 種別: 品質改善 (Error Messages + Safety)
+- ユーザーストーリー: `--where` で全行除外された時に「ヘッダのみ」ではなく「フィルタで全行除外」と明確に伝える。JSON非オブジェクト配列にもヒント付きエラー。regex unwrap → expect。
+- スコア: RICE = 320 (filter error) + 315 (JSON error) + 80 (expect)
+- 改善: 3つの改善を1サイクルで実施:
+  1. `--where` で全行除外時: "No rows remain after filtering. All N rows were excluded by --where predicates." (misleading "only headers" を排除)
+  2. JSON非オブジェクト配列: "JSON elements must be objects (e.g., [{...}]). Got an array of primitives."
+  3. `Regex::new().unwrap()` → `.expect("valid temporal regex")` (4箇所)
+- 影響: src/main.rs, src/loader/mod.rs, src/infer/detector.rs, tests/integration_test.rs
+- テスト追加: +2 integration (test_where_filter_eliminates, test_json_array_of_primitives)
+- 検証: PASS (454 tests: 346 unit + 104 integration + 4 snapshot)
+
+---
+
+## Cycle 124 — 2026-07-11T21:40
+- 種別: リファクタ (Module Extraction)
+- ユーザーストーリー: 開発者として、main.rs が800行以下に保たれ、テーブル出力ロジックが独立モジュールにあることで、新出力フォーマット追加時の見通しが良くなるようにしたい。
+- スコア: RICE = (8×5×9)/3 = 120
+- 改善: `src/table.rs` にテーブル出力関数を抽出 (print_table, print_two_col_values, print_xy_table, print_all_columns, col_width)。main.rs 855→740行 (115行削減)。
+- 影響: src/main.rs, src/table.rs (新規)
+- テスト: 既存の integration tests が網羅 (変更なしで全パス)
+- 検証: PASS (454 tests: 346 unit + 104 integration + 4 snapshot)

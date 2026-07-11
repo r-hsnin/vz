@@ -94,13 +94,13 @@ fn is_temporal(value: &str) -> bool {
     static TEMPORAL_PATTERNS: LazyLock<[regex::Regex; 4]> = LazyLock::new(|| {
         [
             // YYYY-MM-DD (with optional time)
-            regex::Regex::new(r"^\d{4}-\d{2}-\d{2}").unwrap(),
+            regex::Regex::new(r"^\d{4}-\d{2}-\d{2}").expect("valid temporal regex"),
             // YYYY/MM/DD
-            regex::Regex::new(r"^\d{4}/\d{2}/\d{2}").unwrap(),
+            regex::Regex::new(r"^\d{4}/\d{2}/\d{2}").expect("valid temporal regex"),
             // MM/DD/YYYY
-            regex::Regex::new(r"^\d{2}/\d{2}/\d{4}").unwrap(),
+            regex::Regex::new(r"^\d{2}/\d{2}/\d{4}").expect("valid temporal regex"),
             // DD-Mon-YYYY
-            regex::Regex::new(r"^\d{2}-[A-Za-z]{3}-\d{4}").unwrap(),
+            regex::Regex::new(r"^\d{2}-[A-Za-z]{3}-\d{4}").expect("valid temporal regex"),
         ]
     });
 

@@ -185,7 +185,9 @@ fn objects_to_tabular(objects: Vec<serde_json::Value>) -> Result<LoadedData> {
 
     let headers: Vec<String> = match &objects[0] {
         serde_json::Value::Object(map) => map.keys().cloned().collect(),
-        _ => anyhow::bail!("JSON elements must be objects"),
+        _ => anyhow::bail!(
+            "JSON elements must be objects (e.g., [{{\"col\": \"val\"}}]). Got an array of primitives."
+        ),
     };
 
     let rows: Vec<Vec<String>> = objects
