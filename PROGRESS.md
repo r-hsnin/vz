@@ -2091,3 +2091,27 @@ Nagoya  ▄
 Osaka   ▁█
 Tokyo   ▁▂█
 ```
+
+---
+
+## Cycle 118 — 2026-07-11T21:00
+- 種別: 品質改善 (CLI Consistency)
+- ユーザーストーリー: CLIユーザーとして、`-t pizza` がparse段階で拒否され（`--sort` や `--output` と一貫）、有効な値が表示されることで、タイポ時に無音フォールバックで混乱しないようにしたい。
+- スコア: RICE = (7×7×10)/2 = 245
+- 改善: `chart_type: Option<String>` → `Option<ChartTypeArg>` (ValueEnum)。`resolve_chart_type` がstring matchingを排除し、`ChartTypeArg::to_chart_type()` で型安全な変換。clap が parse 時に検証するため、ランタイム warning が不要に。
+- 影響: src/cli/mod.rs, src/main.rs, src/oneshot/mod.rs, tests/integration_test.rs
+- テスト追加: +2 integration (test_invalid_chart_type_rejected, test_valid_chart_types_accepted)、既存 test_invalid_chart_type_emits_warning を parse rejection に更新
+- 検証: PASS (437 tests: 334 unit + 99 integration + 4 snapshot)
+- 次の候補: --no-color / NO_COLOR (RICE 126) or shell completions (RICE 30.4)
+
+---
+
+## Cycle 119 — 2026-07-11T21:10
+- 種別: 機能追加 (CLI Quality)
+- ユーザーストーリー: シェルユーザーとして、`vz completions bash >> ~/.bashrc` でタブ補完が効くようになり、26個のオプションを記憶せずに済むようにしたい。
+- スコア: RICE = (8×2×9.5)/0.5 = 30.4 (effort極小)
+- 改善: `vz completions <shell>` サブコマンド追加。`clap_complete` crateで bash/zsh/fish/elvish/powershell に対応。全フラグ・ValueEnum候補がタブ補完される。
+- 影響: Cargo.toml, src/cli/mod.rs, src/main.rs, tests/integration_test.rs
+- テスト追加: +3 integration (test_completions_bash, test_completions_zsh, test_completions_fish)
+- 検証: PASS (440 tests: 334 unit + 102 integration + 4 snapshot)
+- 次の候補: sparkline DRY (RICE 22.8) or STOP evaluation

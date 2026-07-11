@@ -9,6 +9,7 @@ readme = "README.md"
 [dependencies]
 # CLI
 clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
 
 # TUI
 ratatui = { version = "0.30", features = ["crossterm_0_28"] }

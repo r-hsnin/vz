@@ -22,7 +22,7 @@ const MIN_WIDTH: u16 = 40;
 /// Render a chart to stdout as a one-shot output (no TUI interaction).
 /// Options for oneshot rendering.
 pub struct RenderOptions<'a> {
-    pub chart_type_override: Option<&'a str>,
+    pub chart_type_override: Option<crate::cli::ChartTypeArg>,
     pub y_label_override: Option<&'a str>,
     pub width: Option<u16>,
     pub height: Option<u16>,
@@ -303,24 +303,10 @@ fn fit_labels_to_width(labels: &[String], available_width: usize) -> Vec<String>
 /// Resolve the chart type from recommendation + optional user override.
 pub fn resolve_chart_type(
     recommendation: &ChartRecommendation,
-    override_str: Option<&str>,
+    override_type: Option<crate::cli::ChartTypeArg>,
 ) -> ChartType {
-    match override_str {
-        Some(s) => match s.to_lowercase().as_str() {
-            "line" => ChartType::Line,
-            "bar" => ChartType::Bar,
-            "scatter" => ChartType::Scatter,
-            "histogram" => ChartType::Histogram,
-            "heatmap" => ChartType::Heatmap,
-            other => {
-                eprintln!(
-                    "warning: unknown chart type '{}', using auto. \
-                     Valid types: line, bar, scatter, histogram, heatmap",
-                    other
-                );
-                recommendation.chart_type
-            }
-        },
+    match override_type {
+        Some(t) => t.to_chart_type(),
         None => recommendation.chart_type,
     }
 }
@@ -502,13 +488,16 @@ mod tests {
             y_column: Some("revenue".to_string()),
             color_column: None,
         };
-        assert_eq!(resolve_chart_type(&rec, Some("bar")), ChartType::Bar);
         assert_eq!(
-            resolve_chart_type(&rec, Some("scatter")),
+            resolve_chart_type(&rec, Some(crate::cli::ChartTypeArg::Bar)),
+            ChartType::Bar
+        );
+        assert_eq!(
+            resolve_chart_type(&rec, Some(crate::cli::ChartTypeArg::Scatter)),
             ChartType::Scatter
         );
         assert_eq!(
-            resolve_chart_type(&rec, Some("histogram")),
+            resolve_chart_type(&rec, Some(crate::cli::ChartTypeArg::Histogram)),
             ChartType::Histogram
         );
     }
@@ -521,7 +510,9 @@ mod tests {
             y_column: Some("revenue".to_string()),
             color_column: None,
         };
-        assert_eq!(resolve_chart_type(&rec, Some("invalid")), ChartType::Line);
+        // With ValueEnum, invalid types are rejected at parse time by clap.
+        // None falls back to recommendation.
+        assert_eq!(resolve_chart_type(&rec, None), ChartType::Line);
     }
 
     #[test]

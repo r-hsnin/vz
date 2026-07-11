@@ -10,7 +10,7 @@ pub mod present;
 pub mod render;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 use std::path::{Path, PathBuf};
 
@@ -250,6 +250,10 @@ fn run(cli: &Cli) -> Result<()> {
         Some(Command::Present { file }) => {
             present::run_present(file)?;
         }
+        Some(Command::Completions { shell }) => {
+            let mut cmd = Cli::command();
+            clap_complete::generate(*shell, &mut cmd, "vz", &mut std::io::stdout());
+        }
         None => run_oneshot(cli)?,
     }
 
@@ -271,7 +275,7 @@ fn print_table(
         .as_ref()
         .and_then(|y| headers.iter().position(|h| h == y));
 
-    let chart_type = oneshot::resolve_chart_type(recommendation, cli.chart_type.as_deref());
+    let chart_type = oneshot::resolve_chart_type(recommendation, cli.chart_type);
 
     // For bar charts, show aggregated data
     if chart_type == chart::selector::ChartType::Bar
@@ -519,7 +523,7 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
 /// Construct render options from CLI args and parsed Y-column config.
 fn build_render_options<'a>(cli: &'a Cli, y_opts: &'a YOptions) -> oneshot::RenderOptions<'a> {
     oneshot::RenderOptions {
-        chart_type_override: cli.chart_type.as_deref(),
+        chart_type_override: cli.chart_type,
         y_label_override: y_opts.label_override.as_deref(),
         width: cli.width,
         height: cli.height,
@@ -554,7 +558,7 @@ fn build_recommendation(
     let mut recommendation = chart::select_chart(schema, x_hint, y_opts.hint.as_deref())
         .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-    if cli.chart_type.as_deref() == Some("bar") && cli.x_col.is_none() {
+    if cli.chart_type == Some(cli::ChartTypeArg::Bar) && cli.x_col.is_none() {
         adjust_bar_recommendation(&mut recommendation, schema);
     }
 

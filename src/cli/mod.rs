@@ -21,8 +21,8 @@ pub struct Cli {
     pub y_col: Option<String>,
 
     /// Override chart type (line, bar, scatter, histogram, heatmap).
-    #[arg(short = 't', long = "type")]
-    pub chart_type: Option<String>,
+    #[arg(short = 't', long = "type", value_enum)]
+    pub chart_type: Option<ChartTypeArg>,
 
     /// Color/group-by column.
     #[arg(short = 'c', long = "color")]
@@ -114,6 +114,12 @@ pub enum Command {
         #[arg(value_name = "FILE")]
         file: PathBuf,
     },
+    /// Generate shell completion scripts.
+    Completions {
+        /// Shell to generate completions for.
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
 }
 
 /// Sort order for bar chart values.
@@ -153,6 +159,35 @@ pub enum InputFormatArg {
     Json,
     /// Newline-delimited JSON (one object per line).
     Ndjson,
+}
+
+/// Chart type for the -t/--type flag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ChartTypeArg {
+    /// Line chart (for temporal × quantitative data).
+    Line,
+    /// Bar chart (for categorical × quantitative data).
+    Bar,
+    /// Scatter plot (for quantitative × quantitative data).
+    Scatter,
+    /// Histogram (distribution of a single quantitative column).
+    Histogram,
+    /// Heatmap (for categorical × categorical data).
+    Heatmap,
+}
+
+impl ChartTypeArg {
+    /// Convert CLI argument to internal ChartType.
+    pub fn to_chart_type(self) -> crate::chart::selector::ChartType {
+        use crate::chart::selector::ChartType;
+        match self {
+            Self::Line => ChartType::Line,
+            Self::Bar => ChartType::Bar,
+            Self::Scatter => ChartType::Scatter,
+            Self::Histogram => ChartType::Histogram,
+            Self::Heatmap => ChartType::Heatmap,
+        }
+    }
 }
 
 /// Output format for results.
@@ -229,7 +264,7 @@ mod tests {
     #[test]
     fn test_cli_parse_with_type() {
         let cli = Cli::try_parse_from(["vz", "data.csv", "-t", "bar"]).unwrap();
-        assert_eq!(cli.chart_type, Some("bar".to_string()));
+        assert_eq!(cli.chart_type, Some(ChartTypeArg::Bar));
     }
 
     #[test]

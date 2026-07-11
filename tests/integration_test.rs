@@ -707,13 +707,13 @@ fn test_invalid_chart_type_emits_warning() {
         .output()
         .expect("Failed to run vz");
 
-    // Should succeed (fallback to auto)
-    assert!(output.status.success());
-    // Should emit a warning about invalid type
+    // Should fail at parse time (ValueEnum validation)
+    assert!(!output.status.success());
+    // Should show clap error with possible values
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("pie") && stderr.contains("warning"),
-        "Expected warning about invalid chart type 'pie' on stderr, got: '{}'",
+        stderr.contains("invalid value") || stderr.contains("possible values"),
+        "Expected clap parse error for invalid chart type, got: '{}'",
         stderr
     );
 }
@@ -2160,5 +2160,85 @@ fn test_spark_shorthand_flag() {
         trimmed.chars().all(|c| "▁▂▃▄▅▆▇█".contains(c)),
         "Expected sparkline from --spark, got: {}",
         trimmed
+    );
+}
+
+#[test]
+fn test_invalid_chart_type_rejected() {
+    // -t should reject invalid values like --sort and --output do
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-t", "pizza"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(
+        !output.status.success(),
+        "Expected failure for invalid chart type, but got success"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("invalid value") || stderr.contains("possible values"),
+        "Expected clap error message, got stderr: {}, stdout: {}",
+        stderr,
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+fn test_valid_chart_types_accepted() {
+    for t in &["line", "bar", "scatter", "histogram", "heatmap"] {
+        let output = vz_binary()
+            .args(["fixtures/sales.csv", "-t", t])
+            .output()
+            .expect("Failed to run vz");
+        assert!(
+            output.status.success(),
+            "Expected success for -t {}, got exit code {:?}",
+            t,
+            output.status
+        );
+    }
+}
+
+#[test]
+fn test_completions_bash() {
+    let output = vz_binary()
+        .args(["completions", "bash"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success(), "completions bash should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Bash completions should contain the binary name
+    assert!(
+        stdout.contains("vz") && stdout.contains("complete"),
+        "Expected bash completion script, got: {}",
+        &stdout[..stdout.len().min(200)]
+    );
+}
+
+#[test]
+fn test_completions_zsh() {
+    let output = vz_binary()
+        .args(["completions", "zsh"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success(), "completions zsh should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("vz") || stdout.contains("compdef"),
+        "Expected zsh completion script"
+    );
+}
+
+#[test]
+fn test_completions_fish() {
+    let output = vz_binary()
+        .args(["completions", "fish"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success(), "completions fish should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("vz") && stdout.contains("complete"),
+        "Expected fish completion script"
     );
 }
