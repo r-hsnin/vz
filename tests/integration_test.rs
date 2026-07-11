@@ -1967,3 +1967,55 @@ fn test_labels_flag_shows_percentage_on_bars() {
         &stdout[..stdout.len().min(500)]
     );
 }
+
+#[test]
+fn test_output_table_shows_formatted_data() {
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "-t",
+            "bar",
+            "-o",
+            "table",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success(), "vz -o table should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Table should show column headers
+    assert!(
+        stdout.contains("city"),
+        "Table should contain 'city' header"
+    );
+    assert!(
+        stdout.contains("revenue"),
+        "Table should contain 'revenue' header"
+    );
+    // Table should show aggregated values (since -t bar implies aggregation)
+    assert!(stdout.contains("Tokyo"), "Table should contain 'Tokyo' row");
+}
+
+#[test]
+fn test_json_flag_shorthand() {
+    // --json should produce the same output as -o json
+    let json_flag = vz_binary()
+        .args(["fixtures/sales.csv", "--json"])
+        .output()
+        .expect("Failed to run vz --json");
+    let o_json = vz_binary()
+        .args(["fixtures/sales.csv", "-o", "json"])
+        .output()
+        .expect("Failed to run vz -o json");
+    assert!(json_flag.status.success(), "vz --json should succeed");
+    assert!(o_json.status.success(), "vz -o json should succeed");
+    let out1 = String::from_utf8_lossy(&json_flag.stdout);
+    let out2 = String::from_utf8_lossy(&o_json.stdout);
+    assert_eq!(
+        out1, out2,
+        "--json and -o json should produce identical output"
+    );
+}

@@ -16,6 +16,28 @@ pub fn print_summary(
     agg: AggFunction,
     agg_stats: Option<(f64, f64)>,
 ) {
+    let parts = build_summary_parts(
+        recommendation,
+        chart_type,
+        headers,
+        rows,
+        extra_y_columns,
+        agg,
+        agg_stats,
+    );
+    format_and_print_parts(&parts);
+}
+
+/// Build the summary parts vector (pure logic, no IO).
+pub fn build_summary_parts(
+    recommendation: &ChartRecommendation,
+    chart_type: ChartType,
+    headers: &[String],
+    rows: &[Vec<String>],
+    extra_y_columns: &[(String, Option<String>)],
+    agg: AggFunction,
+    agg_stats: Option<(f64, f64)>,
+) -> Vec<String> {
     let mut parts = vec![format!("{:?}", chart_type)];
     parts.push(format!("x={}", recommendation.x_column));
     if let Some(ref y) = recommendation.y_column {
@@ -24,8 +46,6 @@ pub fn print_summary(
         } else {
             format!("{}({})", agg_label(agg), y)
         };
-        // Only show raw Y range when using default aggregation (Sum).
-        // For other agg functions, the raw range is misleading.
         if agg == AggFunction::Sum {
             let stats = agg_stats.or_else(|| {
                 let y_idx = headers.iter().position(|h| h == y);
@@ -45,7 +65,6 @@ pub fn print_summary(
             parts.push(format!("y={}", y_display));
         }
     }
-    // Show extra Y columns
     if !extra_y_columns.is_empty() {
         let names: Vec<&str> = extra_y_columns
             .iter()
@@ -66,13 +85,15 @@ pub fn print_summary(
     if let Some(hint) = unused_columns_hint_with_extra(recommendation, headers, &extra_names) {
         parts.push(hint);
     }
+    parts
+}
 
+/// Format and print parts with optional ANSI coloring.
+fn format_and_print_parts(parts: &[String]) {
     if ansi::should_colorize() {
-        // Main info in dim gray, actionable hints in brighter yellow
         let main_parts: Vec<&String> = parts.iter().take(parts.len().saturating_sub(1)).collect();
         if let Some(hint) = parts.last() {
             if hint.starts_with('+') || hint.contains("try ") {
-                // The last part is an actionable hint — highlight it
                 let main_line = main_parts
                     .iter()
                     .map(|s| s.as_str())
@@ -339,4 +360,130 @@ mod tests {
         assert_eq!(agg_label(AggFunction::Max), "max");
         assert_eq!(agg_label(AggFunction::Min), "min");
     }
+}
+
+#[test]
+fn test_build_summary_parts_basic() {
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Line,
+        x_column: "date".to_string(),
+        y_column: Some("revenue".to_string()),
+        color_column: None,
+    };
+    let headers = vec!["date".to_string(), "revenue".to_string()];
+    let rows = vec![
+        vec!["2024-01".to_string(), "1000".to_string()],
+        vec!["2024-02".to_string(), "2000".to_string()],
+    ];
+    let parts = build_summary_parts(
+        &rec,
+        ChartType::Line,
+        &headers,
+        &rows,
+        &[],
+        AggFunction::Sum,
+        None,
+    );
+    assert_eq!(parts[0], "Line");
+    assert_eq!(parts[1], "x=date");
+    assert!(parts[2].starts_with("y=revenue"));
+    assert!(parts[2].contains("1.0k"));
+    assert!(parts[2].contains("2.0k"));
+    assert!(parts.iter().any(|p| p.contains("2 rows")));
+}
+
+#[test]
+fn test_build_summary_parts_with_agg_stats() {
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Bar,
+        x_column: "city".to_string(),
+        y_column: Some("revenue".to_string()),
+        color_column: None,
+    };
+    let headers = vec!["city".to_string(), "revenue".to_string()];
+    let rows = vec![
+        vec!["Tokyo".to_string(), "1000".to_string()],
+        vec!["Tokyo".to_string(), "2000".to_string()],
+    ];
+    // With agg_stats override, summary should use provided stats
+    let parts = build_summary_parts(
+        &rec,
+        ChartType::Bar,
+        &headers,
+        &rows,
+        &[],
+        AggFunction::Sum,
+        Some((800.0, 4200.0)),
+    );
+    assert!(
+        parts[2].contains("4.2k"),
+        "Expected 4.2k in parts: {:?}",
+        parts
+    );
+}
+
+#[test]
+fn test_build_summary_parts_non_sum_agg() {
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Bar,
+        x_column: "city".to_string(),
+        y_column: Some("revenue".to_string()),
+        color_column: None,
+    };
+    let headers = vec!["city".to_string(), "revenue".to_string()];
+    let rows = vec![vec!["Tokyo".to_string(), "1000".to_string()]];
+    let parts = build_summary_parts(
+        &rec,
+        ChartType::Bar,
+        &headers,
+        &rows,
+        &[],
+        AggFunction::Mean,
+        None,
+    );
+    // Should show mean(revenue) without range (since range is misleading for non-sum)
+    assert!(
+        parts[2].contains("mean(revenue)"),
+        "Expected mean(revenue): {:?}",
+        parts
+    );
+    assert!(
+        !parts[2].contains('–'),
+        "Should not contain range for non-sum agg"
+    );
+}
+
+#[test]
+fn test_build_summary_parts_extra_y() {
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Line,
+        x_column: "date".to_string(),
+        y_column: Some("revenue".to_string()),
+        color_column: None,
+    };
+    let headers = vec![
+        "date".to_string(),
+        "revenue".to_string(),
+        "profit".to_string(),
+    ];
+    let rows = vec![vec![
+        "2024-01".to_string(),
+        "1000".to_string(),
+        "200".to_string(),
+    ]];
+    let extra = vec![("profit".to_string(), None)];
+    let parts = build_summary_parts(
+        &rec,
+        ChartType::Line,
+        &headers,
+        &rows,
+        &extra,
+        AggFunction::Sum,
+        None,
+    );
+    assert!(
+        parts.iter().any(|p| p.contains("y+=profit")),
+        "Expected y+=profit: {:?}",
+        parts
+    );
 }

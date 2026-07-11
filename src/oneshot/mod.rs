@@ -282,6 +282,12 @@ fn adaptive_height(
             return (unique_categories as u16 * 4 + 2).clamp(10, DEFAULT_HEIGHT);
         }
     }
+
+    // Line/Scatter: reduce height for very small datasets
+    if matches!(chart_type, ChartType::Line | ChartType::Scatter) && rows.len() <= 6 {
+        return (rows.len() as u16 * 3 + 6).clamp(12, DEFAULT_HEIGHT);
+    }
+
     DEFAULT_HEIGHT
 }
 
@@ -302,7 +308,7 @@ fn fit_labels_to_width(labels: &[String], available_width: usize) -> Vec<String>
 }
 
 /// Resolve the chart type from recommendation + optional user override.
-fn resolve_chart_type(
+pub fn resolve_chart_type(
     recommendation: &ChartRecommendation,
     override_str: Option<&str>,
 ) -> ChartType {
@@ -1019,8 +1025,60 @@ mod tests {
             color_column: None,
         };
         let headers = vec!["date".to_string(), "revenue".to_string()];
+        // 1 row → adaptive: 1*3+6=9, clamped to min 12
         let rows = vec![vec!["2024-01".to_string(), "100".to_string()]];
         let height = adaptive_height(ChartType::Line, &rec, &headers, &rows);
-        assert_eq!(height, DEFAULT_HEIGHT);
+        assert_eq!(height, 12);
     }
+}
+
+#[test]
+fn test_adaptive_height_line_small_dataset() {
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Line,
+        x_column: "date".to_string(),
+        y_column: Some("value".to_string()),
+        color_column: None,
+    };
+    let headers = vec!["date".to_string(), "value".to_string()];
+    // 3 rows → height = 3*3+6 = 15
+    let rows = vec![
+        vec!["2024-01".into(), "10".into()],
+        vec!["2024-02".into(), "20".into()],
+        vec!["2024-03".into(), "30".into()],
+    ];
+    let height = adaptive_height(ChartType::Line, &rec, &headers, &rows);
+    assert_eq!(height, 15);
+}
+
+#[test]
+fn test_adaptive_height_scatter_small_dataset() {
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Scatter,
+        x_column: "x".to_string(),
+        y_column: Some("y".to_string()),
+        color_column: None,
+    };
+    let headers = vec!["x".to_string(), "y".to_string()];
+    // 2 rows → height = 2*3+6 = 12
+    let rows = vec![vec!["1".into(), "2".into()], vec!["3".into(), "4".into()]];
+    let height = adaptive_height(ChartType::Scatter, &rec, &headers, &rows);
+    assert_eq!(height, 12);
+}
+
+#[test]
+fn test_adaptive_height_line_large_dataset_uses_default() {
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Line,
+        x_column: "date".to_string(),
+        y_column: Some("value".to_string()),
+        color_column: None,
+    };
+    let headers = vec!["date".to_string(), "value".to_string()];
+    // 10 rows → exceeds threshold, uses DEFAULT_HEIGHT
+    let rows: Vec<Vec<String>> = (0..10)
+        .map(|i| vec![format!("2024-{:02}", i + 1), format!("{}", i * 10)])
+        .collect();
+    let height = adaptive_height(ChartType::Line, &rec, &headers, &rows);
+    assert_eq!(height, DEFAULT_HEIGHT);
 }

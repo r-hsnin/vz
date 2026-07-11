@@ -1833,3 +1833,93 @@
 - SVG export: RICE=19
 - データテーブル出力: RICE=32
 - 関数サイズ (50行超が11個): 全てシーケンシャルな orchestration ロジック
+
+---
+
+## Cycle 105 — 2026-07-11T19:38
+- 種別: 機能追加
+- ユーザーストーリー: アナリストとして、`vz sales.csv -x city -y revenue -t bar -o table` で集計結果をテキストテーブルとして出力し、他CLIツールにパイプしたい。
+- スコア: RICE = (8×7×8)/4 = 112
+- 改善: `--output table` / `-o table` モード追加。Bar チャートでは集約後データ、Line/Scatter では生 x,y データ、それ以外は全カラムを整形テーブルとして stdout に出力。
+- 影響: src/cli/mod.rs, src/main.rs, src/oneshot/mod.rs, tests/integration_test.rs
+- テスト追加: +1 integration (test_output_table_shows_formatted_data)
+- 検証: PASS (413 tests: 320 unit + 89 integration + 4 snapshot)
+- 次の候補: adaptive height for small datasets
+
+---
+
+## Cycle 106 — 2026-07-11T19:43
+- 種別: 機能改善
+- ユーザーストーリー: CLIユーザーとして、2-6行のデータをパイプした時にチャートが適切な高さで描画され、大量の空白が表示されないようにしたい。
+- スコア: RICE = (6×3×9)/2 = 81
+- 改善: `adaptive_height` を Line/Scatter チャートにも適用。6行以下のデータセットでは `rows*3+6` (最小12, 最大24) で高さを決定。以前は常に24行だった。
+- 影響: src/oneshot/mod.rs
+- テスト追加: +3 unit (test_adaptive_height_line_small_dataset, scatter_small, line_large)
+- 検証: PASS (416 tests: 323 unit + 89 integration + 4 snapshot)
+- 次の候補: --json alias
+
+---
+
+## Cycle 107 — 2026-07-11T19:47
+- 種別: 機能追加 (UX)
+- ユーザーストーリー: 開発者として、`vz data.csv --json` と自然に打てることで、`-o json` フラグを暗記する必要をなくしたい。
+- スコア: RICE = (5×4×8)/2 = 80
+- 改善: `--json` フラグを `-o json` のエイリアスとして追加。`conflicts_with = "output"` で排他制御。main.rs で正規化。
+- 影響: src/cli/mod.rs, src/main.rs, tests/integration_test.rs
+- テスト追加: +1 integration (test_json_flag_shorthand)
+- 検証: PASS (417 tests: 323 unit + 90 integration + 4 snapshot)
+- 次の候補: output pipeline / summary refactor
+
+---
+
+## Cycle 108 — 2026-07-11T19:51
+- 種別: リファクタ + テスト追加
+- ユーザーストーリー: 開発者として、`print_summary` のロジックがテスト済みであることで、サマリー行のリグレッションを防ぎたい。
+- スコア: RICE = (8×5×9)/7 = 51
+- 改善: `print_summary` (83行) を `build_summary_parts` (純粋ロジック, 48行) + `format_and_print_parts` (IO, 19行) + `print_summary` (ラッパー, 15行) に分割。`build_summary_parts` に4件のユニットテスト追加。
+- 影響: src/oneshot/summary.rs
+- テスト追加: +4 unit (test_build_summary_parts_basic, _with_agg_stats, _non_sum_agg, _extra_y)
+- 検証: PASS (421 tests: 327 unit + 90 integration + 4 snapshot)
+- 次の候補: run_oneshot refactor or next evaluation
+
+---
+
+## Cycle 109 — 2026-07-11T19:55
+- 種別: リファクタ
+- ユーザーストーリー: 開発者として、`run_oneshot` が小さく分割されていることで、新機能追加時のコード把握コストを下げたい。
+- スコア: RICE = (8×4×9)/6 = 48
+- 改善: `run_oneshot` (76 lines) → `run_oneshot` (53 lines) + `expand_all_y` (17 lines) + `build_render_options` (15 lines)。残り53行はシーケンシャルなパイプラインで許容範囲。
+- 影響: src/main.rs
+- テスト追加: なし（既存の integration tests で振る舞い保持確認）
+- 検証: PASS (421 tests: 327 unit + 90 integration + 4 snapshot)
+- 次の候補: 再評価へ
+
+---
+
+## STOP — 2026-07-11T19:58 (Session 12 — UX & Output Modes)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 421 tests (327 unit + 90 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 5 サイクル記録 (Cycles 105-109)
+4. ✅ 評価エージェント: RICE > 100 の候補なし → STOP
+
+**このセッション (Cycles 105-109) のサマリー:**
+
+| Cycle | 種別 | 内容 | テスト増 |
+|-------|------|------|---------|
+| 105 | 機能追加 | `-o table` テーブル出力モード | +1 |
+| 106 | 機能改善 | Line/Scatter の小データセット適応高さ | +3 |
+| 107 | 機能追加 | `--json` エイリアス (discoverability) | +1 |
+| 108 | リファクタ | `print_summary` 分割 + テスト追加 | +4 |
+| 109 | リファクタ | `run_oneshot` 分割 (76→53 lines) | +0 |
+
+**テスト数推移:** 412 → 421 (このセッションで +9)
+**通算:** 109 サイクル完了、421 テスト
+
+**残存課題 (全て RICE < 50):**
+- Better error messages for invalid columns: RICE=47
+- Data table in explore (already exists): RICE=48 (false positive)
+- Sparklines: RICE=14
+- Horizontal bar: RICE=14

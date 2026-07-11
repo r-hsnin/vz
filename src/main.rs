@@ -129,7 +129,11 @@ fn format_stat(val: f64) -> String {
 }
 
 fn main() {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
+    // --json is a shorthand for -o json
+    if cli.json {
+        cli.output = Some(cli::OutputFormat::Json);
+    }
     let json_output = cli.output == Some(cli::OutputFormat::Json);
 
     if let Err(e) = run(&cli) {
@@ -166,6 +170,129 @@ fn run(cli: &Cli) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Print data as a formatted text table (used by `--output table`).
+fn print_table(
+    recommendation: &chart::selector::ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    cli: &Cli,
+) -> Result<()> {
+    use chart::data_builder;
+
+    let x_idx = headers.iter().position(|h| h == &recommendation.x_column);
+    let y_idx = recommendation
+        .y_column
+        .as_ref()
+        .and_then(|y| headers.iter().position(|h| h == y));
+
+    let chart_type = oneshot::resolve_chart_type(recommendation, cli.chart_type.as_deref());
+
+    // For bar charts, show aggregated data
+    if chart_type == chart::selector::ChartType::Bar
+        && let (Some(xi), Some(yi)) = (x_idx, y_idx)
+    {
+        let agg = cli.agg.unwrap_or(cli::AggFunction::Sum);
+        let y_label = recommendation.y_column.as_deref().unwrap_or("value");
+        let (bar_data, _) =
+            data_builder::aggregate_bar(rows, xi, yi, None, y_label.to_string(), agg);
+        let col_w = bar_data
+            .labels
+            .iter()
+            .map(|l| l.len())
+            .max()
+            .unwrap_or(5)
+            .max(recommendation.x_column.len());
+        let val_w = 12;
+        println!("{:<col_w$}  {:>val_w$}", recommendation.x_column, y_label);
+        println!("{:-<col_w$}  {:-<val_w$}", "", "");
+        for (label, value) in bar_data.labels.iter().zip(bar_data.values.iter()) {
+            println!("{:<col_w$}  {:>val_w$.2}", label, value);
+        }
+        return Ok(());
+    }
+
+    // For other chart types: show raw x, y data
+    let x_label = &recommendation.x_column;
+    let y_label = recommendation.y_column.as_deref().unwrap_or("value");
+    match (x_idx, y_idx) {
+        (Some(xi), Some(yi)) => {
+            let col_w = rows
+                .iter()
+                .map(|r| r.get(xi).map_or(0, |v| v.len()))
+                .max()
+                .unwrap_or(5)
+                .max(x_label.len());
+            let val_w = rows
+                .iter()
+                .map(|r| r.get(yi).map_or(0, |v| v.len()))
+                .max()
+                .unwrap_or(5)
+                .max(y_label.len());
+            println!("{:<col_w$}  {:>val_w$}", x_label, y_label);
+            println!("{:-<col_w$}  {:-<val_w$}", "", "");
+            for row in rows {
+                let x_val = row.get(xi).map_or("", |v| v.as_str());
+                let y_val = row.get(yi).map_or("", |v| v.as_str());
+                println!("{:<col_w$}  {:>val_w$}", x_val, y_val);
+            }
+        }
+        _ => {
+            // Fallback: print all columns
+            let widths: Vec<usize> = headers
+                .iter()
+                .enumerate()
+                .map(|(i, h)| {
+                    rows.iter()
+                        .map(|r| r.get(i).map_or(0, |v| v.len()))
+                        .max()
+                        .unwrap_or(0)
+                        .max(h.len())
+                })
+                .collect();
+            for (i, h) in headers.iter().enumerate() {
+                if i > 0 {
+                    print!("  ");
+                }
+                print!("{:<width$}", h, width = widths[i]);
+            }
+            println!();
+            for w in &widths {
+                print!("{:-<width$}  ", "", width = w);
+            }
+            println!();
+            for row in rows {
+                for (i, val) in row.iter().enumerate() {
+                    if i > 0 {
+                        print!("  ");
+                    }
+                    print!("{:<width$}", val, width = widths[i]);
+                }
+                println!();
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Expand `--all-y`: add all remaining quantitative columns to extra_y.
+fn expand_all_y(
+    recommendation: &chart::selector::ChartRecommendation,
+    schema: &Schema,
+    y_opts: &mut YOptions,
+) {
+    let x_col = &recommendation.x_column;
+    let primary_y = recommendation.y_column.as_deref().unwrap_or("");
+    let extra: Vec<(String, Option<String>)> = schema
+        .columns
+        .iter()
+        .filter(|c| c.data_type == infer::types::DataType::Quantitative)
+        .filter(|c| c.name != *x_col && c.name != primary_y)
+        .filter(|c| !y_opts.extra_columns.iter().any(|(n, _)| n == &c.name))
+        .map(|c| (c.name.clone(), None))
+        .collect();
+    y_opts.extra_columns.extend(extra);
 }
 
 /// Run the oneshot (default) mode: load data, infer types, render chart.
@@ -208,41 +335,35 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
 
     // --all-y: overlay all quantitative columns as multi-series
     if cli.all_y {
-        let x_col = &recommendation.x_column;
-        let primary_y = recommendation.y_column.as_deref().unwrap_or("");
-        let extra: Vec<(String, Option<String>)> = schema
-            .columns
-            .iter()
-            .filter(|c| c.data_type == infer::types::DataType::Quantitative)
-            .filter(|c| c.name != *x_col && c.name != primary_y)
-            .filter(|c| {
-                // Skip if already in extra_y_columns
-                !y_opts.extra_columns.iter().any(|(n, _)| n == &c.name)
-            })
-            .map(|c| (c.name.clone(), None))
-            .collect();
-        y_opts.extra_columns.extend(extra);
+        expand_all_y(&recommendation, &schema, &mut y_opts);
     }
 
-    oneshot::render_oneshot(
-        &recommendation,
-        &data.headers,
-        &data.rows,
-        &oneshot::RenderOptions {
-            chart_type_override: cli.chart_type.as_deref(),
-            y_label_override: y_opts.label_override.as_deref(),
-            width: cli.width,
-            height: cli.height,
-            sort_order: effective_sort(cli),
-            extra_y_columns: y_opts.extra_columns,
-            limit: cli.top.or(cli.tail),
-            agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
-            title: cli.title.clone(),
-            labels: cli.labels,
-        },
-    )?;
+    // --output table: print aggregated/raw data as formatted text table
+    if cli.output == Some(cli::OutputFormat::Table) {
+        print_table(&recommendation, &data.headers, &data.rows, cli)?;
+        return Ok(());
+    }
+
+    let opts = build_render_options(cli, &y_opts);
+    oneshot::render_oneshot(&recommendation, &data.headers, &data.rows, &opts)?;
 
     Ok(())
+}
+
+/// Construct render options from CLI args and parsed Y-column config.
+fn build_render_options<'a>(cli: &'a Cli, y_opts: &'a YOptions) -> oneshot::RenderOptions<'a> {
+    oneshot::RenderOptions {
+        chart_type_override: cli.chart_type.as_deref(),
+        y_label_override: y_opts.label_override.as_deref(),
+        width: cli.width,
+        height: cli.height,
+        sort_order: effective_sort(cli),
+        extra_y_columns: y_opts.extra_columns.clone(),
+        limit: cli.top.or(cli.tail),
+        agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
+        title: cli.title.clone(),
+        labels: cli.labels,
+    }
 }
 
 fn resolve_input_file(cli: &Cli) -> Result<PathBuf> {

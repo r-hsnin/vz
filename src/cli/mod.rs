@@ -72,9 +72,13 @@ pub struct Cli {
     #[arg(long = "title")]
     pub title: Option<String>,
 
-    /// Output format: text (default) or json (machine-readable).
+    /// Output format: text (default), json (machine-readable), or table.
     #[arg(short = 'o', long = "output", value_enum)]
     pub output: Option<OutputFormat>,
+
+    /// Shorthand for --output json (machine-readable JSON output).
+    #[arg(long = "json", conflicts_with = "output")]
+    pub json: bool,
 
     /// Sample at most N rows from the data (systematic sampling for large datasets).
     #[arg(long = "sample", value_name = "N")]
@@ -154,6 +158,8 @@ pub enum OutputFormat {
     Text,
     /// Machine-readable JSON for agent integration.
     Json,
+    /// Formatted text table of aggregated data.
+    Table,
 }
 
 /// Parse a column spec that may include a label override.
