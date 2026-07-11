@@ -1,14 +1,12 @@
 # デモ
 
-同梱のサンプルデータで実際に動かした出力です。
+同梱のサンプルデータで実際に動かした出力。
 
 ## 折れ線グラフ — 時系列 × マルチシリーズ
 
 ```bash
 $ vz sales.csv
 ```
-
-日付列、数値列、カテゴリ列を自動検出して、色分けされた折れ線を描く:
 
 ```
 Line │ x=date │ y=revenue (800–2.0k) ▂▅▃▁█▇ │ ↑ +80% │ color=city │ 6 rows
@@ -35,8 +33,6 @@ Line │ x=date │ y=revenue (800–2.0k) ▂▅▃▁█▇ │ ↑ +80% │ c
 $ vz sales.csv -x city -y revenue -t bar
 ```
 
-都市ごとに売上を合算して、大きい順にバーを並べる:
-
 ```
 Bar │ x=city │ y=revenue (800–4.2k) │ 6 rows
      revenue by city───────────────────────────────────────────────┐
@@ -50,7 +46,7 @@ Bar │ x=city │ y=revenue (800–4.2k) │ 6 rows
      ──────────────────────────────────────────────────────────────┘
 ```
 
-## スパークライン — 1行で傾向を把握
+## スパークライン
 
 ```bash
 $ vz sales.csv --spark
@@ -60,13 +56,14 @@ $ vz stock.csv --spark
 ▁▂▂▃▄▇▇█
 ```
 
-シェルスクリプトに組み込むとこんな使い方も:
+シェルスクリプトに埋め込める。
+
 ```bash
 $ echo "売上: $(vz sales.csv --spark)  株価: $(vz stock.csv --spark)"
 売上: ▂▅▃▁█▇  株価: ▁▂▂▃▄▇▇█
 ```
 
-## カラム情報 — データの素性を確認
+## カラム情報
 
 ```bash
 $ vz sales.csv --info
@@ -87,7 +84,7 @@ profit               Quantitative         0  Min=150  Max=500  Mean=313.33
 Recommendation: Line (x=date, y=revenue, color=city)
 ```
 
-## フィルタリング — 必要な行だけ抽出
+## フィルタリング
 
 ```bash
 $ vz sales.csv --where "city=Tokyo" -o table

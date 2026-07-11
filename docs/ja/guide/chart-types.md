@@ -1,24 +1,24 @@
 # チャート種別
 
-vz はデータの列型を見て、最適なチャートを自動で選びます。
+列の型の組み合わせで、描画するチャートが決まる。
 
-## 自動選択のルール
+## 自動選択ルール
 
-| X 列 | Y 列 | 選ばれるチャート | 典型的なデータ |
-|------|------|-----------------|---------------|
+| X 列 | Y 列 | チャート | 典型的なデータ |
+|------|------|----------|---------------|
 | 日付 | 数値 | 📈 折れ線 | 月別売上、株価推移 |
-| カテゴリ | 数値 | 📊 棒 | 都市別比較、部門ごとの集計 |
+| カテゴリ | 数値 | 📊 棒 | 都市別比較、部門集計 |
 | 数値 | 数値 | 🔵 散布図 | 身長と体重、価格と面積 |
 | — | 数値のみ | 📶 ヒストグラム | 試験スコアの分布 |
 | カテゴリ | カテゴリ | 🟦 ヒートマップ | 部門×職級の人数 |
 
 ## 折れ線グラフ
 
-時間の流れに沿ったデータ。X が日付、Y が数値なら自動的にこれが選ばれます。
+X が日付、Y が数値のとき自動で選ばれる。
 
 ```bash
 vz stock.csv
-# → date × price の折れ線を自動描画
+# → date × price の折れ線
 ```
 
 - Braille 文字で高解像度に描画
@@ -27,7 +27,7 @@ vz stock.csv
 
 ## 棒グラフ
 
-カテゴリごとの比較。X がカテゴリ、Y が数値のときに選ばれます。
+X がカテゴリ、Y が数値のとき。
 
 ```bash
 vz sales.csv -x city -y revenue -t bar
@@ -35,21 +35,20 @@ vz sales.csv -x city -y revenue -t bar
 
 - 同じカテゴリの値は自動で合算（デフォルト: sum）
 - `--sort desc` で降順ソート
-- `--top 5` で上位5件だけ表示
-- バーの中に集計値が入る
+- バーの中に集計値を表示
 
 ## 散布図
 
-2 つの数値列の関係を見る。両方が数値なら自動選択。
+X と Y の両方が数値のとき。
 
 ```bash
 vz body_measurements.csv
-# → height_cm × weight_kg の散布図
+# → height_cm × weight_kg
 ```
 
 ## ヒストグラム
 
-数値1列だけの場合、分布を見るためにヒストグラムが選ばれます。
+数値列が1つだけの場合。
 
 ```bash
 vz exam_scores.csv
@@ -64,14 +63,14 @@ vz exam_scores.csv
 vz departments.csv -x department -y level
 ```
 
-## 手動で指定する
+## 手動指定
 
-自動選択を上書きしたいときは `-t`:
+`-t` で自動選択を上書きできる。
 
 ```bash
-vz data.csv -t line       # 折れ線を強制
-vz data.csv -t bar        # 棒グラフを強制
-vz data.csv -t scatter    # 散布図を強制
-vz data.csv -t histogram  # ヒストグラムを強制
-vz data.csv -t heatmap    # ヒートマップを強制
+vz data.csv -t line
+vz data.csv -t bar
+vz data.csv -t scatter
+vz data.csv -t histogram
+vz data.csv -t heatmap
 ```
