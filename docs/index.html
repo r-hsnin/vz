@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vz — Zero-Config Terminal Data Visualization</title>
+  <meta name="description" content="CLI BI tool that auto-visualizes CSV, JSON, and TSV data in the terminal. Zero config, instant charts.">
+  <meta name="theme-color" content="#0d1117">
+  <meta property="og:title" content="vz — Zero-Config Terminal Data Visualization">
+  <meta property="og:description" content="CLI BI tool that auto-visualizes CSV, JSON, and TSV data in the terminal. Zero config, instant charts.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://r-hsnin.github.io/vz/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="vz — Zero-Config Terminal Data Visualization">
+  <meta name="twitter:description" content="Just `vz data.csv` and you get instant charts in your terminal. Supports CSV, TSV, JSON, NDJSON.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-terminal: #1a1e24;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-2: #7ee787;
+      --accent-3: #ffa657;
+      --border: #30363d;
+      --cyan: #79c0ff;
+      --yellow: #e3b341;
+      --green: #7ee787;
+      --magenta: #d2a8ff;
+      --red: #ff7b72;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      padding: 0.75rem 1.5rem;
+    }
+
+    nav .nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    nav .logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    nav .logo span {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    nav ul {
+      display: flex;
+      list-style: none;
+      gap: 1.5rem;
+    }
+
+    nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+
+    nav a:hover {
+      color: var(--text);
+    }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 6rem 1.5rem 4rem;
+      position: relative;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(88, 166, 255, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero .subtitle {
+      font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+      color: var(--text-muted);
+      max-width: 600px;
+      margin-bottom: 2.5rem;
+    }
+
+    .hero .cta-group {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      background: #79b8ff;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Terminal */
+    .terminal {
+      background: var(--bg-terminal);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      max-width: 820px;
+      width: 100%;
+      margin: 2.5rem auto 0;
+      text-align: left;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+    }
+
+    .terminal-header {
+      background: var(--bg-secondary);
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .terminal-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .terminal-dot.red { background: #ff5f57; }
+    .terminal-dot.yellow { background: #febc2e; }
+    .terminal-dot.green { background: #28c840; }
+
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .terminal-body {
+      padding: 1.25rem;
+      font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, monospace;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .terminal-body .prompt {
+      color: var(--accent-2);
+    }
+
+    .terminal-body .cmd {
+      color: var(--text);
+    }
+
+    .terminal-body .muted {
+      color: var(--text-muted);
+    }
+
+    .terminal-body .cyan { color: var(--cyan); }
+    .terminal-body .yellow { color: var(--yellow); }
+    .terminal-body .green { color: var(--green); }
+    .terminal-body .magenta { color: var(--magenta); }
+    .terminal-body .accent { color: var(--accent); }
+    .terminal-body .red { color: var(--red); }
+
+    /* Sections */
+    section {
+      padding: 5rem 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    section h2 {
+      font-size: clamp(1.8rem, 4vw, 2.5rem);
+      font-weight: 700;
+      margin-bottom: 1rem;
+      letter-spacing: -0.01em;
+    }
+
+    section .section-subtitle {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      max-width: 600px;
+      margin-bottom: 3rem;
+    }
+
+    /* Features Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .feature-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .feature-card .icon {
+      font-size: 1.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    /* Demo Section */
+    .demo-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .demo-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .demo-item h3 {
+      font-size: 1rem;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .demo-item .terminal {
+      margin: 0;
+    }
+
+    /* Install */
+    .install-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .install-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .install-card h3 {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+    }
+
+    .install-card code {
+      display: block;
+      background: var(--bg-terminal);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--text);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Architecture */
+    .arch-diagram {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--text-muted);
+    }
+
+    .arch-diagram .highlight {
+      color: var(--accent);
+    }
+
+    .arch-diagram .accent-2 {
+      color: var(--accent-2);
+    }
+
+    /* Chart Type Table */
+    .chart-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    .chart-table th,
+    .chart-table td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chart-table th {
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .chart-table td:last-child {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 3rem 1.5rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      nav ul {
+        gap: 1rem;
+      }
+
+      .hero {
+        padding-top: 5rem;
+      }
+
+      section {
+        padding: 3rem 1rem;
+      }
+
+      .terminal-body {
+        font-size: 0.7rem;
+        padding: 1rem;
+      }
+    }
+
+    /* Scroll animation */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Badge */
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent);
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+
+    /* Typing animation for hero */
+    .typing-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: var(--accent-2);
+      animation: blink 1s step-end infinite;
+      vertical-align: text-bottom;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="#" class="logo">📊 <span>vz</span></a>
+      <ul>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#demo">Demo</a></li>
+        <li><a href="#install">Install</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="https://github.com/r-hsnin/vz">GitHub</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>vz</h1>
+    <p class="subtitle">
+      Zero-config terminal data visualization. Just <code style="background:var(--bg-secondary);padding:0.2em 0.5em;border-radius:4px;font-size:0.9em;">vz data.csv</code> and you're done.
+    </p>
+    <div class="cta-group">
+      <a href="#install" class="btn btn-primary">Get Started</a>
+      <a href="https://github.com/r-hsnin/vz" class="btn btn-secondary">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </div>
+
+    <!-- Hero Terminal Demo -->
+    <div class="terminal">
+      <div class="terminal-header">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <div class="terminal-title">Terminal — vz</div>
+      </div>
+      <div class="terminal-body"><span class="prompt">$</span> <span class="cmd">vz sales.csv</span>
+<span class="muted">Line │ x=date │ y=revenue (800–2.0k) ▂▅▃▁█▇ │ ↑ +80% │ color=city [</span><span class="cyan">Tokyo</span><span class="muted">=cyan, </span><span class="yellow">Osaka</span><span class="muted">=yellow, </span><span class="green">Nagoya</span><span class="muted">=green] │ 6 rows</span>
+┌revenue vs date───────────────────────────────────────────────────────────────┐
+│2.0k     │revenue                                             <span class="cyan">⡠⠔⠁</span>     ┌──────┐│
+│         │                                                 <span class="cyan">⢀⠔⠊</span>        │<span class="cyan">Tokyo </span>││
+│         │                                               <span class="cyan">⡠⠒⠁</span>          │<span class="yellow">Osaka⣀</span>││
+│         │                                            <span class="cyan">⢀⠔⠉</span>    <span class="yellow">⢀⣀⣀⣀⠤⠤⠤⠤⠒</span>│<span class="green">Nagoya</span>││
+│         │                                     <span class="yellow">⣀⣀⣀⣀⠤⠤⠤⠔⠒⠒⠒⠉⠉⠉⠁</span>        └──────┘│
+│         │                       <span class="yellow">⣀⣀⣀⡠⠤⠤⠤⠒⠒⠒⠊⠉⠉⠉</span>  <span class="cyan">⣀⠔⠁</span>                          │
+│         │             <span class="yellow">⠠⠤⠔⠒⠒⠒⠉⠉⠉⠉</span>             <span class="cyan">⢀⠤⠊</span>                             │
+│1.5k     │                                  <span class="cyan">⡠⠔⠁</span>                               │
+│         │                               <span class="cyan">⢀⠔⠊</span>                                  │
+│         │                             <span class="cyan">⡠⠒⠁</span>                                    │
+│         │                       <span class="cyan">⢀⣀⣀⠤⠔⠉</span>                                       │
+│         │              <span class="cyan">⣀⣀⠤⠤⠔⠒⠒⠉⠉⠁</span>                                            │
+│         │    <span class="cyan">⣀⣀⡠⠤⠤⠒⠒⠊⠉⠉</span>                                                      │
+│1.0k     │<span class="cyan">⠒⠊⠉⠉</span>                                                                │
+│         │                                                                    │
+│         │                                        <span class="green">•</span>                           │
+│         │                                                                    │
+│500      │                                                                date│
+│         └────────────────────────────────────────────────────────────────────│
+│2024-01-01            2024-02-01 2024-03-01 2024-04-01 2024-05-01   2024-06-01│
+└──────────────────────────────────────────────────────────────────────────────┘</div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="fade-in">
+    <h2>Why vz?</h2>
+    <p class="section-subtitle">
+      Data visualization shouldn't require configuration files, GUIs, or a PhD in charting libraries.
+    </p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="icon">🧠</div>
+        <h3>Smart Auto-Detection</h3>
+        <p>Infers column types (temporal, quantitative, categorical) and automatically selects the best chart type. No flags needed.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">⚡</div>
+        <h3>Zero Config</h3>
+        <p>Works out of the box with CSV, TSV, JSON, and NDJSON. Format auto-detected from extension or content.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📊</div>
+        <h3>Multi-Series &amp; Color</h3>
+        <p>Auto-groups data by category with color legends. Supports multi-Y overlay and color grouping with <code>-c</code>.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🔍</div>
+        <h3>Explore Mode</h3>
+        <p>Interactive TUI with vim-style navigation. Switch axes, chart types, and toggle between chart and data table views.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🎬</div>
+        <h3>Present Mode</h3>
+        <p>Build terminal presentations with embedded live charts from Markdown files. Perfect for data-driven talks.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📈</div>
+        <h3>Rich Summary</h3>
+        <p>Every chart includes a smart summary line with sparkline, trend direction, range, and suggestions for additional columns.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Demo -->
+  <section id="demo" class="fade-in">
+    <h2>See It In Action</h2>
+    <p class="section-subtitle">
+      One command, many possibilities. vz adapts to your data automatically.
+    </p>
+    <div class="demo-grid">
+
+      <!-- Bar Chart -->
+      <div class="demo-item">
+        <h3>📊 Bar Chart — Categorical × Quantitative</h3>
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <div class="terminal-title">vz sales.csv -x city -y revenue -t bar --sort desc</div>
+          </div>
+          <div class="terminal-body"><span class="prompt">$</span> <span class="cmd">vz sales.csv -x city -y revenue -t bar --sort desc</span>
+<span class="muted">Bar │ x=city │ y=revenue (800–4.2k) │ 6 rows</span>
+     revenue by city───────────────────────────────────────────────┐
+<span class="muted">4.0k│</span><span class="cyan">████████████████████</span> <span class="yellow">                    </span> <span class="green">                    </span>    │
+<span class="muted">    │</span><span class="cyan">████████████████████</span> <span class="yellow">                    </span> <span class="green">                    </span>    │
+<span class="muted">    │</span><span class="cyan">████████████████████</span> <span class="yellow">▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅</span> <span class="green">                    </span>    │
+<span class="muted">3.0k│</span><span class="cyan">████████████████████</span> <span class="yellow">████████████████████</span> <span class="green">                    </span>    │
+<span class="muted">2.0k│</span><span class="cyan">████████████████████</span> <span class="yellow">████████████████████</span> <span class="green">                    </span>    │
+<span class="muted">1.0k│</span><span class="cyan">████████████████████</span> <span class="yellow">████████████████████</span> <span class="green">████████████████████</span>    │
+<span class="muted">   0│</span><span class="cyan">████████4.2k████████</span> <span class="yellow">████████3.3k████████</span> <span class="green">████████800█████████</span>    │
+            Tokyo                Osaka                Nagoya               │
+     ──────────────────────────────────────────────────────────────────────┘</div>
+        </div>
+      </div>
+
+      <!-- Sparkline -->
+      <div class="demo-item">
+        <h3>✨ Sparkline Mode — Pipeline-Friendly</h3>
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <div class="terminal-title">Pipeline integration</div>
+          </div>
+          <div class="terminal-body"><span class="prompt">$</span> <span class="cmd">vz sales.csv --spark</span>
+▂▅▃▁█▇
+
+<span class="prompt">$</span> <span class="cmd">vz stock.csv --spark</span>
+▁▂▂▃▄▇▇█
+
+<span class="prompt">$</span> <span class="cmd">cat data.json | vz - --spark</span>
+█▅▃</div>
+        </div>
+      </div>
+
+      <!-- Info -->
+      <div class="demo-item">
+        <h3>ℹ️ Column Metadata — Understand Your Data</h3>
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <div class="terminal-title">vz sales.csv --info</div>
+          </div>
+          <div class="terminal-body"><span class="prompt">$</span> <span class="cmd">vz sales.csv --info</span>
+File: sales.csv
+Rows: 6
+Columns: 4
+
+Name                 Type             Nulls  Stats
+----------------------------------------------------------------------
+date                 <span class="magenta">Temporal</span>             0  2024-01-01..2024-06-01
+city                 <span class="green">Categorical</span>          0  3 unique
+revenue              <span class="cyan">Quantitative</span>         0  Min=800  Max=2000  Mean=1383.33
+profit               <span class="cyan">Quantitative</span>         0  Min=150  Max=500  Mean=313.33
+
+Recommendation: Line (x=date, y=revenue, color=city)</div>
+        </div>
+      </div>
+
+      <!-- Filtering -->
+      <div class="demo-item">
+        <h3>🔎 Row Filtering — Slice Your Data</h3>
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <div class="terminal-title">Filtering & table output</div>
+          </div>
+          <div class="terminal-body"><span class="prompt">$</span> <span class="cmd">vz sales.csv --where "city=Tokyo" -o table</span>
+date        revenue
+----------  -------
+2024-01-01     1000
+2024-03-01     1200
+2024-05-01     2000
+
+<span class="prompt">$</span> <span class="cmd">vz sales.csv --where "revenue&gt;1500" -o table</span>
+date        revenue
+----------  -------
+2024-05-01     2000
+2024-06-01     1800</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Chart Selection -->
+  <section id="chart-selection" class="fade-in">
+    <h2>Intelligent Chart Selection</h2>
+    <p class="section-subtitle">
+      vz picks the right chart based on your data types. Override anytime with <code>-t</code>.
+    </p>
+    <table class="chart-table">
+      <thead>
+        <tr>
+          <th>X Column Type</th>
+          <th>Y Column Type</th>
+          <th>Selected Chart</th>
+          <th>Example</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Temporal</td>
+          <td>Quantitative</td>
+          <td>📈 Line</td>
+          <td><code>date × revenue</code></td>
+        </tr>
+        <tr>
+          <td>Categorical</td>
+          <td>Quantitative</td>
+          <td>📊 Bar</td>
+          <td><code>city × sales</code></td>
+        </tr>
+        <tr>
+          <td>Quantitative</td>
+          <td>Quantitative</td>
+          <td>🔵 Scatter</td>
+          <td><code>height × weight</code></td>
+        </tr>
+        <tr>
+          <td>— (single col)</td>
+          <td>Quantitative</td>
+          <td>📶 Histogram</td>
+          <td><code>exam scores</code></td>
+        </tr>
+        <tr>
+          <td>Categorical</td>
+          <td>Categorical</td>
+          <td>🟦 Heatmap</td>
+          <td><code>dept × skill_level</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Install -->
+  <section id="install" class="fade-in">
+    <h2>Installation</h2>
+    <p class="section-subtitle">
+      Requires Rust 1.70+. Install with Cargo in seconds.
+    </p>
+    <div class="install-options">
+      <div class="install-card">
+        <h3>From Source (recommended)</h3>
+        <code>cargo install --git https://github.com/r-hsnin/vz</code>
+      </div>
+      <div class="install-card">
+        <h3>Clone &amp; Build</h3>
+        <code>git clone https://github.com/r-hsnin/vz<br>cd vz &amp;&amp; cargo install --path .</code>
+      </div>
+      <div class="install-card">
+        <h3>Verify Installation</h3>
+        <code>vz --version
+# vz 0.1.0</code>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section id="architecture" class="fade-in">
+    <h2>Architecture</h2>
+    <p class="section-subtitle">
+      Clean, modular Rust codebase. Each layer has a single responsibility.
+    </p>
+    <div class="arch-diagram"><span class="highlight">┌─────────────────────────────────────────────────────┐</span>
+<span class="highlight">│</span>                    <span class="accent-2">CLI (clap 4)</span>                      <span class="highlight">│</span>
+<span class="highlight">│</span>   vz &lt;file&gt;  |  vz explore &lt;file&gt;  |  vz present   <span class="highlight">│</span>
+<span class="highlight">└────────────────────────┬────────────────────────────┘</span>
+                         │
+<span class="highlight">┌────────────────────────▼────────────────────────────┐</span>
+<span class="highlight">│</span>          <span class="accent-2">Data Loader</span> (CSV/TSV/JSON/NDJSON)          <span class="highlight">│</span>
+<span class="highlight">└────────────────────────┬────────────────────────────┘</span>
+                         │
+<span class="highlight">┌────────────────────────▼────────────────────────────┐</span>
+<span class="highlight">│</span>        <span class="accent-2">Type Inference Engine</span> (auto-detect types)    <span class="highlight">│</span>
+<span class="highlight">└────────────────────────┬────────────────────────────┘</span>
+                         │
+<span class="highlight">┌────────────────────────▼────────────────────────────┐</span>
+<span class="highlight">│</span>     <span class="accent-2">Chart Selector</span> + <span class="accent-2">Data Builder</span> (shared logic)    <span class="highlight">│</span>
+<span class="highlight">└────────────────────────┬────────────────────────────┘</span>
+                         │
+          ┌──────────────┼──────────────┐
+          ▼              ▼              ▼
+<span class="highlight">┌──────────────┐</span> <span class="highlight">┌──────────────┐</span> <span class="highlight">┌──────────────┐</span>
+<span class="highlight">│</span>  <span class="cyan">One-shot</span>    <span class="highlight">│</span> <span class="highlight">│</span>   <span class="yellow">Explore</span>    <span class="highlight">│</span> <span class="highlight">│</span>   <span class="green">Present</span>    <span class="highlight">│</span>
+<span class="highlight">│</span>  (stdout)    <span class="highlight">│</span> <span class="highlight">│</span>   (TUI)      <span class="highlight">│</span> <span class="highlight">│</span>  (Slides)    <span class="highlight">│</span>
+<span class="highlight">└──────────────┘</span> <span class="highlight">└──────────────┘</span> <span class="highlight">└──────────────┘</span></div>
+  </section>
+
+  <!-- Usage -->
+  <section id="usage" class="fade-in">
+    <h2>Quick Reference</h2>
+    <p class="section-subtitle">
+      Common commands to get you started.
+    </p>
+    <div class="terminal" style="max-width:700px">
+      <div class="terminal-header">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <div class="terminal-title">Usage Examples</div>
+      </div>
+      <div class="terminal-body"><span class="muted"># Auto-visualize — detects chart type automatically</span>
+<span class="prompt">$</span> <span class="cmd">vz data.csv</span>
+
+<span class="muted"># Specify axes</span>
+<span class="prompt">$</span> <span class="cmd">vz sales.csv -x month -y revenue</span>
+
+<span class="muted"># Multi-series with color grouping</span>
+<span class="prompt">$</span> <span class="cmd">vz sales.csv -y revenue -c city</span>
+
+<span class="muted"># Multiple Y columns overlaid</span>
+<span class="prompt">$</span> <span class="cmd">vz sales.csv -y revenue,profit</span>
+
+<span class="muted"># Pipe from stdin</span>
+<span class="prompt">$</span> <span class="cmd">cat data.json | vz</span>
+
+<span class="muted"># Interactive exploration</span>
+<span class="prompt">$</span> <span class="cmd">vz explore data.csv</span>
+
+<span class="muted"># Slide presentation</span>
+<span class="prompt">$</span> <span class="cmd">vz present slides.md</span>
+
+<span class="muted"># Filter + table output</span>
+<span class="prompt">$</span> <span class="cmd">vz data.csv --where "sales&gt;100" -o table</span>
+
+<span class="muted"># Shell completion</span>
+<span class="prompt">$</span> <span class="cmd">vz completions bash &gt;&gt; ~/.bashrc</span></div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>
+      <strong>vz</strong> is open source under the MIT license.
+      Built with <a href="https://ratatui.rs">ratatui</a> 🦀
+    </p>
+    <p style="margin-top:0.5rem">
+      <a href="https://github.com/r-hsnin/vz">Source</a> ·
+      <a href="https://github.com/r-hsnin/vz/issues">Issues</a> ·
+      <a href="https://github.com/r-hsnin/vz/blob/main/README.md">Docs</a>
+    </p>
+  </footer>
+
+  <!-- Scroll reveal animation -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+            }
+          });
+        },
+        { threshold: 0.1 }
+      );
+      document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+    });
+  </script>
+</body>
+</html>

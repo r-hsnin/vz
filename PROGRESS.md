@@ -2198,3 +2198,23 @@ Tokyo   ▁▂█
 **テスト数推移:** 440 → 454 (このセッションで +14)
 **通算:** 124 実装サイクル完了、454 テスト
 **コミット:** `769998e` on main
+
+---
+
+## Cycle 125 — 2026-07-11T21:38
+- 種別: 機能追加 (GitHub Pages OSS紹介サイト)
+- ユーザーストーリー: OSS利用者として、vzの概要・デモ・インストール方法・アーキテクチャを一目で理解できるWebページが欲しい。
+- スコア: RICE = (10×8×9)/3 = 240
+- 改善: `docs/index.html` を作成。GitHub Pages用の完全なOSS紹介ページ:
+  - ダークテーマ、ターミナル風デザイン
+  - Hero: タイトル + CTA + 実際のvz出力をカラー再現したターミナルデモ
+  - Features: 6カードグリッド (Smart Auto-Detection, Zero Config, Multi-Series, Explore, Present, Rich Summary)
+  - Demo: 4セクション (Bar Chart, Sparkline, Info Metadata, Row Filtering) — 実際の出力を忠実に再現
+  - Chart Selection: 型→チャート対応表
+  - Install: 3カード (From Source, Clone & Build, Verify)
+  - Architecture: ASCII図 (カラー)
+  - Quick Reference: コマンド例集
+  - Footer: MIT/ratatui/links
+  - OGP meta tags, aria-label, scroll animation, responsive design
+- 影響: docs/index.html (新規、890行)
+- 検証: agent-browser で全セクション視覚確認済み。レスポンシブ、カラー、レイアウト全て正常。
