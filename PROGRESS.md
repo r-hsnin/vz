@@ -2166,3 +2166,35 @@ Tokyo   ▁▂█
 - 影響: src/main.rs, src/table.rs (新規)
 - テスト: 既存の integration tests が網羅 (変更なしで全パス)
 - 検証: PASS (454 tests: 346 unit + 104 integration + 4 snapshot)
+
+---
+
+## STOP — 2026-07-11T21:45 (Session 15 — Code Quality & Refactoring Focus)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 454 tests (346 unit + 104 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 5 サイクル記録 (Cycles 120-124)
+4. ✅ 評価エージェントが「改善すべき点なし」と判定 → STOP
+
+**Session 15 全体 (Cycles 120-124):**
+
+| Cycle | RICE | 種別 | 内容 |
+|-------|------|------|------|
+| 120 | 270 | テスト | `adjust_bar_recommendation` 5ケースのユニットテスト |
+| 121 | 135 | リファクタ | sparkline DRY → `src/sparkline.rs` に共有化 |
+| 122 | 85 | リファクタ | `dispatch_output` 抽出 (run_oneshot 57→43行) |
+| 123 | 320+315+80 | 品質 | エラーメッセージ改善3件 + regex expect化 |
+| 124 | 120 | リファクタ | テーブル出力 → `src/table.rs` 抽出 (main.rs 855→740行) |
+
+**品質指標:**
+- 関数: 50行超は3つ (max 57行、dispatch/match系で分割非推奨)
+- ファイル: 本番コード800行超なし (main.rs=740行)
+- 重複: なし (sparkline統合済み)
+- unwrap: 2箇所のみ (全てガード済み)
+- テストカバレッジ: 全ユーザー向け機能を網羅
+
+**テスト数推移:** 440 → 454 (このセッションで +14)
+**通算:** 124 実装サイクル完了、454 テスト
+**コミット:** `769998e` on main
