@@ -1,0 +1,33 @@
+[package]
+name = "vz"
+version = "0.1.0"
+edition = "2024"
+description = "CLI BI tool with smart visualization and terminal presentation"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# TUI
+ratatui = { version = "0.30", features = ["crossterm_0_28"] }
+crossterm = "0.28"
+
+# Data processing
+csv = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Type inference
+chrono = "0.4"
+regex = "1"
+
+# Error handling
+anyhow = "1"
+
+[dev-dependencies]
+insta = "1.48.0"
+pretty_assertions = "1"
+serde_json = "1"
+tempfile = "3"

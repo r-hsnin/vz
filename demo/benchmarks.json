@@ -1,0 +1,14 @@
+[
+  {"framework": "Actix", "language": "Rust", "rps": 425000, "latency_us": 45},
+  {"framework": "Hyper", "language": "Rust", "rps": 380000, "latency_us": 52},
+  {"framework": "Axum", "language": "Rust", "rps": 350000, "latency_us": 58},
+  {"framework": "Gin", "language": "Go", "rps": 290000, "latency_us": 72},
+  {"framework": "Fiber", "language": "Go", "rps": 310000, "latency_us": 65},
+  {"framework": "Fastify", "language": "Node.js", "rps": 85000, "latency_us": 180},
+  {"framework": "Express", "language": "Node.js", "rps": 42000, "latency_us": 350},
+  {"framework": "FastAPI", "language": "Python", "rps": 28000, "latency_us": 520},
+  {"framework": "Django", "language": "Python", "rps": 12000, "latency_us": 1200},
+  {"framework": "Spring", "language": "Java", "rps": 180000, "latency_us": 95},
+  {"framework": "Vert.x", "language": "Java", "rps": 250000, "latency_us": 78},
+  {"framework": "Phoenix", "language": "Elixir", "rps": 95000, "latency_us": 150}
+]
