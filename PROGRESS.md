@@ -1923,3 +1923,83 @@
 - Data table in explore (already exists): RICE=48 (false positive)
 - Sparklines: RICE=14
 - Horizontal bar: RICE=14
+
+---
+
+## Cycle 110 — 2026-07-11T19:58
+- 種別: 機能追加 (Delight)
+- ユーザーストーリー: CLIユーザーとして、サマリー行にスパークライン(▂▅▃▁█▇)が表示されることで、チャートを読む前にデータの形状を即座に把握したい。
+- スコア: RICE = (9×7×8)/2 = 252
+- 改善: サマリー行の y= 表示にUnicodeスパークライン追加。8段階ブロック文字(▁-█)で最大8点にサンプリング。Bar チャートでは非表示（カテゴリ別集約なので時系列形状は不適切）。
+- 影響: src/oneshot/summary.rs, tests/integration_test.rs
+- テスト追加: +1 integration (test_sparkline_in_summary_line) + 3 unit (sparkline_basic, single_value, constant)
+- 検証: PASS (425 tests: 330 unit + 91 integration + 4 snapshot)
+- 次の候補: trend annotation
+
+---
+
+## Cycle 111 — 2026-07-11T20:03
+- 種別: 機能追加 (Delight)
+- ユーザーストーリー: アナリストとして、サマリー行の `↑ +80%` トレンド表示で、チャートを読む前にデータの方向性を一目で把握したい。
+- スコア: RICE = (9×8×9)/1 = 648 → 正規化 150
+- 改善: `trend_annotation()` — first/last Y値の変化率を計算し、±5%以上で ↑/↓、以下で → stable を表示。Bar チャートでは非表示。
+- 影響: src/oneshot/summary.rs, tests/integration_test.rs
+- テスト追加: +1 integration (test_trend_annotation_in_summary) + 4 unit (uptrend, downtrend, stable, single_row)
+- 検証: PASS (430 tests: 334 unit + 92 integration + 4 snapshot)
+- 次の候補: contextual error messages
+
+---
+
+## Cycle 112 — 2026-07-11T20:10
+- 種別: 機能追加 (Delight)
+- ユーザーストーリー: ユーザーとして、ファイルが見つからない時に「Did you mean? • sales.csv」と表示されることで、タイポを即座に修正したい。
+- スコア: RICE = (8×6×9)/3 = 144
+- 改善: `error_hint()` + `find_similar_files()` — ファイル未発見時に同ディレクトリの類似データファイルを提案。空データ時は `--no-header` ヒント。拡張子でフィルタ（csv/tsv/json/ndjson）し、prefix一致度で候補を選択。
+- 影響: src/main.rs, tests/integration_test.rs
+- テスト追加: +2 integration (test_error_hint_did_you_mean, test_error_hint_stdin_tip)
+- 検証: PASS (432 tests: 334 unit + 94 integration + 4 snapshot)
+- 次の候補: print_table refactor
+
+---
+
+## Cycle 113 — 2026-07-11T20:16
+- 種別: リファクタ
+- ユーザーストーリー: 開発者として、`print_table` がテーブル出力のパターン別に分割されていることで、新フォーマット追加が容易になるようにしたい。
+- スコア: RICE = (3×2×9)/1 = 54 → 正規化 11
+- 改善: `print_table` (102 lines) → `print_table` (40 lines) + `print_two_col_values` (9 lines) + `print_xy_table` (11 lines) + `print_all_columns` (22 lines) + `col_width` (6 lines)。共通パターン `col_width` で DRY 化。
+- 影響: src/main.rs
+- テスト追加: なし（既存 integration test で振る舞い保持確認）
+- 検証: PASS (432 tests: 334 unit + 94 integration + 4 snapshot)
+- 次の候補: 再評価 or IndexMap
+
+---
+
+## STOP — 2026-07-11T20:20 (Session 13 — Delight & Elegance)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 432 tests (334 unit + 94 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 5 サイクル記録 (Cycles 110-114相当: 4実装 + 1評価)
+4. ✅ 評価エージェント: RICE > 100 の候補なし → STOP
+
+**このセッション (Cycles 110-113) のサマリー:**
+
+| Cycle | 種別 | 内容 | テスト増 |
+|-------|------|------|---------|
+| 110 | Delight | スパークライン `▂▅▃▁█▇` in summary | +4 |
+| 111 | Delight | トレンド表示 `↑ +80%` in summary | +5 |
+| 112 | Delight | 「Did you mean?」エラーヒント | +2 |
+| 113 | リファクタ | `print_table` 分割 (102→5関数) | +0 |
+
+**テスト数推移:** 421 → 432 (このセッションで +11)
+**通算:** 113 実装サイクル完了、432 テスト
+
+**Delight ハイライト:**
+サマリー行だけでデータの全貌が分かる:
+```
+Line │ x=date │ y=revenue (800–2.0k) ▂▅▃▁█▇ │ ↑ +80% │ color=city [Tokyo=cyan] │ 6 rows │ +1: profit
+```
+- ▂▅▃▁█▇ → データの形状が一目瞭然
+- ↑ +80% → トレンドの方向と大きさ
+- "Did you mean? • sales.csv" → タイポ時に即座にガイド

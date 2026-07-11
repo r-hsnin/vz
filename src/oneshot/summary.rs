@@ -64,6 +64,22 @@ pub fn build_summary_parts(
         } else {
             parts.push(format!("y={}", y_display));
         }
+        // Append sparkline to the y= part (skip for bar charts — bar order is by category)
+        if chart_type != ChartType::Bar
+            && let Some(y_idx) = headers.iter().position(|h| h == y)
+            && let Some(spark) = sparkline(rows, y_idx)
+            && let Some(last) = parts.last_mut()
+        {
+            last.push(' ');
+            last.push_str(&spark);
+        }
+        // Add trend annotation for line/scatter
+        if chart_type != ChartType::Bar
+            && let Some(y_idx) = headers.iter().position(|h| h == y)
+            && let Some(trend) = trend_annotation(rows, y_idx)
+        {
+            parts.push(trend);
+        }
     }
     if !extra_y_columns.is_empty() {
         let names: Vec<&str> = extra_y_columns
@@ -86,6 +102,65 @@ pub fn build_summary_parts(
         parts.push(hint);
     }
     parts
+}
+
+/// Compute trend annotation for line/scatter charts.
+/// Returns arrow + percentage change from first to last value.
+fn trend_annotation(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
+    let values: Vec<f64> = rows
+        .iter()
+        .filter_map(|r| r.get(y_idx)?.parse::<f64>().ok())
+        .collect();
+    if values.len() < 2 {
+        return None;
+    }
+    let first = values[0];
+    let last = *values.last().unwrap();
+    if first.abs() < f64::EPSILON {
+        return None;
+    }
+    let pct = ((last - first) / first) * 100.0;
+    if pct > 5.0 {
+        Some(format!("↑ {:+.0}%", pct))
+    } else if pct < -5.0 {
+        Some(format!("↓ {:+.0}%", pct))
+    } else {
+        Some("→ stable".to_string())
+    }
+}
+
+/// Generate a sparkline string from numeric values.
+/// Maps values to 8 Unicode block characters (▁▂▃▄▅▆▇█).
+/// Samples to at most 8 points for compact display.
+fn sparkline(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
+    let values: Vec<f64> = rows
+        .iter()
+        .filter_map(|r| r.get(y_idx)?.parse::<f64>().ok())
+        .collect();
+    if values.len() < 2 {
+        return None;
+    }
+    let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    if (max - min).abs() < f64::EPSILON {
+        return Some("▄".repeat(values.len().min(8)));
+    }
+    // Sample to at most 8 points
+    let sampled: Vec<f64> = if values.len() <= 8 {
+        values
+    } else {
+        let step = values.len() as f64 / 8.0;
+        (0..8).map(|i| values[(i as f64 * step) as usize]).collect()
+    };
+    let blocks = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    let spark: String = sampled
+        .iter()
+        .map(|&v| {
+            let idx = ((v - min) / (max - min) * 7.0).round() as usize;
+            blocks[idx.min(7)]
+        })
+        .collect();
+    Some(spark)
 }
 
 /// Format and print parts with optional ANSI coloring.
@@ -486,4 +561,88 @@ fn test_build_summary_parts_extra_y() {
         "Expected y+=profit: {:?}",
         parts
     );
+}
+
+#[test]
+fn test_sparkline_basic() {
+    let rows = vec![
+        vec!["a".to_string(), "1".to_string()],
+        vec!["b".to_string(), "5".to_string()],
+        vec!["c".to_string(), "3".to_string()],
+        vec!["d".to_string(), "10".to_string()],
+    ];
+    let spark = sparkline(&rows, 1).unwrap();
+    assert_eq!(spark.chars().count(), 4);
+    // First value (1) should be lowest block, last (10) should be highest
+    let chars: Vec<char> = spark.chars().collect();
+    assert_eq!(chars[0], '▁'); // min value
+    assert_eq!(chars[3], '█'); // max value
+}
+
+#[test]
+fn test_sparkline_single_value_returns_none() {
+    let rows = vec![vec!["a".to_string(), "5".to_string()]];
+    assert!(sparkline(&rows, 1).is_none());
+}
+
+#[test]
+fn test_sparkline_constant_values() {
+    let rows = vec![
+        vec!["a".to_string(), "5".to_string()],
+        vec!["b".to_string(), "5".to_string()],
+        vec!["c".to_string(), "5".to_string()],
+    ];
+    let spark = sparkline(&rows, 1).unwrap();
+    // All same value → all middle blocks
+    assert!(spark.chars().all(|c| c == '▄'));
+}
+
+#[test]
+fn test_trend_annotation_uptrend() {
+    let rows = vec![
+        vec!["a".to_string(), "100".to_string()],
+        vec!["b".to_string(), "200".to_string()],
+    ];
+    let trend = trend_annotation(&rows, 1).unwrap();
+    assert!(
+        trend.contains('↑'),
+        "Expected ↑ for uptrend, got: {}",
+        trend
+    );
+    assert!(trend.contains("+100%"), "Expected +100%, got: {}", trend);
+}
+
+#[test]
+fn test_trend_annotation_downtrend() {
+    let rows = vec![
+        vec!["a".to_string(), "100".to_string()],
+        vec!["b".to_string(), "50".to_string()],
+    ];
+    let trend = trend_annotation(&rows, 1).unwrap();
+    assert!(
+        trend.contains('↓'),
+        "Expected ↓ for downtrend, got: {}",
+        trend
+    );
+}
+
+#[test]
+fn test_trend_annotation_stable() {
+    let rows = vec![
+        vec!["a".to_string(), "100".to_string()],
+        vec!["b".to_string(), "103".to_string()],
+    ];
+    let trend = trend_annotation(&rows, 1).unwrap();
+    assert!(trend.contains('→'), "Expected → for stable, got: {}", trend);
+    assert!(
+        trend.contains("stable"),
+        "Expected 'stable', got: {}",
+        trend
+    );
+}
+
+#[test]
+fn test_trend_annotation_single_row_returns_none() {
+    let rows = vec![vec!["a".to_string(), "100".to_string()]];
+    assert!(trend_annotation(&rows, 1).is_none());
 }

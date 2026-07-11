@@ -2019,3 +2019,76 @@ fn test_json_flag_shorthand() {
         "--json and -o json should produce identical output"
     );
 }
+
+#[test]
+fn test_sparkline_in_summary_line() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Summary should contain Unicode block characters (sparkline)
+    let has_spark = stderr.chars().any(|c| "▁▂▃▄▅▆▇█".contains(c));
+    assert!(
+        has_spark,
+        "Expected sparkline characters in summary line, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_trend_annotation_in_summary() {
+    // sales.csv revenue goes from 1000 to 1800 (first to last row) → uptrend
+    let output = vz_binary()
+        .args(["fixtures/sales.csv"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Should contain an arrow indicator
+    let has_trend = stderr.contains('↑') || stderr.contains('↓') || stderr.contains('→');
+    assert!(
+        has_trend,
+        "Expected trend annotation (↑/↓/→) in summary, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_error_hint_did_you_mean() {
+    // Use a wrong filename that's close to an actual fixture
+    let output = vz_binary()
+        .args(["fixtures/sale.csv"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Did you mean?"),
+        "Expected 'Did you mean?' suggestion, got: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("sales.csv"),
+        "Expected 'sales.csv' suggestion, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_error_hint_stdin_tip() {
+    // Nonexistent file with no similar files around
+    let output = vz_binary()
+        .args(["zzz_no_match_xyz.csv"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Should show at least the stdin tip or nearby data files
+    assert!(
+        stderr.contains("Tip:") || stderr.contains("Did you mean?"),
+        "Expected hint in error output, got: {}",
+        stderr
+    );
+}
