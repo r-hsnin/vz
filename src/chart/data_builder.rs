@@ -99,6 +99,7 @@ pub fn aggregate_bar(
             labels,
             values,
             y_label,
+            show_labels: false,
         },
         rows_used,
     )

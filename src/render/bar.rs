@@ -37,7 +37,12 @@ impl<'a> Widget for BarChart<'a> {
 
         let bar_count = self.data.labels.len();
         let bar_width = compute_bar_width(chart_area.width, bar_count);
-        let bars = build_bars(&self.data.labels, &self.data.values, max_val);
+        let bars = build_bars(
+            &self.data.labels,
+            &self.data.values,
+            max_val,
+            self.data.show_labels,
+        );
         let group = BarGroup::default().bars(&bars);
 
         let chart = RatatuiBarChart::default()
@@ -65,11 +70,22 @@ fn compute_bar_width(chart_width: u16, bar_count: usize) -> u16 {
 }
 
 /// Build ratatui Bar widgets from labels and values, scaling floats to u64.
-fn build_bars<'a>(labels: &'a [String], values: &[f64], max_val: f64) -> Vec<Bar<'a>> {
+fn build_bars<'a>(
+    labels: &'a [String],
+    values: &[f64],
+    max_val: f64,
+    show_labels: bool,
+) -> Vec<Bar<'a>> {
     let scale_factor = if max_val > 0.0 {
         10000.0 / max_val
     } else {
         1.0
+    };
+
+    let total: f64 = if show_labels {
+        values.iter().sum()
+    } else {
+        0.0
     };
 
     labels
@@ -79,10 +95,16 @@ fn build_bars<'a>(labels: &'a [String], values: &[f64], max_val: f64) -> Vec<Bar
         .map(|(i, (label, &value))| {
             let color = SERIES_COLORS[i % SERIES_COLORS.len()];
             let scaled = (value * scale_factor).round() as u64;
+            let text = if show_labels && total > 0.0 {
+                let pct = (value / total * 100.0).round() as u32;
+                format!("{} ({}%)", format_number_pub(value), pct)
+            } else {
+                format_number_pub(value)
+            };
             Bar::default()
                 .label(Line::from(label.clone()))
                 .value(scaled)
-                .text_value(format_number_pub(value))
+                .text_value(text)
                 .style(Style::default().fg(color))
         })
         .collect()
@@ -103,6 +125,7 @@ mod tests {
             ],
             values: vec![300.0, 200.0, 150.0],
             y_label: "Revenue".to_string(),
+            show_labels: false,
         };
 
         let chart = BarChart::new(&data);
@@ -125,6 +148,7 @@ mod tests {
             labels: vec![],
             values: vec![],
             y_label: "Y".to_string(),
+            show_labels: false,
         };
 
         let chart = BarChart::new(&data);
@@ -141,6 +165,7 @@ mod tests {
             labels: vec!["Only".to_string()],
             values: vec![42.0],
             y_label: "Count".to_string(),
+            show_labels: false,
         };
 
         let chart = BarChart::new(&data);
@@ -156,6 +181,7 @@ mod tests {
             labels: vec!["A".to_string(), "B".to_string(), "C".to_string()],
             values: vec![0.75, 0.50, 0.25],
             y_label: "Rate".to_string(),
+            show_labels: false,
         };
 
         let chart = BarChart::new(&data);
@@ -184,6 +210,7 @@ mod tests {
             labels: vec!["Tokyo".to_string(), "Osaka".to_string()],
             values: vec![1500000.0, 750000.0],
             y_label: "Revenue".to_string(),
+            show_labels: false,
         };
 
         let chart = BarChart::new(&data);

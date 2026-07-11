@@ -35,6 +35,8 @@ pub struct RenderOptions<'a> {
     pub agg: AggFunction,
     /// Custom chart title (overrides auto-generated title).
     pub title: Option<String>,
+    /// Show value + percentage labels on bar chart bars.
+    pub labels: bool,
 }
 
 pub fn render_oneshot(
@@ -49,6 +51,14 @@ pub fn render_oneshot(
         .height
         .unwrap_or_else(|| adaptive_height(chart_type, recommendation, headers, rows));
 
+    // For bar charts, compute post-aggregation stats so the summary line
+    // shows the actual rendered values (e.g. sums), not the raw per-row values.
+    let agg_stats = if chart_type == ChartType::Bar {
+        compute_bar_agg_stats(recommendation, headers, rows, opts.agg)
+    } else {
+        None
+    };
+
     summary::print_summary(
         recommendation,
         chart_type,
@@ -56,6 +66,7 @@ pub fn render_oneshot(
         rows,
         &opts.extra_y_columns,
         opts.agg,
+        agg_stats,
     );
 
     if opts.sort_order.is_some()
@@ -90,6 +101,30 @@ pub fn render_oneshot(
     print_buffer(&buf, &mut io::stdout().lock())
 }
 
+/// Compute min/max of aggregated bar chart values (post-sum/mean/etc).
+fn compute_bar_agg_stats(
+    recommendation: &ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    agg: AggFunction,
+) -> Option<(f64, f64)> {
+    let x_idx = headers.iter().position(|h| h == &recommendation.x_column)?;
+    let y_col = recommendation.y_column.as_ref()?;
+    let y_idx = headers.iter().position(|h| h == y_col)?;
+    let y_label = y_col.clone();
+    let (data, _) = data_builder::aggregate_bar(rows, x_idx, y_idx, None, y_label, agg);
+    if data.values.is_empty() {
+        return None;
+    }
+    let min = data.values.iter().copied().fold(f64::INFINITY, f64::min);
+    let max = data
+        .values
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
+    Some((min, max))
+}
+
 /// Render the appropriate chart type into a buffer.
 fn render_chart_to_buffer(
     chart_type: ChartType,
@@ -104,7 +139,8 @@ fn render_chart_to_buffer(
 
     let chart_data = match chart_type {
         ChartType::Line | ChartType::Scatter => {
-            let mut config = build_line_scatter_config(recommendation, headers, rows, opts, area);
+            let mut config =
+                build_line_scatter_config(recommendation, headers, rows, opts, area, chart_type);
             if let Some(ref title) = opts.title {
                 config.title = Some(title.clone());
             }
@@ -129,9 +165,10 @@ fn render_chart_to_buffer(
             if let Some(ref title) = opts.title {
                 data.title = Some(title.clone());
             }
+            data.show_labels = opts.labels;
             sort_bar_data(&mut data, opts.sort_order);
             truncate_bar_data(&mut data, opts.limit);
-            warn_skipped_rows(rows.len(), rows_used, recommendation);
+            warn_skipped_rows(rows.len(), rows_used, recommendation, ChartType::Bar);
             ChartData::Bar(data)
         }
         ChartType::Histogram => {
@@ -140,7 +177,7 @@ fn render_chart_to_buffer(
                 data.title = Some(title.clone());
             }
             let rendered = data.values.len();
-            warn_skipped_rows(rows.len(), rendered, recommendation);
+            warn_skipped_rows(rows.len(), rendered, recommendation, ChartType::Histogram);
             ChartData::Histogram(data)
         }
     };
@@ -154,6 +191,7 @@ fn build_line_scatter_config(
     rows: &[Vec<String>],
     opts: &RenderOptions<'_>,
     area: Rect,
+    chart_type: ChartType,
 ) -> ChartConfig {
     let mut config = build_chart_config(recommendation, headers, rows);
     if let Some(label) = opts.y_label_override {
@@ -167,7 +205,7 @@ fn build_line_scatter_config(
         .map(|labels| fit_labels_to_width(&labels, area.width.saturating_sub(12) as usize));
     let rendered = config.series.iter().map(|s| s.data.len()).sum::<usize>();
     let effective_rows = rows.len().min(data_builder::MAX_CHART_POINTS);
-    warn_skipped_rows(effective_rows, rendered, recommendation);
+    warn_skipped_rows(effective_rows, rendered, recommendation, chart_type);
     config
 }
 
@@ -293,16 +331,27 @@ fn warn_skipped_rows(
     total_rows: usize,
     rendered_points: usize,
     recommendation: &ChartRecommendation,
+    chart_type: ChartType,
 ) {
     if rendered_points < total_rows {
         let skipped = total_rows - rendered_points;
-        let col_name = recommendation
-            .y_column
-            .as_deref()
-            .unwrap_or(&recommendation.x_column);
-        eprintln!(
-            "warning: {skipped}/{total_rows} rows skipped (non-parseable values in '{col_name}')"
-        );
+        // Bar charts skip rows with empty X (category) labels.
+        // Line/Scatter skip rows with non-parseable Y values.
+        let (col_name, reason) = if chart_type == ChartType::Bar {
+            (
+                recommendation.x_column.as_str(),
+                "empty/missing category label",
+            )
+        } else {
+            (
+                recommendation
+                    .y_column
+                    .as_deref()
+                    .unwrap_or(&recommendation.x_column),
+                "non-parseable values",
+            )
+        };
+        eprintln!("warning: {skipped}/{total_rows} rows skipped ({reason} in '{col_name}')");
     }
 }
 
@@ -830,6 +879,7 @@ mod tests {
             values: vec![10.0, 30.0, 20.0],
             y_label: String::new(),
             title: None,
+            show_labels: false,
         };
         sort_bar_data(&mut data, Some(SortOrder::Desc));
         assert_eq!(data.labels, vec!["B", "C", "A"]);
@@ -843,6 +893,7 @@ mod tests {
             values: vec![10.0, 30.0, 20.0],
             y_label: String::new(),
             title: None,
+            show_labels: false,
         };
         sort_bar_data(&mut data, Some(SortOrder::Asc));
         assert_eq!(data.labels, vec!["A", "C", "B"]);
@@ -856,6 +907,7 @@ mod tests {
             values: vec![10.0, 30.0, 20.0],
             y_label: String::new(),
             title: None,
+            show_labels: false,
         };
         sort_bar_data(&mut data, None);
         assert_eq!(data.labels, vec!["A", "B", "C"]);
@@ -869,6 +921,7 @@ mod tests {
             values: vec![f64::NAN, 30.0, 20.0],
             y_label: String::new(),
             title: None,
+            show_labels: false,
         };
         // Should not panic with NaN values
         sort_bar_data(&mut data, Some(SortOrder::Desc));
@@ -891,6 +944,7 @@ mod tests {
             labels: vec!["A".into(), "B".into(), "C".into()],
             values: vec![100.0, 50.0, 25.0],
             y_label: "val".into(),
+            show_labels: false,
         };
         truncate_bar_data(&mut data, Some(2));
         assert_eq!(data.labels, vec!["A", "B"]);
@@ -904,6 +958,7 @@ mod tests {
             labels: vec!["A".into(), "B".into(), "C".into()],
             values: vec![100.0, 50.0, 25.0],
             y_label: "val".into(),
+            show_labels: false,
         };
         truncate_bar_data(&mut data, None);
         assert_eq!(data.labels.len(), 3);
@@ -916,6 +971,7 @@ mod tests {
             labels: vec!["A".into(), "B".into()],
             values: vec![100.0, 50.0],
             y_label: "val".into(),
+            show_labels: false,
         };
         truncate_bar_data(&mut data, Some(10));
         assert_eq!(data.labels.len(), 2);

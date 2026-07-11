@@ -65,7 +65,6 @@ impl ExploreApp {
     }
 
     pub fn handle_key(&mut self, key: KeyCode) {
-        let max_idx = self.schema.columns.len().saturating_sub(1);
         match key {
             KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
             KeyCode::Char('d') | KeyCode::Tab => {
@@ -74,51 +73,59 @@ impl ExploreApp {
                     ViewMode::Table => ViewMode::Chart,
                 };
             }
-            KeyCode::Char('h') | KeyCode::Left => {
-                if self.selected_x > 0 {
-                    self.selected_x -= 1;
-                    if self.selected_x == self.selected_y && self.selected_x > 0 {
-                        self.selected_x -= 1;
-                    }
-                }
-            }
-            KeyCode::Char('l') | KeyCode::Right => {
-                if self.selected_x < max_idx {
-                    self.selected_x += 1;
-                    if self.selected_x == self.selected_y && self.selected_x < max_idx {
-                        self.selected_x += 1;
-                    }
-                }
-            }
-            KeyCode::Char('j') | KeyCode::Down => {
-                if self.view_mode == ViewMode::Table {
-                    if self.table_offset < self.data.len().saturating_sub(1) {
-                        self.table_offset += 1;
-                    }
-                } else if self.selected_y < max_idx {
-                    self.selected_y += 1;
-                    if self.selected_y == self.selected_x && self.selected_y < max_idx {
-                        self.selected_y += 1;
-                    }
-                }
-            }
-            KeyCode::Char('k') | KeyCode::Up => {
-                if self.view_mode == ViewMode::Table {
-                    self.table_offset = self.table_offset.saturating_sub(1);
-                } else if self.selected_y > 0 {
-                    self.selected_y -= 1;
-                    if self.selected_y == self.selected_x && self.selected_y > 0 {
-                        self.selected_y -= 1;
-                    }
-                }
-            }
+            KeyCode::Char('h') | KeyCode::Left => self.navigate_x(-1),
+            KeyCode::Char('l') | KeyCode::Right => self.navigate_x(1),
+            KeyCode::Char('j') | KeyCode::Down => self.navigate_y(1),
+            KeyCode::Char('k') | KeyCode::Up => self.navigate_y(-1),
             KeyCode::Char('1') => self.chart_type_override = Some(ChartType::Line),
             KeyCode::Char('2') => self.chart_type_override = Some(ChartType::Bar),
             KeyCode::Char('3') => self.chart_type_override = Some(ChartType::Scatter),
             KeyCode::Char('4') => self.chart_type_override = Some(ChartType::Histogram),
-            KeyCode::Char('0') => self.chart_type_override = None, // auto
+            KeyCode::Char('0') => self.chart_type_override = None,
             KeyCode::Char('c') => self.cycle_color_column(),
             _ => {}
+        }
+    }
+
+    /// Move X axis column selection, skipping the current Y column when possible.
+    fn navigate_x(&mut self, direction: isize) {
+        let max_idx = self.schema.columns.len().saturating_sub(1);
+        if direction > 0 && self.selected_x < max_idx {
+            self.selected_x += 1;
+            if self.selected_x == self.selected_y && self.selected_x < max_idx {
+                self.selected_x += 1;
+            }
+        } else if direction < 0 && self.selected_x > 0 {
+            self.selected_x -= 1;
+            if self.selected_x == self.selected_y && self.selected_x > 0 {
+                self.selected_x -= 1;
+            }
+        }
+    }
+
+    /// Move Y axis column selection or scroll table.
+    fn navigate_y(&mut self, direction: isize) {
+        if self.view_mode == ViewMode::Table {
+            if direction > 0 {
+                if self.table_offset < self.data.len().saturating_sub(1) {
+                    self.table_offset += 1;
+                }
+            } else {
+                self.table_offset = self.table_offset.saturating_sub(1);
+            }
+            return;
+        }
+        let max_idx = self.schema.columns.len().saturating_sub(1);
+        if direction > 0 && self.selected_y < max_idx {
+            self.selected_y += 1;
+            if self.selected_y == self.selected_x && self.selected_y < max_idx {
+                self.selected_y += 1;
+            }
+        } else if direction < 0 && self.selected_y > 0 {
+            self.selected_y -= 1;
+            if self.selected_y == self.selected_x && self.selected_y > 0 {
+                self.selected_y -= 1;
+            }
         }
     }
 

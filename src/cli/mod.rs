@@ -79,6 +79,14 @@ pub struct Cli {
     /// Sample at most N rows from the data (systematic sampling for large datasets).
     #[arg(long = "sample", value_name = "N")]
     pub sample: Option<usize>,
+
+    /// Plot all quantitative columns as multi-series (overlay all numeric Y columns).
+    #[arg(short = 'Y', long = "all-y")]
+    pub all_y: bool,
+
+    /// Show value labels with percentages on bar chart bars.
+    #[arg(long = "labels")]
+    pub labels: bool,
 }
 
 #[derive(Subcommand, Debug, PartialEq)]

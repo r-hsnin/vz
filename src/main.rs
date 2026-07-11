@@ -203,8 +203,26 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
         return Ok(());
     }
 
-    let y_opts = parse_y_options(cli);
+    let mut y_opts = parse_y_options(cli);
     let recommendation = build_recommendation(cli, &schema, &y_opts)?;
+
+    // --all-y: overlay all quantitative columns as multi-series
+    if cli.all_y {
+        let x_col = &recommendation.x_column;
+        let primary_y = recommendation.y_column.as_deref().unwrap_or("");
+        let extra: Vec<(String, Option<String>)> = schema
+            .columns
+            .iter()
+            .filter(|c| c.data_type == infer::types::DataType::Quantitative)
+            .filter(|c| c.name != *x_col && c.name != primary_y)
+            .filter(|c| {
+                // Skip if already in extra_y_columns
+                !y_opts.extra_columns.iter().any(|(n, _)| n == &c.name)
+            })
+            .map(|c| (c.name.clone(), None))
+            .collect();
+        y_opts.extra_columns.extend(extra);
+    }
 
     oneshot::render_oneshot(
         &recommendation,
@@ -220,6 +238,7 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
             limit: cli.top.or(cli.tail),
             agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
             title: cli.title.clone(),
+            labels: cli.labels,
         },
     )?;
 

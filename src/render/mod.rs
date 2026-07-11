@@ -103,6 +103,8 @@ pub struct BarChartData {
     pub labels: Vec<String>,
     pub values: Vec<f64>,
     pub y_label: String,
+    /// Show value + percentage labels on bars.
+    pub show_labels: bool,
 }
 
 /// Data for a histogram.

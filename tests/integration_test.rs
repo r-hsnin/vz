@@ -1882,3 +1882,88 @@ fn test_where_filter_shows_feedback() {
         stderr
     );
 }
+
+#[test]
+fn test_all_y_flag_overlays_all_numeric_columns() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-Y"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success(), "vz -Y should succeed");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // With --all-y, the summary should show multi-Y (e.g. "y=revenue,profit")
+    // and should NOT show "+1: profit" hint (since it's already plotted)
+    assert!(
+        !stderr.contains("+1:"),
+        "With -Y, no columns should be listed as unused. Got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_bar_summary_shows_aggregated_values() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-t", "bar"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Tokyo has revenue 1000+1200+2000=4200, which is >2000 (the raw max).
+    // Summary should show the aggregated max (4.2k), not raw max (2.0k).
+    assert!(
+        !stderr.contains("800\u{2013}2.0k"),
+        "Summary should NOT show raw range 800-2.0k for bar chart; got: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("4.2k"),
+        "Summary should show aggregated max 4.2k for bar chart; got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_bar_skip_warning_blames_x_column() {
+    // Create CSV with empty category (X) labels — bar chart should blame X, not Y
+    let mut file = NamedTempFile::new().unwrap();
+    writeln!(file, "city,revenue").unwrap();
+    writeln!(file, "Tokyo,1000").unwrap();
+    writeln!(file, ",500").unwrap(); // empty X label
+    writeln!(file, "Osaka,800").unwrap();
+    file.flush().unwrap();
+
+    let output = vz_binary()
+        .args([file.path().to_str().unwrap(), "-t", "bar"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if stderr.contains("rows skipped") {
+        assert!(
+            stderr.contains("'city'"),
+            "Bar chart skip warning should blame X column 'city', got: {}",
+            stderr
+        );
+        assert!(
+            !stderr.contains("'revenue'"),
+            "Bar chart skip warning should NOT blame Y column 'revenue', got: {}",
+            stderr
+        );
+    }
+}
+
+#[test]
+fn test_labels_flag_shows_percentage_on_bars() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-t", "bar", "--labels"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success(), "vz --labels should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // With --labels, bar values should show percentage (e.g., "51%" or similar)
+    assert!(
+        stdout.contains('%'),
+        "Expected percentage labels on bars with --labels flag, got stdout: {}",
+        &stdout[..stdout.len().min(500)]
+    );
+}

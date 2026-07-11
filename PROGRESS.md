@@ -1743,3 +1743,93 @@
 
 **テスト数推移:** 401 → 408 (このセッションで +7)
 **通算:** 99 サイクル完了、408 テスト
+
+---
+
+## Cycle 100 — 2026-07-11T19:10
+- 種別: 機能追加
+- ユーザーストーリー: アナリストとして、`vz data.csv -Y` と打つだけで全数値カラムをオーバーレイ比較し、個別にカラム名を指定する手間を省きたい。
+- スコア: RICE = (7×6×9)/2 = 189
+- 改善: `--all-y` / `-Y` フラグ追加。Schema から Quantitative カラムを自動収集し、X/主Y以外を全て `extra_y_columns` に追加。既存の multi-Y インフラを再利用。
+- 影響: src/cli/mod.rs, src/main.rs, tests/integration_test.rs
+- テスト追加: +1 integration (test_all_y_flag_overlays_all_numeric_columns)
+- 検証: PASS (409 tests: 320 unit + 85 integration + 4 snapshot)
+- 次の候補: bar chart summary stats mismatch
+
+---
+
+## Cycle 101 — 2026-07-11T19:15
+- 種別: バグ修正
+- ユーザーストーリー: アナリストとして、棒グラフのサマリーに表示される Y 範囲が実際のチャート値（集約後）と一致することで、数値を信頼して共有したい。
+- スコア: RICE = (6×5×9)/2 = 135
+- 改善: `print_summary` で Bar チャートの場合は `aggregate_bar` の結果から min/max を計算して表示。以前は生データの min/max を表示しており、集約後の値（例: Tokyo=4.2k）と食い違っていた。
+- 影響: src/oneshot/mod.rs, src/oneshot/summary.rs, tests/integration_test.rs
+- テスト追加: +1 integration (test_bar_summary_shows_aggregated_values)
+- 検証: PASS (410 tests: 320 unit + 86 integration + 4 snapshot)
+- 次の候補: misleading skip warning fix
+
+---
+
+## Cycle 102 — 2026-07-11T19:19
+- 種別: バグ修正
+- ユーザーストーリー: ユーザーとして、スキップ行の警告が正しいカラムを指摘することで、データ品質の問題を迅速に特定したい。
+- スコア: RICE = (6×6×9)/3 = 108
+- 改善: `warn_skipped_rows` に `chart_type` パラメータ追加。Bar チャートでは X カラム（空カテゴリ）を指摘、Line/Scatter では Y カラム（数値パース不可）を指摘。以前は常に Y カラムを誤って指摘していた。
+- 影響: src/oneshot/mod.rs, tests/integration_test.rs
+- テスト追加: +1 integration (test_bar_skip_warning_blames_x_column)
+- 検証: PASS (411 tests: 320 unit + 87 integration + 4 snapshot)
+- 次の候補: explore handle_key refactor
+
+---
+
+## Cycle 103 — 2026-07-11T19:23
+- 種別: リファクタ
+- ユーザーストーリー: 開発者として、explore モードの `handle_key` を50行以下に分割し、新キーバインド追加を容易にしたい。
+- スコア: RICE = (8×4×10)/3 = 107
+- 改善: `handle_key` (64 lines) → `handle_key` (24 lines) + `navigate_x` (16 lines) + `navigate_y` (27 lines)。全て50行以内。動作変更なし。
+- 影響: src/explore/mod.rs
+- テスト追加: なし（既存テスト3件で振る舞い保持を確認）
+- 検証: PASS (411 tests: 320 unit + 87 integration + 4 snapshot)
+- 次の候補: --labels flag for bar chart
+
+---
+
+## Cycle 104 — 2026-07-11T19:28
+- 種別: 機能追加
+- ユーザーストーリー: アナリストとして、棒グラフに `--labels` を付けて各バーの値と全体に対する割合を表示し、プレゼン資料にそのまま使いたい。
+- スコア: RICE = (8×7×9.5)/1 = 532 (実質 Effort=0.5 → 106 に正規化)
+- 改善: `--labels` フラグ追加。Bar チャートの `text_value` を `"4.2k (51%)"` 形式に変更。total=sum(values) から各バーの割合を計算。
+- 影響: src/cli/mod.rs, src/main.rs, src/oneshot/mod.rs, src/render/mod.rs, src/render/bar.rs, src/chart/data_builder.rs, tests/integration_test.rs
+- テスト追加: +1 integration (test_labels_flag_shows_percentage_on_bars)
+- 検証: PASS (412 tests: 320 unit + 88 integration + 4 snapshot)
+- 次の候補: 再評価へ
+
+---
+
+## STOP — 2026-07-11T19:30 (Session 11 — BI Use Case Enhancements)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 412 tests (320 unit + 88 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 5 サイクル記録 (Cycles 100-104)
+4. ✅ 評価エージェント: RICE > 100 の候補なし → STOP
+
+**このセッション (Cycles 100-104) のサマリー:**
+
+| Cycle | 種別 | 内容 | テスト増 |
+|-------|------|------|---------|
+| 100 | 機能追加 | `--all-y` / `-Y` 全数値カラムオーバーレイ | +1 |
+| 101 | バグ修正 | Bar chart サマリーに集約後の min/max 表示 | +1 |
+| 102 | バグ修正 | スキップ行警告で正しいカラムを指摘 | +1 |
+| 103 | リファクタ | explore handle_key 分割 (64→24+16+27 lines) | +0 |
+| 104 | 機能追加 | `--labels` バーチャートに値+割合表示 | +1 |
+
+**テスト数推移:** 408 → 412 (このセッションで +4)
+**通算:** 104 サイクル完了、412 テスト
+
+**残存課題 (全て RICE < 100):**
+- 横棒グラフ (hbar): RICE=28
+- SVG export: RICE=19
+- データテーブル出力: RICE=32
+- 関数サイズ (50行超が11個): 全てシーケンシャルな orchestration ロジック

@@ -14,6 +14,7 @@ pub fn print_summary(
     rows: &[Vec<String>],
     extra_y_columns: &[(String, Option<String>)],
     agg: AggFunction,
+    agg_stats: Option<(f64, f64)>,
 ) {
     let mut parts = vec![format!("{:?}", chart_type)];
     parts.push(format!("x={}", recommendation.x_column));
@@ -26,8 +27,10 @@ pub fn print_summary(
         // Only show raw Y range when using default aggregation (Sum).
         // For other agg functions, the raw range is misleading.
         if agg == AggFunction::Sum {
-            let y_idx = headers.iter().position(|h| h == y);
-            let stats = y_idx.and_then(|idx| compute_y_stats(rows, idx));
+            let stats = agg_stats.or_else(|| {
+                let y_idx = headers.iter().position(|h| h == y);
+                y_idx.and_then(|idx| compute_y_stats(rows, idx))
+            });
             if let Some((min, max)) = stats {
                 parts.push(format!(
                     "y={} ({}–{})",
