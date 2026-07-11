@@ -134,6 +134,10 @@ fn main() {
     if cli.json {
         cli.output = Some(cli::OutputFormat::Json);
     }
+    // --spark is a shorthand for -o spark
+    if cli.spark {
+        cli.output = Some(cli::OutputFormat::Spark);
+    }
     let json_output = cli.output == Some(cli::OutputFormat::Json);
 
     if let Err(e) = run(&cli) {
@@ -190,56 +194,49 @@ fn error_hint(err: &anyhow::Error, cli: &Cli) -> Option<String> {
 }
 
 /// Find files in `dir` with names similar to `target`.
+/// Supported data file extensions for discovery.
+const DATA_EXTENSIONS: &[&str] = &["csv", "tsv", "json", "ndjson", "jsonl", "tab"];
+
+/// Check if a filename has a recognized data extension.
+fn is_data_file(name: &str) -> bool {
+    name.rsplit('.')
+        .next()
+        .is_some_and(|ext| DATA_EXTENSIONS.contains(&ext))
+}
+
 fn find_similar_files(dir: &std::path::Path, target: &str) -> Vec<String> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return vec![];
     };
     let target_lower = target.to_lowercase();
-    let mut matches: Vec<String> = entries
+    let all_data_files: Vec<String> = entries
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().ok().is_some_and(|t| t.is_file()))
-        .filter_map(|e| {
-            let name = e.file_name().into_string().ok()?;
-            // Match by extension (csv/tsv/json) or substring similarity
-            let ext = name.rsplit('.').next().unwrap_or("");
-            if !["csv", "tsv", "json", "ndjson", "jsonl", "tab"].contains(&ext) {
-                return None;
-            }
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|name| is_data_file(name))
+        .collect();
+
+    // First: find files similar to the target name
+    let similar: Vec<String> = all_data_files
+        .iter()
+        .filter(|name| {
             let name_lower = name.to_lowercase();
-            // Substring match or Levenshtein-like (simple: shared prefix ≥ 3)
             let shared = target_lower
                 .chars()
                 .zip(name_lower.chars())
                 .take_while(|(a, b)| a == b)
                 .count();
-            if shared >= 3 || name_lower.contains(&target_lower[..target_lower.len().min(4)]) {
-                Some(name)
-            } else {
-                None
-            }
+            shared >= 3 || name_lower.contains(&target_lower[..target_lower.len().min(4)])
         })
         .take(3)
+        .cloned()
         .collect();
-    // If no close match, show any data files in directory
-    if matches.is_empty()
-        && let Ok(entries) = std::fs::read_dir(dir)
-    {
-        matches = entries
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().ok().is_some_and(|t| t.is_file()))
-            .filter_map(|e| {
-                let name = e.file_name().into_string().ok()?;
-                let ext = name.rsplit('.').next().unwrap_or("");
-                if ["csv", "tsv", "json", "ndjson", "jsonl", "tab"].contains(&ext) {
-                    Some(name)
-                } else {
-                    None
-                }
-            })
-            .take(3)
-            .collect();
+
+    if !similar.is_empty() {
+        return similar;
     }
-    matches
+    // Fallback: show any data files in the directory
+    all_data_files.into_iter().take(3).collect()
 }
 
 fn run(cli: &Cli) -> Result<()> {
@@ -376,6 +373,69 @@ fn col_width(rows: &[Vec<String>], idx: usize, min: usize) -> usize {
         .max(min)
 }
 
+/// Generate a sparkline string from values, mapping to 8 Unicode block characters.
+fn make_sparkline(values: &[f64]) -> String {
+    if values.is_empty() {
+        return String::new();
+    }
+    let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let blocks = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    if (max - min).abs() < f64::EPSILON {
+        return "▄".repeat(values.len());
+    }
+    values
+        .iter()
+        .map(|&v| {
+            let idx = ((v - min) / (max - min) * 7.0).round() as usize;
+            blocks[idx.min(7)]
+        })
+        .collect()
+}
+
+/// Print sparkline output: single-line or grouped by color column.
+fn print_spark(
+    recommendation: &chart::selector::ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    cli: &Cli,
+) {
+    let y_idx = recommendation
+        .y_column
+        .as_ref()
+        .and_then(|y| headers.iter().position(|h| h == y));
+    let Some(yi) = y_idx else {
+        println!("▄");
+        return;
+    };
+
+    // If color column specified, output one sparkline per group
+    if let Some(ref color) = cli.color_col
+        && let Some(ci) = headers.iter().position(|h| h == color)
+    {
+        let mut groups: std::collections::BTreeMap<&str, Vec<f64>> =
+            std::collections::BTreeMap::new();
+        for row in rows {
+            let group = row.get(ci).map_or("", |v| v.as_str());
+            let val = row.get(yi).and_then(|v| v.parse::<f64>().ok());
+            if let Some(v) = val {
+                groups.entry(group).or_default().push(v);
+            }
+        }
+        for (name, values) in &groups {
+            println!("{}  {}", name, make_sparkline(values));
+        }
+        return;
+    }
+
+    // Single sparkline from all Y values in row order
+    let values: Vec<f64> = rows
+        .iter()
+        .filter_map(|r| r.get(yi)?.parse::<f64>().ok())
+        .collect();
+    println!("{}", make_sparkline(&values));
+}
+
 /// Expand `--all-y`: add all remaining quantitative columns to extra_y.
 fn expand_all_y(
     recommendation: &chart::selector::ChartRecommendation,
@@ -441,6 +501,12 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
     // --output table: print aggregated/raw data as formatted text table
     if cli.output == Some(cli::OutputFormat::Table) {
         print_table(&recommendation, &data.headers, &data.rows, cli)?;
+        return Ok(());
+    }
+
+    // --output spark: single-line sparkline for pipeline embedding
+    if cli.output == Some(cli::OutputFormat::Spark) {
+        print_spark(&recommendation, &data.headers, &data.rows, cli);
         return Ok(());
     }
 

@@ -80,6 +80,10 @@ pub struct Cli {
     #[arg(long = "json", conflicts_with = "output")]
     pub json: bool,
 
+    /// Shorthand for --output spark (single-line sparkline).
+    #[arg(long = "spark", conflicts_with_all = ["output", "json"])]
+    pub spark: bool,
+
     /// Sample at most N rows from the data (systematic sampling for large datasets).
     #[arg(long = "sample", value_name = "N")]
     pub sample: Option<usize>,
@@ -160,6 +164,8 @@ pub enum OutputFormat {
     Json,
     /// Formatted text table of aggregated data.
     Table,
+    /// Single-line sparkline for pipeline embedding.
+    Spark,
 }
 
 /// Parse a column spec that may include a label override.

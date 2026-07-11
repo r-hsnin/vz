@@ -137,13 +137,10 @@ fn render_chart_to_buffer(
 ) {
     use crate::render::{ChartData, render_chart_data};
 
-    let chart_data = match chart_type {
+    let mut chart_data = match chart_type {
         ChartType::Line | ChartType::Scatter => {
-            let mut config =
+            let config =
                 build_line_scatter_config(recommendation, headers, rows, opts, area, chart_type);
-            if let Some(ref title) = opts.title {
-                config.title = Some(title.clone());
-            }
             if chart_type == ChartType::Scatter {
                 ChartData::Scatter(config)
             } else {
@@ -151,19 +148,13 @@ fn render_chart_to_buffer(
             }
         }
         ChartType::Heatmap => {
-            let mut data = build_heatmap(recommendation, headers, rows);
-            if let Some(ref title) = opts.title {
-                data.title = Some(title.clone());
-            }
+            let data = build_heatmap(recommendation, headers, rows);
             ChartData::Heatmap(data)
         }
         ChartType::Bar => {
             let (mut data, rows_used) = build_bar_data(recommendation, headers, rows, opts.agg);
             if let Some(label) = opts.y_label_override {
                 data.y_label = label.to_string();
-            }
-            if let Some(ref title) = opts.title {
-                data.title = Some(title.clone());
             }
             data.show_labels = opts.labels;
             sort_bar_data(&mut data, opts.sort_order);
@@ -172,15 +163,17 @@ fn render_chart_to_buffer(
             ChartData::Bar(data)
         }
         ChartType::Histogram => {
-            let mut data = build_histogram_data(recommendation, headers, rows);
-            if let Some(ref title) = opts.title {
-                data.title = Some(title.clone());
-            }
+            let data = build_histogram_data(recommendation, headers, rows);
             let rendered = data.values.len();
             warn_skipped_rows(rows.len(), rendered, recommendation, ChartType::Histogram);
             ChartData::Histogram(data)
         }
     };
+
+    // Apply title override once for all chart types
+    if let Some(ref title) = opts.title {
+        chart_data.set_title(title.clone());
+    }
 
     render_chart_data(&chart_data, area, buf);
 }

@@ -40,47 +40,20 @@ pub fn build_summary_parts(
 ) -> Vec<String> {
     let mut parts = vec![format!("{:?}", chart_type)];
     parts.push(format!("x={}", recommendation.x_column));
+
     if let Some(ref y) = recommendation.y_column {
-        let y_display = if agg == AggFunction::Sum {
-            y.clone()
-        } else {
-            format!("{}({})", agg_label(agg), y)
-        };
-        if agg == AggFunction::Sum {
-            let stats = agg_stats.or_else(|| {
-                let y_idx = headers.iter().position(|h| h == y);
-                y_idx.and_then(|idx| compute_y_stats(rows, idx))
-            });
-            if let Some((min, max)) = stats {
-                parts.push(format!(
-                    "y={} ({}–{})",
-                    y_display,
-                    format_number_pub(min),
-                    format_number_pub(max)
-                ));
-            } else {
-                parts.push(format!("y={}", y_display));
-            }
-        } else {
-            parts.push(format!("y={}", y_display));
-        }
-        // Append sparkline to the y= part (skip for bar charts — bar order is by category)
-        if chart_type != ChartType::Bar
-            && let Some(y_idx) = headers.iter().position(|h| h == y)
-            && let Some(spark) = sparkline(rows, y_idx)
-            && let Some(last) = parts.last_mut()
-        {
-            last.push(' ');
-            last.push_str(&spark);
-        }
+        let y_idx = headers.iter().position(|h| h == y);
+        let y_part = format_y_part(y, agg, agg_stats, rows, y_idx, chart_type);
+        parts.push(y_part);
         // Add trend annotation for line/scatter
         if chart_type != ChartType::Bar
-            && let Some(y_idx) = headers.iter().position(|h| h == y)
-            && let Some(trend) = trend_annotation(rows, y_idx)
+            && let Some(idx) = y_idx
+            && let Some(trend) = trend_annotation(rows, idx)
         {
             parts.push(trend);
         }
     }
+
     if !extra_y_columns.is_empty() {
         let names: Vec<&str> = extra_y_columns
             .iter()
@@ -89,8 +62,7 @@ pub fn build_summary_parts(
         parts.push(format!("y+={}", names.join(",")));
     }
     if let Some(ref c) = recommendation.color_column {
-        let legend = color_legend_hint(c, headers, rows);
-        parts.push(legend);
+        parts.push(color_legend_hint(c, headers, rows));
     }
     parts.push(format!("{} rows", rows.len()));
 
@@ -102,6 +74,49 @@ pub fn build_summary_parts(
         parts.push(hint);
     }
     parts
+}
+
+/// Format the Y-axis display part including range and sparkline.
+fn format_y_part(
+    y: &str,
+    agg: AggFunction,
+    agg_stats: Option<(f64, f64)>,
+    rows: &[Vec<String>],
+    y_idx: Option<usize>,
+    chart_type: ChartType,
+) -> String {
+    let y_display = if agg == AggFunction::Sum {
+        y.to_string()
+    } else {
+        format!("{}({})", agg_label(agg), y)
+    };
+
+    let mut result = if agg == AggFunction::Sum {
+        let stats = agg_stats.or_else(|| y_idx.and_then(|idx| compute_y_stats(rows, idx)));
+        if let Some((min, max)) = stats {
+            format!(
+                "y={} ({}–{})",
+                y_display,
+                format_number_pub(min),
+                format_number_pub(max)
+            )
+        } else {
+            format!("y={}", y_display)
+        }
+    } else {
+        format!("y={}", y_display)
+    };
+
+    // Append sparkline (skip for bar charts)
+    if chart_type != ChartType::Bar
+        && let Some(idx) = y_idx
+        && let Some(spark) = sparkline(rows, idx)
+    {
+        result.push(' ');
+        result.push_str(&spark);
+    }
+
+    result
 }
 
 /// Compute trend annotation for line/scatter charts.

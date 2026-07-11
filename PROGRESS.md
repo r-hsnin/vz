@@ -2003,3 +2003,91 @@ Line │ x=date │ y=revenue (800–2.0k) ▂▅▃▁█▇ │ ↑ +80% │ c
 - ▂▅▃▁█▇ → データの形状が一目瞭然
 - ↑ +80% → トレンドの方向と大きさ
 - "Did you mean? • sales.csv" → タイポ時に即座にガイド
+
+---
+
+## Cycle 114 — 2026-07-11T20:32
+- 種別: 機能追加 (Delight / Unix Philosophy)
+- ユーザーストーリー: CLIパワーユーザーとして、`vz data.csv -o spark` で1行スパークラインが得られることで、シェルスクリプトやパイプラインにトレンド可視化を組み込みたい。
+- スコア: RICE = (9×8×9)/2 = 324
+- 改善: `--output spark` モード追加。Y値をUnicodeブロック文字(▁-█)にマップして1行出力。`-c` でグループ別にスパークライン表示（BTreeMapで辞書順）。`make_sparkline()` を共有ヘルパーとして抽出。
+- 影響: src/cli/mod.rs, src/main.rs, tests/integration_test.rs
+- テスト追加: +2 integration (test_spark_output_mode, test_spark_with_color_grouped)
+- 検証: PASS (434 tests: 334 unit + 96 integration + 4 snapshot)
+- 次の候補: render_chart_to_buffer title dedup (RICE 157.5)
+
+---
+
+## Cycle 115 — 2026-07-11T20:38
+- 種別: リファクタ (Elegance)
+- ユーザーストーリー: 開発者として、新チャート種追加時にタイトル上書きパターンを1箇所だけ管理したい。
+- スコア: RICE = (7×5×9)/2 = 157.5
+- 改善: `render_chart_to_buffer` の4箇所重複していた `if let Some(ref title)` を排除。`ChartData::set_title(&mut self, title)` メソッドを追加し、match外で一度だけ適用。関数が58行→48行に短縮。
+- 影響: src/oneshot/mod.rs, src/render/mod.rs
+- テスト追加: なし（既存テストで振る舞い保持確認）
+- 検証: PASS (434 tests: 334 unit + 96 integration + 4 snapshot)
+- 次の候補: build_summary_parts refactor (RICE 144)
+
+---
+
+## Cycle 116 — 2026-07-11T20:42
+- 種別: リファクタ (Elegance)
+- ユーザーストーリー: 開発者として、summary 各部の責務が独立した関数に分かれていることで、新メタデータ追加が容易になるようにしたい。
+- スコア: RICE = (8×6×9)/3 = 144
+- 改善: `build_summary_parts` (74行) → `build_summary_parts` (46行) + `format_y_part` (41行)。Y軸の range/sparkline ロジックを専用関数に抽出。重複していた `headers.iter().position(|h| h == y)` も1回に集約。
+- 影響: src/oneshot/summary.rs
+- テスト追加: なし（既存テストで振る舞い保持確認）
+- 検証: PASS (434 tests: 334 unit + 96 integration + 4 snapshot)
+- 次の候補: extension list DRY (RICE 125) or new evaluation
+
+---
+
+## Cycle 117 — 2026-07-11T20:48
+- 種別: リファクタ + 機能追加
+- ユーザーストーリー:
+  - 開発者: `DATA_EXTENSIONS` を一箇所で管理し、新フォーマット追加時の漏れを防ぐ
+  - ユーザー: `vz data.csv --spark` で即座にスパークライン取得（`-o spark` のエイリアス）
+- スコア: RICE = (5×5×10)/2 = 125 (DRY) + (8×3×9)/1 = 216 (alias)
+- 改善:
+  1. `find_similar_files` のデータ拡張子リスト重複排除: `DATA_EXTENSIONS` 定数 + `is_data_file()` ヘルパー。関数が51行→35行に短縮、ディレクトリ読み込みも1回に削減。
+  2. `--spark` フラグ追加（`--json` と同様のショートハンド）。
+- 影響: src/main.rs, src/cli/mod.rs, tests/integration_test.rs
+- テスト追加: +1 integration (test_spark_shorthand_flag)
+- 検証: PASS (435 tests: 334 unit + 97 integration + 4 snapshot)
+- 次の候補: 最終評価
+
+---
+
+## STOP — 2026-07-11T20:52 (Session 14 — UX Delight + Elegance)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 435 tests (334 unit + 97 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 4 サイクル記録 (Cycles 114-117)
+4. ✅ 評価エージェント: RICE > 100 の候補なし → STOP
+
+**このセッション (Cycles 114-117) のサマリー:**
+
+| Cycle | 種別 | 内容 | テスト増 |
+|-------|------|------|---------|
+| 114 | 機能追加 | `--output spark` / `--spark` パイプライン用スパークライン | +3 |
+| 115 | リファクタ | `render_chart_to_buffer` タイトル重複排除 (ChartData::set_title) | +0 |
+| 116 | リファクタ | `build_summary_parts` 分割 (74→46+41) | +0 |
+| 117 | リファクタ+機能 | `DATA_EXTENSIONS` DRY + `--spark` ショートハンド | +1 |
+
+**テスト数推移:** 432 → 435 (このセッションで +3)
+**通算:** 117 実装サイクル完了、435 テスト
+
+**Delight ハイライト:**
+```bash
+# Unix パイプライン統合 — 1行でデータの形状を可視化
+$ vz sales.csv --spark
+▂▅▃▁█▇
+
+# グループ別
+$ vz sales.csv --spark -c city
+Nagoya  ▄
+Osaka   ▁█
+Tokyo   ▁▂█
+```

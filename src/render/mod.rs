@@ -324,6 +324,18 @@ pub enum ChartData {
     Heatmap(HeatmapData),
 }
 
+impl ChartData {
+    /// Set the title on any chart data variant.
+    pub fn set_title(&mut self, title: String) {
+        match self {
+            ChartData::Line(c) | ChartData::Scatter(c) => c.title = Some(title),
+            ChartData::Bar(d) => d.title = Some(title),
+            ChartData::Histogram(d) => d.title = Some(title),
+            ChartData::Heatmap(d) => d.title = Some(title),
+        }
+    }
+}
+
 /// Render a `ChartData` value into the given buffer area.
 /// This is the single dispatch point for all chart types across all modes.
 pub fn render_chart_data(data: &ChartData, area: Rect, buf: &mut Buffer) {

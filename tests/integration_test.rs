@@ -2092,3 +2092,73 @@ fn test_error_hint_stdin_tip() {
         stderr
     );
 }
+
+#[test]
+fn test_spark_output_mode() {
+    // --spark should output a single line of Unicode block characters (no chart)
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-o", "spark"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(
+        output.status.success(),
+        "Expected success, got: {:?}",
+        output
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Should contain only sparkline characters and be a single short line
+    let trimmed = stdout.trim();
+    assert!(!trimmed.is_empty(), "Expected sparkline output");
+    assert!(
+        trimmed.chars().all(|c| "▁▂▃▄▅▆▇█".contains(c)),
+        "Expected only sparkline chars, got: {}",
+        trimmed
+    );
+    // Should be compact (≤ 20 chars for 6 data points)
+    assert!(
+        trimmed.len() <= 60,
+        "Sparkline too long: {} chars",
+        trimmed.len()
+    );
+}
+
+#[test]
+fn test_spark_with_color_grouped() {
+    // With -c, should show one sparkline per group
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-o", "spark", "-c", "city"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    // Should have multiple lines (one per city)
+    assert!(
+        lines.len() >= 2,
+        "Expected multiple sparkline lines for grouped data, got: {}",
+        stdout
+    );
+    // Each line should contain group name and sparkline
+    assert!(
+        lines[0].contains("Tokyo") || lines[0].contains("Osaka") || lines[0].contains("Nagoya"),
+        "Expected group name in output, got: {}",
+        lines[0]
+    );
+}
+
+#[test]
+fn test_spark_shorthand_flag() {
+    // --spark should be equivalent to -o spark
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--spark"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    assert!(
+        trimmed.chars().all(|c| "▁▂▃▄▅▆▇█".contains(c)),
+        "Expected sparkline from --spark, got: {}",
+        trimmed
+    );
+}
