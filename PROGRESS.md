@@ -2218,3 +2218,42 @@ Tokyo   ▁▂█
   - OGP meta tags, aria-label, scroll animation, responsive design
 - 影響: docs/index.html (新規、890行)
 - 検証: agent-browser で全セクション視覚確認済み。レスポンシブ、カラー、レイアウト全て正常。
+
+---
+
+## Cycle 126-130 — 2026-07-11T22:30 (GitHub Pages サイト構築)
+- 種別: 機能追加 (ドキュメントサイト)
+- ユーザーストーリー: OSS利用者として、vzの概要・デモ・インストール方法・使い方を分かりやすいWebサイトで確認したい。
+- スコア: RICE = (10×8×9)/3 = 240
+
+### 比較プロセス
+| 候補 | 品質 | 保守性 | 設定量 | 依存数 |
+|------|------|--------|--------|--------|
+| **VitePress** ✅ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 1ファイル(40行) | 127 |
+| Astro Starlight | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 3ファイル | 359 |
+| 手書きHTML | ⭐⭐⭐ | ⭐⭐ | N/A | 0 |
+
+VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
+
+### 成果物
+- `docs/.vitepress/config.ts` — サイト設定 (dark mode, search, nav, sidebar)
+- `docs/index.md` — ランディングページ (Hero + Features + Demo + Chart Selection + Quick Start)
+- `docs/demo.md` — 8セクションのデモ (Line, Bar, Spark, Info, Table, Filter, JSON, Present)
+- `docs/guide/getting-started.md` — インストール + 初回使用ガイド
+- `docs/guide/chart-types.md` — チャート選択ルール + override
+- `docs/guide/output-modes.md` — 出力形式 + Explore/Present モード
+- `docs/public/` — favicon.svg, logo.svg, demo-placeholder.svg
+- `.github/workflows/docs.yml` — GitHub Actions デプロイ (docs/ 変更時)
+
+### 品質確認 (agent-browser)
+- ✅ Hero: グラデーションタイトル、SVGデモ、CTA ボタン
+- ✅ Features: 6カード3列グリッド、アイコン付き
+- ✅ Dark mode: デフォルト、トグル切替可
+- ✅ ガイドページ: サイドバー、ToC、コードグループタブ
+- ✅ デモページ: 8セクション目次、Braille文字正常表示
+- ✅ 検索: Ctrl+K ローカル検索
+- ✅ モバイル: レスポンシブ対応
+
+- 影響: docs/ (新規), .github/workflows/docs.yml (新規)
+- 検証: agent-browser で全ページ視覚確認。ビルド成功 (2.48s)。
+- コミット: `9469593`
