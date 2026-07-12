@@ -346,9 +346,7 @@ fn compute_y_stats(rows: &[Vec<String>], y_idx: usize) -> Option<(f64, f64)> {
         return None;
     }
 
-    let min = values.iter().copied().fold(f64::INFINITY, f64::min);
-    let max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    Some((min, max))
+    crate::util::min_max(&values)
 }
 
 /// Human-readable label for aggregation function.

@@ -13,8 +13,7 @@ pub fn sparkline_from_values(values: &[f64]) -> String {
     if values.is_empty() {
         return String::new();
     }
-    let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
-    let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let (min, max) = crate::util::min_max(values).unwrap_or((0.0, 0.0));
     if (max - min).abs() < f64::EPSILON {
         return "▄".repeat(values.len());
     }

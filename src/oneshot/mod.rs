@@ -134,13 +134,7 @@ fn compute_bar_agg_stats(
     if data.values.is_empty() {
         return None;
     }
-    let min = data.values.iter().copied().fold(f64::INFINITY, f64::min);
-    let max = data
-        .values
-        .iter()
-        .copied()
-        .fold(f64::NEG_INFINITY, f64::max);
-    Some((min, max))
+    crate::util::min_max(&data.values)
 }
 
 /// Render the appropriate chart type into a buffer.

@@ -48,8 +48,7 @@ impl Axis {
             };
         }
 
-        let data_min = values.iter().copied().fold(f64::INFINITY, f64::min);
-        let data_max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let (data_min, data_max) = crate::util::min_max(values).unwrap_or((0.0, 1.0));
 
         let scale = nice_numbers::nice_scale(data_min, data_max, 5);
 
@@ -182,8 +181,7 @@ pub fn compute_bins(values: &[f64], bin_count: usize) -> Vec<(f64, f64, usize)> 
         return vec![];
     }
 
-    let min = values.iter().copied().fold(f64::INFINITY, f64::min);
-    let max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let (min, max) = crate::util::min_max(values).unwrap_or((0.0, 0.0));
 
     if (max - min).abs() < f64::EPSILON {
         return vec![(min, max, values.len())];

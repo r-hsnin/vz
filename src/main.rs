@@ -11,6 +11,7 @@ pub mod render;
 pub mod sparkline;
 pub mod table;
 pub mod theme;
+pub mod util;
 pub mod watch;
 
 use anyhow::Result;

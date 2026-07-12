@@ -2945,3 +2945,13 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 **テスト数推移:** 495→510 (+15 this session)
 **テーマ:** 全5チャート × 全3モード × 全UIパーツで統一完了
 **ファイルサイズ:** oneshot/mod.rs 882→375行（800行制約クリア）
+
+---
+
+## Cycle 174 — 2026-07-12T16:15
+- 種別: DRY リファクタ
+- スコア: RICE = (5×2×9)/1 = 90
+- 改善: `min_max()` ユーティリティを `src/util.rs` に新設。7ファイル×14箇所のfoldパターンを5箇所統一（data_builder の aggregation 用途は除外）。
+- 影響: 新規 src/util.rs, src/main.rs, src/render/mod.rs, src/output/mod.rs, src/oneshot/mod.rs, src/oneshot/summary.rs, src/sparkline.rs
+- テスト追加: 4 unit (min_max tests in util.rs)
+- 検証: PASS (515 tests: 394 unit + 117 integration + 4 snapshot)

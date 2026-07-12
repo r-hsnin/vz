@@ -150,8 +150,7 @@ pub fn compute_column_stats(
             if nums.is_empty() {
                 return ColumnStats::Empty {};
             }
-            let min = nums.iter().copied().fold(f64::INFINITY, f64::min);
-            let max = nums.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+            let (min, max) = crate::util::min_max(&nums).unwrap_or((0.0, 0.0));
             let mean = nums.iter().sum::<f64>() / nums.len() as f64;
             // Sanitize: if any value is NaN/Infinity (shouldn't happen with
             // the guards above, but defensively handle), return Empty.
