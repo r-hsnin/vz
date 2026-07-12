@@ -2847,3 +2847,12 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存501テスト全パス
 - 検証: PASS (501 tests: 380 unit + 117 integration + 4 snapshot)
 - テーマ完全性: 全5チャート種別(Line/Scatter/Bar/Histogram/Heatmap) × 全3モード(oneshot/explore/present) で axis_color 統一
+
+---
+
+## Cycle 168 — 2026-07-12T15:26
+- 種別: 設計整合 (explore mode theme 完了)
+- 改善: Explore モードの bar/histogram ビルダーにも `axis_color` 適用。これで全モード×全チャートで統一完了。
+- 影響: src/explore/mod.rs
+- テスト: 既存501テスト全パス
+- 検証: PASS (501 tests: 380 unit + 117 integration + 4 snapshot)

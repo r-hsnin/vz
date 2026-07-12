@@ -241,7 +241,7 @@ impl ExploreApp {
             .unwrap_or_default();
         let title = format!("{} by category", y_label);
 
-        let (data, _) = data_builder::aggregate_bar(
+        let (mut data, _) = data_builder::aggregate_bar(
             &self.data,
             self.selected_x,
             self.selected_y,
@@ -249,6 +249,7 @@ impl ExploreApp {
             y_label,
             AggFunction::Sum,
         );
+        data.axis_color = Some(self.theme.axis_color);
         data
     }
 
@@ -262,7 +263,10 @@ impl ExploreApp {
             .unwrap_or_default();
         let title = format!("Distribution of {}", x_label);
 
-        data_builder::build_histogram(&self.data, self.selected_x, Some(title), x_label)
+        let mut data =
+            data_builder::build_histogram(&self.data, self.selected_x, Some(title), x_label);
+        data.axis_color = Some(self.theme.axis_color);
+        data
     }
 
     /// Build heatmap data for the two selected columns.
