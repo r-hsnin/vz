@@ -2714,3 +2714,18 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存495テスト全パス
 - 検証: PASS (495 tests: 375 unit + 116 integration + 4 snapshot)
 - 次の候補: render_chart_to_buffer 分割 or 停止条件チェック
+
+---
+
+## Cycle 159 — 2026-07-12T14:13
+- 種別: UX改善 (設計整合)
+- スコア: RICE = (4×3×9)/1 = 108 (legend color fidelity)
+- 改善: Summary の color legend がテーマに連動するよう修正。
+  - `COLOR_NAMES` 定数を削除、`color_display_name(Color)` 関数に置換
+  - `color_legend_hint` に `series_colors` 引数追加
+  - `SummaryContext` に `series_colors` フィールド追加
+  - `--theme light` 時の legend が正しい色名（blue, red...）を表示
+- 影響: src/oneshot/summary.rs, src/oneshot/mod.rs
+- テスト: 既存495テスト全パス
+- 検証: PASS (495 tests: 375 unit + 116 integration + 4 snapshot)
+- 次の候補: 停止条件チェック or render_chart_to_buffer 分割

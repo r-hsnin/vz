@@ -16,6 +16,7 @@ pub struct SummaryContext<'a> {
     pub agg: AggFunction,
     pub agg_stats: Option<(f64, f64)>,
     pub skipped_rows: usize,
+    pub series_colors: &'a [ratatui::style::Color],
 }
 
 /// Print a one-line summary before the chart.
@@ -51,7 +52,12 @@ pub fn build_summary_parts(ctx: &SummaryContext<'_>) -> Vec<String> {
         parts.push(format!("y+={}", names.join(",")));
     }
     if let Some(ref c) = ctx.recommendation.color_column {
-        parts.push(color_legend_hint(c, ctx.headers, ctx.rows));
+        parts.push(color_legend_hint(
+            c,
+            ctx.headers,
+            ctx.rows,
+            ctx.series_colors,
+        ));
     }
     parts.push(if ctx.skipped_rows > 0 {
         format!("{} rows ({} skipped)", ctx.rows.len(), ctx.skipped_rows)
@@ -213,11 +219,31 @@ fn truncate_to_width(s: &str, max_width: usize) -> String {
     format!("{}…", truncated)
 }
 
-/// Color name for ANSI display corresponding to SERIES_COLORS palette.
-const COLOR_NAMES: &[&str] = &["cyan", "yellow", "green", "magenta", "red", "blue"];
+/// Human-readable name for a ratatui Color value.
+fn color_display_name(color: ratatui::style::Color) -> &'static str {
+    use ratatui::style::Color;
+    match color {
+        Color::Cyan => "cyan",
+        Color::Yellow => "yellow",
+        Color::Green => "green",
+        Color::Magenta => "magenta",
+        Color::Red => "red",
+        Color::Blue => "blue",
+        Color::White => "white",
+        Color::Black => "black",
+        Color::Gray => "gray",
+        Color::DarkGray => "darkgray",
+        _ => "color",
+    }
+}
 
 /// Format a color legend for the summary line, e.g. `color=city [Tokyo=cyan, Osaka=yellow]`.
-pub fn color_legend_hint(color_col: &str, headers: &[String], rows: &[Vec<String>]) -> String {
+pub fn color_legend_hint(
+    color_col: &str,
+    headers: &[String],
+    rows: &[Vec<String>],
+    series_colors: &[ratatui::style::Color],
+) -> String {
     let color_idx = headers.iter().position(|h| h == color_col);
     let unique_values: Vec<String> = match color_idx {
         Some(idx) => {
@@ -243,12 +269,12 @@ pub fn color_legend_hint(color_col: &str, headers: &[String], rows: &[Vec<String
     let mappings: Vec<String> = unique_values
         .iter()
         .enumerate()
-        .take(COLOR_NAMES.len())
-        .map(|(i, name)| format!("{}={}", name, COLOR_NAMES[i]))
+        .take(series_colors.len())
+        .map(|(i, name)| format!("{}={}", name, color_display_name(series_colors[i])))
         .collect();
 
-    let suffix = if unique_values.len() > COLOR_NAMES.len() {
-        format!(" +{}", unique_values.len() - COLOR_NAMES.len())
+    let suffix = if unique_values.len() > series_colors.len() {
+        format!(" +{}", unique_values.len() - series_colors.len())
     } else {
         String::new()
     };
@@ -347,7 +373,7 @@ mod tests {
             vec!["Tokyo".to_string(), "1000".to_string()],
             vec!["Osaka".to_string(), "2000".to_string()],
         ];
-        let result = color_legend_hint("city", &headers, &rows);
+        let result = color_legend_hint("city", &headers, &rows, crate::render::SERIES_COLORS);
         assert!(result.contains("Tokyo=cyan"));
         assert!(result.contains("Osaka=yellow"));
     }
@@ -356,7 +382,7 @@ mod tests {
     fn test_color_legend_hint_missing_column() {
         let headers = vec!["x".to_string()];
         let rows = vec![vec!["a".to_string()]];
-        let result = color_legend_hint("missing", &headers, &rows);
+        let result = color_legend_hint("missing", &headers, &rows, crate::render::SERIES_COLORS);
         assert_eq!(result, "color=missing");
     }
 
@@ -486,6 +512,7 @@ fn test_build_summary_parts_basic() {
         agg: AggFunction::Sum,
         agg_stats: None,
         skipped_rows: 0,
+        series_colors: crate::render::SERIES_COLORS,
     });
     assert_eq!(parts[0], "Line");
     assert_eq!(parts[1], "x=date");
@@ -518,6 +545,7 @@ fn test_build_summary_parts_with_agg_stats() {
         agg: AggFunction::Sum,
         agg_stats: Some((800.0, 4200.0)),
         skipped_rows: 0,
+        series_colors: crate::render::SERIES_COLORS,
     });
     assert!(
         parts[2].contains("4.2k"),
@@ -545,6 +573,7 @@ fn test_build_summary_parts_non_sum_agg() {
         agg: AggFunction::Mean,
         agg_stats: None,
         skipped_rows: 0,
+        series_colors: crate::render::SERIES_COLORS,
     });
     // Should show mean(revenue) without range (since range is misleading for non-sum)
     assert!(
@@ -586,6 +615,7 @@ fn test_build_summary_parts_extra_y() {
         agg: AggFunction::Sum,
         agg_stats: None,
         skipped_rows: 0,
+        series_colors: crate::render::SERIES_COLORS,
     });
     assert!(
         parts.iter().any(|p| p.contains("y+=profit")),
@@ -723,6 +753,7 @@ fn test_build_summary_parts_shows_skipped_rows() {
         agg: AggFunction::Sum,
         agg_stats: None,
         skipped_rows: 1,
+        series_colors: crate::render::SERIES_COLORS,
     });
     assert!(
         parts.iter().any(|p| p.contains("3 rows (1 skipped)")),

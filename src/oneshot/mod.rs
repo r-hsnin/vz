@@ -72,6 +72,7 @@ pub fn render_oneshot(
         agg: opts.agg,
         agg_stats,
         skipped_rows,
+        series_colors: &opts.theme.series_colors,
     });
 
     warn_incompatible_flags(chart_type, opts);
