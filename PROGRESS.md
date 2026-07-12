@@ -3017,3 +3017,22 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: src/explore/render.rs
 - テスト: 既存522テスト全パス
 - 検証: PASS (522 tests: 398 unit + 120 integration + 4 snapshot)
+
+---
+
+## Cycle 181 — 2026-07-12T16:15
+- 種別: ドキュメント整合
+- 改善: README の Explore キーバインド表を最新に更新（c, y, ?, Esc を追加、数字キーを簡潔に統合）。
+- 影響: README.md
+- テスト: 既存522テスト全パス
+- 検証: PASS
+
+---
+
+## Cycle 182 — 2026-07-12T16:15
+- 種別: リファクタ
+- スコア: RICE = (5×2×9)/1 = 90
+- 改善: `aggregate_bar` を `collect_groups` に分割。重複していた "find or push" パターンを統一し、56行→28+27行に。Count ケースの特殊分岐も解消。
+- 影響: src/chart/data_builder.rs
+- テスト: 既存522テスト全パス
+- 検証: PASS (522 tests: 398 unit + 120 integration + 4 snapshot)

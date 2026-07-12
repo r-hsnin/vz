@@ -54,38 +54,7 @@ pub fn aggregate_bar(
     y_label: String,
     agg: AggFunction,
 ) -> (BarChartData, usize) {
-    // Collect values per category
-    let mut groups: Vec<(String, Vec<f64>)> = Vec::new();
-    let mut rows_used = 0usize;
-
-    for row in rows {
-        let label = match row.get(x_idx) {
-            Some(l) if !l.is_empty() => l.clone(),
-            _ => continue,
-        };
-
-        if agg == AggFunction::Count {
-            rows_used += 1;
-            if let Some(entry) = groups.iter_mut().find(|(l, _)| l == &label) {
-                entry.1.push(1.0);
-            } else {
-                groups.push((label, vec![1.0]));
-            }
-            continue;
-        }
-
-        let value = match row.get(y_idx).and_then(|v| v.parse::<f64>().ok()) {
-            Some(v) => v,
-            None => continue,
-        };
-
-        rows_used += 1;
-        if let Some(entry) = groups.iter_mut().find(|(l, _)| l == &label) {
-            entry.1.push(value);
-        } else {
-            groups.push((label, vec![value]));
-        }
-    }
+    let (groups, rows_used) = collect_groups(rows, x_idx, y_idx, agg);
 
     let labels: Vec<String> = groups.iter().map(|(l, _)| l.clone()).collect();
     let values: Vec<f64> = groups
@@ -105,6 +74,42 @@ pub fn aggregate_bar(
         },
         rows_used,
     )
+}
+
+/// Collect rows into per-category groups for aggregation.
+fn collect_groups(
+    rows: &[Vec<String>],
+    x_idx: usize,
+    y_idx: usize,
+    agg: AggFunction,
+) -> (Vec<(String, Vec<f64>)>, usize) {
+    let mut groups: Vec<(String, Vec<f64>)> = Vec::new();
+    let mut rows_used = 0usize;
+
+    for row in rows {
+        let label = match row.get(x_idx) {
+            Some(l) if !l.is_empty() => l.clone(),
+            _ => continue,
+        };
+
+        let value = if agg == AggFunction::Count {
+            1.0
+        } else {
+            match row.get(y_idx).and_then(|v| v.parse::<f64>().ok()) {
+                Some(v) => v,
+                None => continue,
+            }
+        };
+
+        rows_used += 1;
+        if let Some(entry) = groups.iter_mut().find(|(l, _)| l == &label) {
+            entry.1.push(value);
+        } else {
+            groups.push((label, vec![value]));
+        }
+    }
+
+    (groups, rows_used)
 }
 
 /// Apply the aggregation function to a slice of values.
