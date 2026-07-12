@@ -45,8 +45,8 @@ cargo test                                   # All tests pass
 
 ### Expected test results
 
-- ~244 unit tests (in-source `#[cfg(test)]` modules)
-- ~49 integration tests (`tests/integration_test.rs`)
+- ~439 unit tests (in-source `#[cfg(test)]` modules)
+- ~137 integration tests (`tests/integration_test.rs`)
 - ~4 snapshot tests (`tests/snapshot_test.rs`)
 - Total runtime: < 2 seconds
 
@@ -95,10 +95,13 @@ Chart source paths resolve relative to the Markdown file's directory. If charts 
 | Dependency | Version | Purpose |
 |-----------|---------|---------|
 | clap | 4 | CLI argument parsing |
+| clap_complete | 4 | Shell completion generation |
 | ratatui | 0.30 | Terminal UI rendering |
 | crossterm | 0.28 | Terminal manipulation |
 | csv | 1 | CSV/TSV parsing |
-| serde_json | 1 | JSON/NDJSON parsing |
+| serde | 1 | Serialization framework |
+| serde_json | 1 | JSON/NDJSON parsing & output |
 | chrono | 0.4 | Date parsing (type inference) |
 | regex | 1 | Pattern matching (type inference) |
 | anyhow | 1 | Error handling |
+| notify | 7 | File system watching (--watch) |

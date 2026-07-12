@@ -39,22 +39,43 @@ src/
 │   ├── mod.rs           — Module re-exports
 │   ├── selector.rs      — Type combination → chart type mapping
 │   └── data_builder.rs  — Schema+rows → rendering data structures
+├── filter.rs            — Row filtering engine (--where predicates)
 ├── render/              — Terminal chart rendering (ratatui widgets)
 │   ├── mod.rs           — ChartData enum, ChartWidget, dispatch
-│   ├── line.rs          — Line chart widget
+│   ├── line.rs          — Line/Scatter unified widget (XYChart)
 │   ├── bar.rs           — Bar chart widget
-│   ├── scatter.rs       — Scatter plot widget
+│   ├── scatter.rs       — Scatter re-export (thin wrapper)
 │   ├── histogram.rs     — Histogram widget
 │   ├── heatmap.rs       — Heatmap widget (Cat×Cat count matrix)
 │   └── nice_numbers.rs  — Axis tick calculation
 ├── oneshot/             — One-shot stdout rendering (Buffer → ANSI)
 │   ├── mod.rs           — Render orchestration
+│   ├── builders.rs      — Chart data builders (bar/histogram/line)
 │   ├── summary.rs       — Summary line & color legend
+│   ├── tests.rs         — Unit tests (separated for file size)
 │   └── ansi.rs          — ANSI escape sequence output
-├── explore/mod.rs       — Interactive TUI mode
-└── present/             — Slide presentation mode
-    ├── mod.rs           — Presentation TUI & chart loading
-    └── parser.rs        — Markdown slide parser
+├── output/              — Machine-readable output formats
+│   ├── mod.rs           — InfoOutput struct, build_info_output
+│   ├── chart_json.rs    — --output json chart data generation
+│   ├── markdown.rs      — --output markdown (GFM tables)
+│   ├── spark.rs         — --output spark (Unicode sparklines)
+│   ├── stats_text.rs    — Column statistics text formatter
+│   ├── svg.rs           — --output svg (monospace SVG image)
+│   └── table.rs         — --output table (formatted text)
+├── explore/             — Interactive TUI mode
+│   ├── mod.rs           — ExploreApp state & key handling
+│   └── render.rs        — TUI rendering (chart, table, status bar)
+├── present/             — Slide presentation mode
+│   ├── mod.rs           — PresentApp state & key handling
+│   ├── parser.rs        — Markdown slide parser
+│   ├── render.rs        — Slide rendering (elements, charts)
+│   ├── chart_loader.rs  — Chart data loading & type inference
+│   └── tests.rs         — Unit tests (separated for file size)
+├── diagnostics.rs       — Error hints & file suggestions
+├── sparkline.rs         — Shared sparkline generation utility
+├── theme.rs             — Color theme definitions (dark/light/high-contrast)
+├── util.rs              — Numeric utilities (min_max)
+└── watch.rs             — File watch & auto-redraw (--watch)
 ```
 
 <!-- /AUTO-GENERATED -->
@@ -79,8 +100,8 @@ cargo test
 ```
 
 This runs:
-- **244 unit tests** — inline `#[cfg(test)]` modules in each source file
-- **49 integration tests** — `tests/integration_test.rs`, end-to-end binary tests
+- **439 unit tests** — inline `#[cfg(test)]` modules in each source file
+- **137 integration tests** — `tests/integration_test.rs`, end-to-end binary tests
 - **4 snapshot tests** — `tests/snapshot_test.rs`, visual regression tests
 
 ### Run specific tests
@@ -136,8 +157,10 @@ Test data lives in `fixtures/`:
 - `body_measurements.csv` — Quantitative×Quantitative data
 - `access_log.csv` — Large-ish log-style data (2000 rows)
 - `messy_data.csv` — Edge case: missing values, mixed types
+- `mixed_values.csv` — Edge case: mixed parseable/non-parseable Y values
 - `scores.json` — JSON array format test data
 - `demo.md` — Sample presentation file with chart blocks
+- `code_demo.md` — Presentation with code blocks
 
 ## Code Style
 
