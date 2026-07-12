@@ -39,12 +39,18 @@ pub fn print_table(
         return Ok(());
     }
 
-    // For other chart types: show raw x, y data
+    // For other chart types: show raw x, y, and color column data
+    let color_idx = recommendation
+        .color_column
+        .as_ref()
+        .and_then(|c| headers.iter().position(|h| h == c));
+
     match (x_idx, y_idx) {
         (Some(xi), Some(yi)) => {
             let x_label = &recommendation.x_column;
             let y_label = recommendation.y_column.as_deref().unwrap_or("value");
-            print_xy_table(x_label, y_label, rows, xi, yi);
+            let color_label = recommendation.color_column.as_deref();
+            print_xy_table(x_label, y_label, color_label, rows, xi, yi, color_idx);
         }
         _ => print_all_columns(headers, rows),
     }
@@ -67,16 +73,43 @@ fn print_two_col_values(x_label: &str, y_label: &str, labels: &[String], values:
     }
 }
 
-/// Print a two-column table from raw row data.
-fn print_xy_table(x_label: &str, y_label: &str, rows: &[Vec<String>], xi: usize, yi: usize) {
+/// Print a table from raw row data with x, y, and optional color columns.
+fn print_xy_table(
+    x_label: &str,
+    y_label: &str,
+    color_label: Option<&str>,
+    rows: &[Vec<String>],
+    xi: usize,
+    yi: usize,
+    color_idx: Option<usize>,
+) {
     let col_w = col_width(rows, xi, x_label.len());
     let val_w = col_width(rows, yi, y_label.len());
-    println!("{:<col_w$}  {:>val_w$}", x_label, y_label);
-    println!("{:-<col_w$}  {:-<val_w$}", "", "");
-    for row in rows {
-        let x_val = row.get(xi).map_or("", |v| v.as_str());
-        let y_val = row.get(yi).map_or("", |v| v.as_str());
-        println!("{:<col_w$}  {:>val_w$}", x_val, y_val);
+
+    match (color_label, color_idx) {
+        (Some(c_label), Some(ci)) => {
+            let c_w = col_width(rows, ci, c_label.len());
+            println!(
+                "{:<col_w$}  {:<c_w$}  {:>val_w$}",
+                x_label, c_label, y_label
+            );
+            println!("{:-<col_w$}  {:-<c_w$}  {:-<val_w$}", "", "", "");
+            for row in rows {
+                let x_val = row.get(xi).map_or("", |v| v.as_str());
+                let c_val = row.get(ci).map_or("", |v| v.as_str());
+                let y_val = row.get(yi).map_or("", |v| v.as_str());
+                println!("{:<col_w$}  {:<c_w$}  {:>val_w$}", x_val, c_val, y_val);
+            }
+        }
+        _ => {
+            println!("{:<col_w$}  {:>val_w$}", x_label, y_label);
+            println!("{:-<col_w$}  {:-<val_w$}", "", "");
+            for row in rows {
+                let x_val = row.get(xi).map_or("", |v| v.as_str());
+                let y_val = row.get(yi).map_or("", |v| v.as_str());
+                println!("{:<col_w$}  {:>val_w$}", x_val, y_val);
+            }
+        }
     }
 }
 

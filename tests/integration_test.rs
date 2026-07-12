@@ -2000,6 +2000,33 @@ fn test_output_table_shows_formatted_data() {
 }
 
 #[test]
+fn test_output_table_includes_color_column() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-c", "city", "-o", "table"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(
+        output.status.success(),
+        "vz -c city -o table should succeed"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Table should include the color/group column
+    assert!(
+        stdout.contains("city"),
+        "Table should show color column header: {stdout}"
+    );
+    // Should show the data values for the color column
+    assert!(
+        stdout.contains("Tokyo"),
+        "Table should show color column values: {stdout}"
+    );
+    assert!(
+        stdout.contains("Osaka"),
+        "Table should show color column values: {stdout}"
+    );
+}
+
+#[test]
 fn test_json_flag_shorthand() {
     // --json should produce the same output as -o json
     let json_flag = vz_binary()
