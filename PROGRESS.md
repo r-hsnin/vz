@@ -2825,3 +2825,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 検証: PASS (501 tests: 380 unit + 117 integration + 4 snapshot)
 - テスト数累計推移: 493→501 (+8 this session)
 - 次の候補: auto_select 57行リファクタ (RICE=60) or DESIGN.md 更新
+
+---
+
+## Cycle 166 — 2026-07-12T15:26
+- 種別: ドキュメント修正
+- スコア: RICE = (3×3×9)/2 = 40.5
+- 改善: DESIGN.md のデータフロー図を実装と整合。mode-specific builder 層を明示。
+- 影響: DESIGN.md
+- テスト: 既存501テスト全パス
+- 検証: PASS
+- 次の候補: auto_select リファクタ (RICE=60) or 新評価

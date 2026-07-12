@@ -102,9 +102,16 @@ main.rs ─── cli/        (parse args)
    │
    └──────── render/    (data structs → ratatui Buffer)
              │
-             ├── oneshot/  (Buffer → ANSI stdout)
-             ├── explore/  (Buffer → TUI event loop)
-             └── present/  (Buffer → slide frames)
+             ├── oneshot/  (builders.rs → ChartData → render_chart_data → Buffer → ANSI)
+             ├── explore/  (inline construction → ChartData → ChartWidget → TUI)
+             └── present/  (chart_loader.rs → ChartData → render_chart_data → slide)
+```
+
+Each mode has a **mode-specific builder layer** that adapts the shared `ChartData`
+structures before passing them to `render_chart_data()`:
+- `oneshot/builders.rs` — sorting, truncation, label fitting, theme application
+- `explore/mod.rs` — interactive column selection → ChartData construction
+- `present/chart_loader.rs` — Markdown chart block → ChartData
 ```
 
 **変更影響マップ:**
