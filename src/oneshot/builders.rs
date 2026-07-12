@@ -30,9 +30,7 @@ pub fn build_line_scatter_config(
     let effective_rows = rows.len().min(data_builder::MAX_CHART_POINTS);
     super::warn_skipped_rows(effective_rows, rendered, recommendation, chart_type);
     // Apply theme colors
-    config.series_colors = opts.theme.series_colors.clone();
-    config.axis_color = Some(opts.theme.axis_color);
-    config.label_color = Some(opts.theme.label_color);
+    config.apply_theme(&opts.theme);
     config
 }
 

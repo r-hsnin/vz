@@ -2662,3 +2662,16 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 **テスト数推移:** 489 → 493 (+4)
 **コミット:** 9 commits on main
 **ファイルサイズ改善:** explore/mod.rs 839→628行, oneshot/mod.rs 969→862行
+
+---
+
+## Cycle 155 — 2026-07-12T14:13
+- 種別: 品質改善
+- スコア: RICE = 160 (unwrap除去) + 54 (apply_theme抽出)
+- 改善:
+  1. `summary.rs` の `unwrap()` を `if let Some(hint) = last.filter(...)` に置換
+  2. `ChartConfig::apply_theme()` メソッド追加 — 3箇所の重複パターンを統一
+- 影響: src/oneshot/summary.rs, src/render/mod.rs, src/oneshot/builders.rs, src/explore/mod.rs, src/present/chart_loader.rs
+- テスト: 既存493テスト全パス
+- 検証: PASS (493 tests: 373 unit + 116 integration + 4 snapshot)
+- 次の候補: fit_labels_to_width 修正 for small datasets (RICE=144)

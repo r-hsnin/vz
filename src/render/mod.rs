@@ -102,6 +102,15 @@ pub struct ChartConfig {
     pub label_color: Option<Color>,
 }
 
+impl ChartConfig {
+    /// Apply theme colors to this config (series, axis, label).
+    pub fn apply_theme(&mut self, theme: &crate::theme::Theme) {
+        self.series_colors = theme.series_colors.clone();
+        self.axis_color = Some(theme.axis_color);
+        self.label_color = Some(theme.label_color);
+    }
+}
+
 /// Labels for a bar chart (categorical x-axis).
 #[derive(Debug, Clone, PartialEq)]
 pub struct BarChartData {

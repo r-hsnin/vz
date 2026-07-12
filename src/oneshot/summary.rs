@@ -171,10 +171,7 @@ fn format_and_print_parts(parts: &[String]) {
     };
 
     let last = parts.last();
-    let has_hint = last.is_some_and(|h| is_hint(h));
-
-    if has_hint {
-        let hint = last.unwrap();
+    if let Some(hint) = last.filter(|h| is_hint(h)) {
         let main_line = parts[..parts.len() - 1].join(sep);
         let full = format!("{}{}{}", main_line, sep, hint);
         if full.chars().count() <= max_width {
