@@ -1767,6 +1767,20 @@ fn test_output_svg_basic() {
 }
 
 #[test]
+fn test_output_svg_light_theme() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--svg", "--theme", "light"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("fill=\"#ffffff\""),
+        "Light theme SVG should have white background"
+    );
+}
+
+#[test]
 fn test_output_json_info_flag() {
     let output = vz_binary()
         .args(["fixtures/sales.csv", "--info", "--output", "json"])

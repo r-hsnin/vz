@@ -3047,3 +3047,12 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: src/svg.rs, src/main.rs, src/theme.rs, src/chart/data_builder.rs
 - テスト: 既存522テスト全パス
 - 検証: PASS (522 tests: 398 unit + 120 integration + 4 snapshot)
+
+---
+
+## Cycle 184 — 2026-07-12T16:15
+- 種別: テスト追加
+- 改善: SVG + light テーマの統合テスト追加。テーマ背景色の検証。
+- 影響: tests/integration_test.rs
+- テスト追加: 1 integration (test_output_svg_light_theme)
+- 検証: PASS (523 tests: 398 unit + 121 integration + 4 snapshot)
