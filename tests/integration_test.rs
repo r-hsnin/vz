@@ -2439,3 +2439,32 @@ fn test_summary_shows_skipped_rows() {
         stderr
     );
 }
+
+#[test]
+fn test_theme_light_produces_output() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--theme", "light"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success(), "vz --theme light failed");
+    assert!(!output.stdout.is_empty(), "Expected chart output");
+}
+
+#[test]
+fn test_theme_high_contrast_produces_output() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--theme", "high-contrast"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success(), "vz --theme high-contrast failed");
+    assert!(!output.stdout.is_empty(), "Expected chart output");
+}
+
+#[test]
+fn test_theme_invalid_value_errors() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--theme", "neon"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success(), "Expected error for invalid theme");
+}

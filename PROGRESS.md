@@ -2619,3 +2619,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存490テスト全パス
 - 検証: PASS (490 tests: 373 unit + 113 integration + 4 snapshot)
 - 次の候補: X軸ラベル省略インジケータ (RICE=120 from Agent A)
+
+---
+
+## Cycle 154 — 2026-07-12T13:45
+- 種別: テスト追加
+- スコア: RICE = (5×3×9)/1 = 135 (confidence in theme feature)
+- 改善: `--theme` フラグの統合テスト3件追加 (light/high-contrast/invalid)
+- 影響: tests/integration_test.rs
+- テスト追加: 3 integration
+- 検証: PASS (493 tests: 373 unit + 116 integration + 4 snapshot)
+- 次の候補: oneshot/mod.rs 残テスト整理 (800行超過対策) or 停止判定
