@@ -2525,3 +2525,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存489テスト全パス（動作変更なし）
 - 検証: PASS (489 tests: 372 unit + 113 integration + 4 snapshot)
 - 次の候補: build_status_bar keybind helper (RICE=112.5)
+
+---
+
+## Cycle 147 — 2026-07-12T13:45
+- 種別: リファクタ
+- スコア: RICE = (5×5×9)/2 = 112.5
+- 改善: `build_status_bar` のキーバインド表示をデータ駆動に変換。14個のSpan手書き → `bindings` 配列ループ化。
+- 影響: src/explore/mod.rs
+- テスト: 既存489テスト全パス
+- 検証: PASS (489 tests: 372 unit + 113 integration + 4 snapshot)
+- 次の候補: Summary truncation fix — hints cut first on narrow terminals (RICE=120)

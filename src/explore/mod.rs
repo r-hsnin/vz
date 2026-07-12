@@ -495,38 +495,41 @@ fn build_status_bar(app: &ExploreApp) -> Paragraph<'static> {
         .collect::<Vec<_>>()
         .join(" ");
 
-    let color_info = match app.selected_color {
-        Some(idx) => format!(
-            "c={}",
-            app.schema
-                .columns
-                .get(idx)
-                .map(|c| c.name.as_str())
-                .unwrap_or("?")
-        ),
-        None => "c=off".to_string(),
+    let color_label = match app.selected_color {
+        Some(idx) => app
+            .schema
+            .columns
+            .get(idx)
+            .map(|c| c.name.clone())
+            .unwrap_or_else(|| "?".to_string()),
+        None => "off".to_string(),
     };
 
-    let text = Line::from(vec![
-        Span::styled(" h/l", Style::default().fg(Color::Yellow)),
-        Span::raw("=X "),
-        Span::styled("j/k", Style::default().fg(Color::Yellow)),
-        Span::raw("=Y "),
-        Span::styled("c", Style::default().fg(Color::Yellow)),
-        Span::raw(format!(
-            "={} ",
-            color_info.strip_prefix("c=").unwrap_or("off")
-        )),
-        Span::styled("1-4", Style::default().fg(Color::Yellow)),
-        Span::raw("=type "),
-        Span::styled("0", Style::default().fg(Color::Yellow)),
-        Span::raw("=auto "),
-        Span::styled("d", Style::default().fg(Color::Yellow)),
-        Span::raw("=data "),
-        Span::styled("q", Style::default().fg(Color::Yellow)),
-        Span::raw("=quit │ "),
-        Span::styled(col_display, Style::default().fg(Color::DarkGray)),
-    ]);
+    let bindings: &[(&str, String)] = &[
+        ("h/l", "X".to_string()),
+        ("j/k", "Y".to_string()),
+        ("c", color_label),
+        ("1-4", "type".to_string()),
+        ("0", "auto".to_string()),
+        ("d", "data".to_string()),
+        ("q", "quit".to_string()),
+    ];
+
+    let mut spans: Vec<Span<'static>> = vec![Span::raw(" ".to_string())];
+    for (key, desc) in bindings {
+        spans.push(Span::styled(
+            key.to_string(),
+            Style::default().fg(Color::Yellow),
+        ));
+        spans.push(Span::raw(format!("={} ", desc)));
+    }
+    spans.push(Span::raw("│ ".to_string()));
+    spans.push(Span::styled(
+        col_display,
+        Style::default().fg(Color::DarkGray),
+    ));
+
+    let text = Line::from(spans);
 
     let mut lines = vec![text];
     if let Some(ref msg) = app.status_message {
