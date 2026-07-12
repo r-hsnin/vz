@@ -1753,6 +1753,20 @@ fn test_output_json_chart_data_bar_sorted() {
 }
 
 #[test]
+fn test_output_svg_basic() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--output", "svg"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.starts_with("<svg"), "SVG should start with <svg tag");
+    assert!(stdout.contains("</svg>"), "SVG should have closing tag");
+    assert!(stdout.contains("viewBox"), "SVG should have viewBox");
+    assert!(stdout.contains("revenue"), "SVG should contain data labels");
+}
+
+#[test]
 fn test_output_json_info_flag() {
     let output = vz_binary()
         .args(["fixtures/sales.csv", "--info", "--output", "json"])

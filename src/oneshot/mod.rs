@@ -138,7 +138,7 @@ fn compute_bar_agg_stats(
 }
 
 /// Render the appropriate chart type into a buffer.
-fn render_chart_to_buffer(
+pub fn render_chart_to_buffer(
     chart_type: ChartType,
     recommendation: &ChartRecommendation,
     headers: &[String],
@@ -202,7 +202,7 @@ fn render_chart_to_buffer(
 
 /// Get terminal width, falling back to 80 columns.
 /// When stdout is piped (not a TTY), always returns 80 for deterministic output.
-fn terminal_width() -> u16 {
+pub fn terminal_width() -> u16 {
     if !std::io::IsTerminal::is_terminal(&std::io::stdout()) {
         return 80;
     }

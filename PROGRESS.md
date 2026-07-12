@@ -2986,3 +2986,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: src/output/mod.rs
 - テスト: 既存517テスト全パス
 - 検証: PASS (517 tests: 394 unit + 119 integration + 4 snapshot)
+
+---
+
+## Cycle 178 — 2026-07-12T16:15
+- 種別: 機能追加
+- ユーザーストーリー: チャートをSVG画像として出力し、ドキュメントやSlackに埋め込みたい。
+- スコア: RICE = (8×9×7)/5 = 100.8
+- 改善: `--output svg` / `--svg` を実装。既存のratatuiバッファをモノスペースSVGに変換するアプローチ（Approach A）。全5チャート種別に対応。
+- 影響: 新規 src/svg.rs (144行), src/main.rs, src/cli/mod.rs, src/oneshot/mod.rs (公開化), README.md, tests/integration_test.rs
+- テスト追加: 3 unit (buffer_to_svg_basic, _colored, xml_escape) + 1 integration (test_output_svg_basic)
+- 検証: PASS (521 tests: 397 unit + 120 integration + 4 snapshot)

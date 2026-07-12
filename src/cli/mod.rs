@@ -84,6 +84,10 @@ pub struct Cli {
     #[arg(long = "spark", conflicts_with_all = ["output", "json"])]
     pub spark: bool,
 
+    /// Shorthand for --output svg (SVG image export).
+    #[arg(long = "svg", conflicts_with_all = ["output", "json", "spark"])]
+    pub svg: bool,
+
     /// Sample at most N rows from the data (systematic sampling for large datasets).
     #[arg(long = "sample", value_name = "N")]
     pub sample: Option<usize>,
@@ -209,6 +213,8 @@ pub enum OutputFormat {
     Table,
     /// Single-line sparkline for pipeline embedding.
     Spark,
+    /// SVG image output (monospace text rendering).
+    Svg,
 }
 
 /// Color theme preset.

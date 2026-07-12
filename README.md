@@ -87,7 +87,7 @@ vz present slides.md
 | `-H` | `--height` | Chart height in rows (default: 24) |
 | `-I` | `--info` | Show column metadata without rendering a chart |
 | `-w` | `--where` | Filter rows: `col=value`, `col>value`, `col<value` (repeatable) |
-| `-o` | `--output` | Output format: `text`, `json`, `table`, `spark` |
+| `-o` | `--output` | Output format: `text`, `json`, `table`, `spark`, `svg` |
 | `-Y` | `--all-y` | Plot all quantitative columns as multi-series overlay |
 | | `--no-header` | Treat first row as data (auto-detected if all-numeric) |
 | | `--sort` | Sort bar chart values: `desc`, `asc`, `none` |
@@ -101,6 +101,7 @@ vz present slides.md
 | | `--theme` | Color theme: `dark` (default), `light`, `high-contrast` |
 | | `--json` | Shorthand for `--output json` |
 | | `--spark` | Shorthand for `--output spark` |
+| | `--svg` | Shorthand for `--output svg` |
 | `-h` | `--help` | Print help |
 | `-V` | `--version` | Print version |
 

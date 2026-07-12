@@ -9,6 +9,7 @@ pub mod output;
 pub mod present;
 pub mod render;
 pub mod sparkline;
+pub mod svg;
 pub mod table;
 pub mod theme;
 pub mod util;
@@ -245,6 +246,10 @@ fn main() {
     // --spark is a shorthand for -o spark
     if cli.spark {
         cli.output = Some(cli::OutputFormat::Spark);
+    }
+    // --svg is a shorthand for -o svg
+    if cli.svg {
+        cli.output = Some(cli::OutputFormat::Svg);
     }
     let json_output = cli.output == Some(cli::OutputFormat::Json);
 
@@ -530,11 +535,44 @@ fn dispatch_output(
         Some(cli::OutputFormat::Spark) => {
             print_spark(recommendation, headers, rows, cli);
         }
+        Some(cli::OutputFormat::Svg) => {
+            let opts = build_render_options(cli, y_opts);
+            print_svg(recommendation, headers, rows, &opts)?;
+        }
         _ => {
             let opts = build_render_options(cli, y_opts);
             oneshot::render_oneshot(recommendation, headers, rows, &opts)?;
         }
     }
+    Ok(())
+}
+
+/// Render the chart to SVG and print to stdout.
+fn print_svg(
+    recommendation: &chart::ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &oneshot::RenderOptions<'_>,
+) -> anyhow::Result<()> {
+    use ratatui::{buffer::Buffer, layout::Rect};
+
+    let width = opts.width.unwrap_or_else(oneshot::terminal_width);
+    let chart_type = oneshot::resolve_chart_type(recommendation, opts.chart_type_override);
+    let height = opts.height.unwrap_or(24);
+
+    let area = Rect::new(0, 0, width, height);
+    let mut buf = Buffer::empty(area);
+    oneshot::render_chart_to_buffer(
+        chart_type,
+        recommendation,
+        headers,
+        rows,
+        opts,
+        area,
+        &mut buf,
+    );
+
+    println!("{}", svg::buffer_to_svg(&buf));
     Ok(())
 }
 
