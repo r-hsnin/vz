@@ -154,28 +154,18 @@ Bar charts automatically aggregate (sum) values by category.
 
 ## Present Mode
 
-Write Markdown with embedded chart blocks:
+Write Markdown with embedded `chart` code blocks:
 
 ````markdown
-# Revenue Report
-
 ```chart
 source: sales.csv
 x: month
 y: revenue
 type: line
-title: Monthly Revenue
 ```
-
----
-
-# Takeaways
-
-- Revenue grew 80%
-- Tokyo leads
 ````
 
-Chart source paths resolve relative to the Markdown file's directory.
+Navigate: `←`/`→` or `h`/`l`, jump: `g`/`G`, quit: `q`
 
 Navigate: `←`/`→` or `h`/`l`, jump: `g`/`G`, quit: `q`
 

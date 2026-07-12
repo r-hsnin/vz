@@ -100,3 +100,50 @@ date        revenue
 2024-05-01     2000
 2024-06-01     1800
 ```
+
+## SVG エクスポート
+
+```bash
+$ vz sales.csv -x city -y revenue -t bar --svg > chart.svg
+```
+
+ターミナル表示と同じモノスペーステキストの SVG 画像を生成。`--theme light` で白背景（ドキュメント向け）。
+
+## Markdown 出力
+
+```bash
+$ vz sales.csv -x city -y revenue -t bar --markdown
+```
+
+```markdown
+| city | revenue |
+|---|---|
+| Tokyo | 4200 |
+| Osaka | 3300 |
+| Nagoya | 800 |
+```
+
+README や GitHub Issue に集計結果を埋め込むのに便利。
+
+## ラベル表示
+
+```bash
+$ vz sales.csv -x city -y revenue -t bar --labels
+```
+
+各バーに値とパーセンテージを表示: `████ 4.2k (51%)`
+
+## 集計関数
+
+```bash
+# デフォルト: 合計
+$ vz data.csv -x product -y revenue --agg sum
+
+# カテゴリごとの平均
+$ vz data.csv -x product -y revenue --agg mean
+
+# カテゴリごとの行数
+$ vz data.csv -x region -y id --agg count
+```
+
+サマリー行に関数が反映される: `y=mean(revenue)`

@@ -125,27 +125,13 @@ Bar │ x=name │ y=score (78–92) │ 3 rows
 
 ## Present Mode
 
-Write slides with embedded charts:
+Terminal slide presentations with embedded live charts.
 
-````markdown
-# Revenue Report
-
-```chart
-source: sales.csv
-x: month
-y: revenue
-type: line
-title: Monthly Revenue
+```bash
+$ vz present slides.md
 ```
 
----
-
-# Takeaways
-- Revenue grew 80%
-- Tokyo leads all cities
-````
-
-Run: `vz present slides.md`
+See [Output Modes → Present Mode](/guide/output-modes#present-mode) for the full chart block syntax.
 
 ## SVG Export
 

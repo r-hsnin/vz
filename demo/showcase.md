@@ -100,6 +100,5 @@ title: Requests per Second
 # Next Steps
 
 - Expand to Parquet/SQLite data sources
-- Add SVG export for reports
-- Custom color themes for accessibility
 - Streaming data support for dashboards
+- Additional aggregation functions (median, percentile)
