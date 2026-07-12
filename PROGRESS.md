@@ -2606,3 +2606,16 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 1 unit (test_themes_have_different_axis_colors)
 - 検証: PASS (490 tests: 373 unit + 113 integration + 4 snapshot)
 - 次の候補: explore/mod.rs ファイル分割 (837行 > 800行制限)
+
+---
+
+## Cycle 153 — 2026-07-12T13:45
+- 種別: リファクタ（ファイル分割）
+- スコア: RICE = (4×2×9)/3 = 24
+- 改善: `explore/mod.rs` の描画関数を `explore/render.rs` に抽出。839行→628行（-211行）。
+  - 移動: draw_ui, render_chart, render_table, build_header, build_status_bar
+  - 未使用 import 除去
+- 影響: src/explore/mod.rs (-211行), src/explore/render.rs (新規218行)
+- テスト: 既存490テスト全パス
+- 検証: PASS (490 tests: 373 unit + 113 integration + 4 snapshot)
+- 次の候補: X軸ラベル省略インジケータ (RICE=120 from Agent A)
