@@ -2514,3 +2514,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 
 **テスト数推移:** 474 → 489 (+15)
 **コミット:** 5 commits on main
+
+---
+
+## Cycle 146 — 2026-07-12T13:45
+- 種別: リファクタ
+- スコア: RICE = (8×6×9)/3 = 144
+- 改善: `render_oneshot` (73行) から `warn_incompatible_flags()` を抽出。関数を50行以下に削減。
+- 影響: src/oneshot/mod.rs
+- テスト: 既存489テスト全パス（動作変更なし）
+- 検証: PASS (489 tests: 372 unit + 113 integration + 4 snapshot)
+- 次の候補: build_status_bar keybind helper (RICE=112.5)

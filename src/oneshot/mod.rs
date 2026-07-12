@@ -74,6 +74,25 @@ pub fn render_oneshot(
         skipped_rows,
     });
 
+    warn_incompatible_flags(chart_type, opts);
+
+    let area = Rect::new(0, 0, width, height);
+    let mut buf = Buffer::empty(area);
+    render_chart_to_buffer(
+        chart_type,
+        recommendation,
+        headers,
+        rows,
+        opts,
+        area,
+        &mut buf,
+    );
+
+    print_buffer(&buf, &mut io::stdout().lock())
+}
+
+/// Emit warnings when CLI flags are used with incompatible chart types.
+fn warn_incompatible_flags(chart_type: ChartType, opts: &RenderOptions<'_>) {
     if opts.sort_order.is_some()
         && opts.sort_order != Some(SortOrder::None)
         && !matches!(chart_type, ChartType::Bar)
@@ -97,20 +116,6 @@ pub fn render_oneshot(
             chart_type
         );
     }
-
-    let area = Rect::new(0, 0, width, height);
-    let mut buf = Buffer::empty(area);
-    render_chart_to_buffer(
-        chart_type,
-        recommendation,
-        headers,
-        rows,
-        opts,
-        area,
-        &mut buf,
-    );
-
-    print_buffer(&buf, &mut io::stdout().lock())
 }
 
 /// Compute min/max of aggregated bar chart values (post-sum/mean/etc).
