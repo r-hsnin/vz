@@ -12,7 +12,8 @@ const CELL_HEIGHT: f64 = 16.0;
 const FONT_SIZE: f64 = 14.0;
 
 /// Convert a ratatui Buffer to an SVG string.
-pub fn buffer_to_svg(buf: &Buffer) -> String {
+/// `bg_color` sets the background (default: dark theme #1e1e1e).
+pub fn buffer_to_svg(buf: &Buffer, bg_color: &str) -> String {
     let area = buf.area;
     let width = area.width as f64 * CELL_WIDTH;
     let height = area.height as f64 * CELL_HEIGHT;
@@ -26,7 +27,7 @@ pub fn buffer_to_svg(buf: &Buffer) -> String {
     // Background
     writeln!(
         svg,
-        r##"<rect width="100%" height="100%" fill="#1e1e1e"/>"##
+        r#"<rect width="100%" height="100%" fill="{bg_color}"/>"#,
     )
     .unwrap();
     // Font style
@@ -120,7 +121,7 @@ mod tests {
         let mut buf = Buffer::empty(area);
         buf[(0, 0)].set_char('H');
         buf[(1, 0)].set_char('i');
-        let svg = buffer_to_svg(&buf);
+        let svg = buffer_to_svg(&buf, "#1e1e1e");
         assert!(svg.contains("<svg"));
         assert!(svg.contains("</svg>"));
         assert!(svg.contains("Hi"));
@@ -132,7 +133,7 @@ mod tests {
         let mut buf = Buffer::empty(area);
         buf[(0, 0)].set_char('R');
         buf[(0, 0)].set_style(Style::default().fg(Color::Red));
-        let svg = buffer_to_svg(&buf);
+        let svg = buffer_to_svg(&buf, "#1e1e1e");
         assert!(svg.contains("#f44747"), "Red color expected");
         assert!(svg.contains("R"));
     }

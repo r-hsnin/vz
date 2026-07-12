@@ -76,6 +76,15 @@ impl Theme {
     pub fn series_color(&self, index: usize) -> Color {
         self.series_colors[index % self.series_colors.len()]
     }
+
+    /// Get the SVG background color as a hex string.
+    pub fn svg_background(&self) -> &'static str {
+        match self.title_color {
+            Color::Black => "#ffffff", // light theme
+            Color::White => "#1e1e1e", // dark theme
+            _ => "#0a0a0a",            // high-contrast
+        }
+    }
 }
 
 impl Default for Theme {

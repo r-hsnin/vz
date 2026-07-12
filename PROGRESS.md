@@ -3036,3 +3036,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: src/chart/data_builder.rs
 - テスト: 既存522テスト全パス
 - 検証: PASS (522 tests: 398 unit + 120 integration + 4 snapshot)
+
+---
+
+## Cycle 183 — 2026-07-12T16:15
+- 種別: UX改善 + リファクタ
+- 改善:
+  1. SVG出力がテーマに連動: dark=#1e1e1e, light=#ffffff, high-contrast=#0a0a0a
+  2. `aggregate_bar` を `collect_groups` に分割完了
+- 影響: src/svg.rs, src/main.rs, src/theme.rs, src/chart/data_builder.rs
+- テスト: 既存522テスト全パス
+- 検証: PASS (522 tests: 398 unit + 120 integration + 4 snapshot)

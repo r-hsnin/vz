@@ -572,7 +572,7 @@ fn print_svg(
         &mut buf,
     );
 
-    println!("{}", svg::buffer_to_svg(&buf));
+    println!("{}", svg::buffer_to_svg(&buf, opts.theme.svg_background()));
     Ok(())
 }
 
