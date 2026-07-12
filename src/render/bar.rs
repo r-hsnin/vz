@@ -1,7 +1,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::Style,
+    style::{Color, Style},
     text::Line,
     widgets::{Bar, BarChart as RatatuiBarChart, BarGroup, Block, Borders, Widget},
 };
@@ -42,6 +42,7 @@ impl<'a> Widget for BarChart<'a> {
             &self.data.values,
             max_val,
             self.data.show_labels,
+            &self.data.series_colors,
         );
         let group = BarGroup::default().bars(&bars);
 
@@ -75,6 +76,7 @@ fn build_bars<'a>(
     values: &[f64],
     max_val: f64,
     show_labels: bool,
+    series_colors: &[Color],
 ) -> Vec<Bar<'a>> {
     let scale_factor = if max_val > 0.0 {
         10000.0 / max_val
@@ -93,7 +95,11 @@ fn build_bars<'a>(
         .zip(values.iter())
         .enumerate()
         .map(|(i, (label, &value))| {
-            let color = SERIES_COLORS[i % SERIES_COLORS.len()];
+            let color = if series_colors.is_empty() {
+                SERIES_COLORS[i % SERIES_COLORS.len()]
+            } else {
+                series_colors[i % series_colors.len()]
+            };
             let scaled = (value * scale_factor).round() as u64;
             let text = if show_labels && total > 0.0 {
                 let pct = (value / total * 100.0).round() as u32;
@@ -126,6 +132,7 @@ mod tests {
             values: vec![300.0, 200.0, 150.0],
             y_label: "Revenue".to_string(),
             show_labels: false,
+            series_colors: vec![],
         };
 
         let chart = BarChart::new(&data);
@@ -149,6 +156,7 @@ mod tests {
             values: vec![],
             y_label: "Y".to_string(),
             show_labels: false,
+            series_colors: vec![],
         };
 
         let chart = BarChart::new(&data);
@@ -166,6 +174,7 @@ mod tests {
             values: vec![42.0],
             y_label: "Count".to_string(),
             show_labels: false,
+            series_colors: vec![],
         };
 
         let chart = BarChart::new(&data);
@@ -182,6 +191,7 @@ mod tests {
             values: vec![0.75, 0.50, 0.25],
             y_label: "Rate".to_string(),
             show_labels: false,
+            series_colors: vec![],
         };
 
         let chart = BarChart::new(&data);
@@ -211,6 +221,7 @@ mod tests {
             values: vec![1500000.0, 750000.0],
             y_label: "Revenue".to_string(),
             show_labels: false,
+            series_colors: vec![],
         };
 
         let chart = BarChart::new(&data);

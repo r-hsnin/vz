@@ -100,6 +100,7 @@ pub fn aggregate_bar(
             values,
             y_label,
             show_labels: false,
+            series_colors: vec![],
         },
         rows_used,
     )

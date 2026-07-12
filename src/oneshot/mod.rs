@@ -173,6 +173,7 @@ fn render_chart_to_buffer(
                 data.y_label = label.to_string();
             }
             data.show_labels = opts.labels;
+            data.series_colors = opts.theme.series_colors.clone();
             builders::sort_bar_data(&mut data, opts.sort_order);
             builders::truncate_bar_data(&mut data, opts.limit);
             warn_skipped_rows(rows.len(), rows_used, recommendation, ChartType::Bar);
@@ -737,6 +738,7 @@ mod tests {
             y_label: String::new(),
             title: None,
             show_labels: false,
+            series_colors: vec![],
         };
         sort_bar_data(&mut data, Some(SortOrder::Desc));
         assert_eq!(data.labels, vec!["B", "C", "A"]);
@@ -751,6 +753,7 @@ mod tests {
             y_label: String::new(),
             title: None,
             show_labels: false,
+            series_colors: vec![],
         };
         sort_bar_data(&mut data, Some(SortOrder::Asc));
         assert_eq!(data.labels, vec!["A", "C", "B"]);
@@ -765,6 +768,7 @@ mod tests {
             y_label: String::new(),
             title: None,
             show_labels: false,
+            series_colors: vec![],
         };
         sort_bar_data(&mut data, None);
         assert_eq!(data.labels, vec!["A", "B", "C"]);
@@ -779,6 +783,7 @@ mod tests {
             y_label: String::new(),
             title: None,
             show_labels: false,
+            series_colors: vec![],
         };
         // Should not panic with NaN values
         sort_bar_data(&mut data, Some(SortOrder::Desc));
@@ -802,6 +807,7 @@ mod tests {
             values: vec![100.0, 50.0, 25.0],
             y_label: "val".into(),
             show_labels: false,
+            series_colors: vec![],
         };
         truncate_bar_data(&mut data, Some(2));
         assert_eq!(data.labels, vec!["A", "B"]);
@@ -816,6 +822,7 @@ mod tests {
             values: vec![100.0, 50.0, 25.0],
             y_label: "val".into(),
             show_labels: false,
+            series_colors: vec![],
         };
         truncate_bar_data(&mut data, None);
         assert_eq!(data.labels.len(), 3);
@@ -829,6 +836,7 @@ mod tests {
             values: vec![100.0, 50.0],
             y_label: "val".into(),
             show_labels: false,
+            series_colors: vec![],
         };
         truncate_bar_data(&mut data, Some(10));
         assert_eq!(data.labels.len(), 2);

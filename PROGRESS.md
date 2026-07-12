@@ -2387,3 +2387,41 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存474テスト全パス (新色がテストに影響しないことを確認)
 - 検証: PASS (474 tests: 358 unit + 112 integration + 4 snapshot)
 - 次の候補: bar chart にもテーマ適用 or 停止判定
+
+---
+
+## Cycle 140 — 2026-07-12T12:36
+- 種別: 機能追加 (テーマ適用完了)
+- 改善: Theme の series_colors を Bar チャートにも適用。全チャートタイプ (Line/Scatter/Bar) がテーマ対応に。
+- 影響: src/render/mod.rs (BarChartData.series_colors), src/render/bar.rs (build_bars引数追加), src/oneshot/mod.rs (theme injection)
+- 検証: diff で dark(cyan/yellow/green) vs light(blue/red/green) の差異確認
+- テスト: PASS (474 tests: 358 unit + 112 integration + 4 snapshot)
+- 次の候補: 停止条件再評価
+
+---
+
+## STOP — 2026-07-12T12:36 (Session — 10 cycles complete)
+
+**停止条件:**
+1. ✅ cargo test 全パス: 474 tests (358 unit + 112 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 10 サイクル記録 (Cycles 131-140)
+4. ⚠️ 残存候補: Histogram/Heatmap theme 未適用 (RICE<50), render_oneshot 61行分割 (RICE=80)
+
+**このセッション (Cycles 131-140) のサマリー:**
+
+| Cycle | Type | Key Change |
+|-------|------|-----------|
+| 131 | 機能追加 | `--watch` ファイル変更監視+自動再描画 |
+| 132 | リファクタ | present/mod.rs 分割 (1071→751行) |
+| 133 | 品質改善 | unwrap→? 安全性 + explore c=color ヒント |
+| 134 | リファクタ | oneshot builders 抽出 (-173行) |
+| 135 | 足回り | GitHub Actions CI |
+| 136 | UX改善 | --labels警告 + summary行幅制限 |
+| 137 | ドキュメント | DESIGN.md 実装同期 |
+| 138 | 機能追加 | --theme フラグ (dark/light/high-contrast) |
+| 139 | 機能追加 | Theme を Line/Scatter に適用 |
+| 140 | 機能追加 | Theme を Bar に適用 |
+
+**テスト数推移:** 454 → 474 (+20)
+**コミット:** 10 commits on main

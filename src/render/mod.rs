@@ -107,6 +107,8 @@ pub struct BarChartData {
     pub y_label: String,
     /// Show value + percentage labels on bars.
     pub show_labels: bool,
+    /// Color palette for bars (from theme). Falls back to SERIES_COLORS if empty.
+    pub series_colors: Vec<Color>,
 }
 
 /// Data for a histogram.
