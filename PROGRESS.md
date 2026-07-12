@@ -2319,3 +2319,18 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 0 (リファクタリングのみ)
 - 検証: PASS (460 tests: 349 unit + 107 integration + 4 snapshot)
 - 次の候補: Cycle 5 評価で判断
+
+---
+
+## Cycle 135 — 2026-07-12T12:03
+- 種別: 足回り (CI)
+- 選定: GitHub Actions CI追加 (TODO.md記載, RICE=280: R10×I7×C8/E2)
+- 改善: `.github/workflows/ci.yml` 新規作成。push/PR時に自動実行:
+  1. `cargo fmt --check` — フォーマット検証
+  2. `cargo clippy --all-targets -- -D warnings` — lint
+  3. `cargo test` — 全テスト実行
+  4. Rust cache (Swatinem/rust-cache) でビルド高速化
+  5. docs/ と *.md の変更は CI スキップ
+- 影響: .github/workflows/ci.yml (新規), TODO.md (完了項目マーク)
+- テスト追加: 0 (インフラ変更)
+- 検証: PASS (460 tests: 349 unit + 107 integration + 4 snapshot)
