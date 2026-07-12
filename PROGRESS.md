@@ -2955,3 +2955,13 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: 新規 src/util.rs, src/main.rs, src/render/mod.rs, src/output/mod.rs, src/oneshot/mod.rs, src/oneshot/summary.rs, src/sparkline.rs
 - テスト追加: 4 unit (min_max tests in util.rs)
 - 検証: PASS (515 tests: 394 unit + 117 integration + 4 snapshot)
+
+---
+
+## Cycle 175 — 2026-07-12T16:15
+- 種別: DRY リファクタ
+- スコア: RICE = (2×2×9.5)/0.5 = 76
+- 改善: `ExploreApp` に `x_label()`/`y_label()` ヘルパーを追加し、6箇所の `.schema.columns.get(...).map(|c| c.name.clone()).unwrap_or_default()` を統一。
+- 影響: src/explore/mod.rs
+- テスト: 既存515テスト全パス
+- 検証: PASS (515 tests: 394 unit + 117 integration + 4 snapshot)

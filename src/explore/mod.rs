@@ -195,20 +195,28 @@ impl ExploreApp {
             .collect()
     }
 
-    /// Build chart configuration for the current selection.
-    pub fn build_chart_config(&self) -> ChartConfig {
-        let x_label = self
-            .schema
+    /// Get the current X-axis column name.
+    fn x_label(&self) -> String {
+        self.schema
             .columns
             .get(self.selected_x)
             .map(|c| c.name.clone())
-            .unwrap_or_default();
-        let y_label = self
-            .schema
+            .unwrap_or_default()
+    }
+
+    /// Get the current Y-axis column name.
+    fn y_label(&self) -> String {
+        self.schema
             .columns
             .get(self.selected_y)
             .map(|c| c.name.clone())
-            .unwrap_or_default();
+            .unwrap_or_default()
+    }
+
+    /// Build chart configuration for the current selection.
+    pub fn build_chart_config(&self) -> ChartConfig {
+        let x_label = self.x_label();
+        let y_label = self.y_label();
 
         // Use user-selected color column, or auto-detect
         let color_idx = self.selected_color.or_else(|| {
@@ -233,12 +241,7 @@ impl ExploreApp {
 
     /// Build bar chart data (aggregated by category).
     pub fn build_bar_data(&self) -> BarChartData {
-        let y_label = self
-            .schema
-            .columns
-            .get(self.selected_y)
-            .map(|c| c.name.clone())
-            .unwrap_or_default();
+        let y_label = self.y_label();
         let title = format!("{} by category", y_label);
 
         let (mut data, _) = data_builder::aggregate_bar(
@@ -255,12 +258,7 @@ impl ExploreApp {
 
     /// Build histogram data.
     pub fn build_histogram_data(&self) -> HistogramData {
-        let x_label = self
-            .schema
-            .columns
-            .get(self.selected_x)
-            .map(|c| c.name.clone())
-            .unwrap_or_default();
+        let x_label = self.x_label();
         let title = format!("Distribution of {}", x_label);
 
         let mut data =
@@ -271,18 +269,8 @@ impl ExploreApp {
 
     /// Build heatmap data for the two selected columns.
     pub fn build_heatmap_data(&self) -> crate::render::HeatmapData {
-        let x_label = self
-            .schema
-            .columns
-            .get(self.selected_x)
-            .map(|c| c.name.clone())
-            .unwrap_or_default();
-        let y_label = self
-            .schema
-            .columns
-            .get(self.selected_y)
-            .map(|c| c.name.clone())
-            .unwrap_or_default();
+        let x_label = self.x_label();
+        let y_label = self.y_label();
         let title = format!("{} × {}", x_label, y_label);
         data_builder::build_heatmap_data(&self.data, self.selected_x, self.selected_y, Some(title))
     }
