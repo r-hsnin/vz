@@ -134,6 +134,8 @@ fn build_chart_data_for_type(
                 block.title.clone(),
             );
             config.series_colors = theme.series_colors.clone();
+            config.axis_color = Some(theme.axis_color);
+            config.label_color = Some(theme.label_color);
             if chart_type == ChartType::Scatter {
                 Ok(ChartData::Scatter(config))
             } else {

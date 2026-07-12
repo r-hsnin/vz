@@ -96,6 +96,10 @@ pub struct ChartConfig {
     pub x_labels: Option<Vec<String>>,
     /// Color palette for series (from theme). Falls back to SERIES_COLORS if empty.
     pub series_colors: Vec<Color>,
+    /// Color for axis lines/ticks. Falls back to DarkGray if not set.
+    pub axis_color: Option<Color>,
+    /// Color for axis label text. Falls back to axis_color then DarkGray.
+    pub label_color: Option<Color>,
 }
 
 /// Labels for a bar chart (categorical x-axis).
@@ -207,7 +211,7 @@ pub fn dedup_tick_labels(ticks: &[String]) -> Vec<String> {
 
 /// Render Y-axis tick labels in the given area.
 /// `y_ticks` should be ordered from top (max) to bottom (min).
-pub fn render_y_axis(y_ticks: &[String], area: Rect, buf: &mut Buffer) {
+pub fn render_y_axis(y_ticks: &[String], area: Rect, buf: &mut Buffer, color: Color) {
     let y_label_width = y_ticks.iter().map(|s| s.len()).max().unwrap_or(3).max(3) as u16;
     let chart_inner_height = area.height.saturating_sub(3) as usize;
     if chart_inner_height == 0 {
@@ -234,12 +238,12 @@ pub fn render_y_axis(y_ticks: &[String], area: Rect, buf: &mut Buffer) {
             let label = &y_ticks[tick_idx];
             lines.push(Line::from(Span::styled(
                 format!("{:>width$}│", label, width = y_label_width as usize),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(color),
             )));
         } else {
             lines.push(Line::from(Span::styled(
                 format!("{:>width$}│", "", width = y_label_width as usize),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(color),
             )));
         }
     }
@@ -313,7 +317,7 @@ fn render_y_axis_frame_inner(
     let y_ticks = dedup_tick_labels(&y_ticks);
 
     let (y_area, chart_area) = split_y_axis(*area, &y_ticks);
-    render_y_axis(&y_ticks, y_area, buf);
+    render_y_axis(&y_ticks, y_area, buf, Color::DarkGray);
     chart_area
 }
 
@@ -556,7 +560,7 @@ mod tests {
         let ticks = vec!["100".to_string(), "50".to_string(), "0".to_string()];
         let area = Rect::new(0, 0, 6, 24);
         let mut buf = Buffer::empty(area);
-        render_y_axis(&ticks, area, &mut buf);
+        render_y_axis(&ticks, area, &mut buf, Color::DarkGray);
         // Should have rendered something
         let content: String = buf
             .content()

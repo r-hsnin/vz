@@ -276,6 +276,8 @@ pub fn build_chart_config(
         series,
         x_labels,
         series_colors: vec![],
+        axis_color: None,
+        label_color: None,
     }
 }
 

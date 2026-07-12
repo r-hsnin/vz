@@ -106,10 +106,13 @@ impl<'a> Widget for XYChart<'a> {
                     .unwrap_or_else(|| self.config.x_axis.tick_labels(5)),
             );
 
+        let axis_style = Style::default().fg(self.config.axis_color.unwrap_or(Color::DarkGray));
+
         let y_axis = RatatuiAxis::default()
             .title(self.config.y_axis.label.clone())
             .bounds([self.config.y_axis.min, self.config.y_axis.max])
-            .labels(self.config.y_axis.tick_labels(5));
+            .labels(self.config.y_axis.tick_labels(5))
+            .style(axis_style);
 
         let chart = Chart::new(datasets)
             .block(Block::default().title(title).borders(Borders::ALL))
@@ -183,6 +186,8 @@ mod tests {
             }],
             x_labels: None,
             series_colors: vec![],
+            axis_color: None,
+            label_color: None,
         };
 
         let chart = XYChart::new(&config, XYMode::Line);
@@ -224,6 +229,8 @@ mod tests {
             }],
             x_labels: None,
             series_colors: vec![],
+            axis_color: None,
+            label_color: None,
         };
 
         let chart = ScatterPlot::new(&config);
@@ -265,6 +272,8 @@ mod tests {
             ],
             x_labels: None,
             series_colors: vec![],
+            axis_color: None,
+            label_color: None,
         };
 
         let chart = XYChart::new(&config, XYMode::Line);
@@ -319,6 +328,8 @@ mod tests {
             }],
             x_labels: None,
             series_colors: vec![],
+            axis_color: None,
+            label_color: None,
         };
 
         let chart = ScatterPlot::new(&config);
@@ -353,6 +364,8 @@ mod tests {
             ],
             x_labels: None,
             series_colors: vec![],
+            axis_color: None,
+            label_color: None,
         };
 
         let chart = XYChart::new(&config, XYMode::Line);
@@ -387,6 +400,8 @@ mod tests {
             ],
             x_labels: None,
             series_colors: vec![],
+            axis_color: None,
+            label_color: None,
         };
 
         let chart = ScatterPlot::new(&config);
@@ -425,6 +440,8 @@ mod tests {
             }],
             x_labels: None,
             series_colors: vec![],
+            axis_color: None,
+            label_color: None,
         };
 
         let chart = ScatterPlot::new(&config);

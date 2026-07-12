@@ -31,6 +31,8 @@ pub fn build_line_scatter_config(
     super::warn_skipped_rows(effective_rows, rendered, recommendation, chart_type);
     // Apply theme colors
     config.series_colors = opts.theme.series_colors.clone();
+    config.axis_color = Some(opts.theme.axis_color);
+    config.label_color = Some(opts.theme.label_color);
     config
 }
 

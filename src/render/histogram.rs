@@ -37,7 +37,7 @@ impl<'a> Widget for Histogram<'a> {
             let y_ticks = compute_integer_ticks(max_count.ceil() as usize, 5);
             let y_ticks = super::dedup_tick_labels(&y_ticks);
             let (y_area, chart_area) = super::split_y_axis(area, &y_ticks);
-            super::render_y_axis(&y_ticks, y_area, buf);
+            super::render_y_axis(&y_ticks, y_area, buf, Color::DarkGray);
             chart_area
         } else {
             super::render_y_axis_frame(max_count, 5, &area, buf)

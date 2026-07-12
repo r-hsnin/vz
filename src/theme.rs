@@ -114,4 +114,12 @@ mod tests {
     fn test_default_is_dark() {
         assert_eq!(Theme::default(), Theme::dark());
     }
+
+    #[test]
+    fn test_themes_have_different_axis_colors() {
+        let dark = Theme::dark();
+        let light = Theme::light();
+        assert_ne!(dark.axis_color, light.axis_color);
+        assert_ne!(dark.title_color, light.title_color);
+    }
 }

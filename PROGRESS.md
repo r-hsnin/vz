@@ -2590,3 +2590,19 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存489テスト全パス
 - 検証: PASS (489 tests: 372 unit + 113 integration + 4 snapshot)
 - 次の候補: theme dead code の活用 (axis_color等) or explore/mod.rs のファイル分割
+
+---
+
+## Cycle 152 — 2026-07-12T13:45
+- 種別: 設計整合 (theme dead code 活用)
+- スコア: RICE = (3×2×9.5)/0.5 = 11.4
+- 改善: Theme の `axis_color` / `label_color` を render 層に接続。
+  - `ChartConfig` に `axis_color: Option<Color>`, `label_color: Option<Color>` 追加
+  - `render_y_axis` にカラー引数追加
+  - Line/Scatter チャートの軸にテーマカラー適用
+  - oneshot/explore/present 全モードから theme.axis_color を注入
+  - `--theme light` で軸が Gray に変わるようになった
+- 影響: src/render/mod.rs, src/render/line.rs, src/render/histogram.rs, src/oneshot/builders.rs, src/explore/mod.rs, src/present/chart_loader.rs, src/chart/data_builder.rs, src/theme.rs
+- テスト追加: 1 unit (test_themes_have_different_axis_colors)
+- 検証: PASS (490 tests: 373 unit + 113 integration + 4 snapshot)
+- 次の候補: explore/mod.rs ファイル分割 (837行 > 800行制限)

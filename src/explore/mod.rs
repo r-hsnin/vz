@@ -214,6 +214,8 @@ impl ExploreApp {
             Some(title),
         );
         config.series_colors = self.theme.series_colors.clone();
+        config.axis_color = Some(self.theme.axis_color);
+        config.label_color = Some(self.theme.label_color);
         config
     }
 
