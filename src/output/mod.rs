@@ -174,8 +174,18 @@ pub fn compute_column_stats(
             }
         }
         DataType::Temporal => {
-            let min_val = values.first().unwrap_or(&"").to_string();
-            let max_val = values.last().unwrap_or(&"").to_string();
+            let min_val = values
+                .iter()
+                .filter(|v| !v.is_empty())
+                .min()
+                .unwrap_or(&"")
+                .to_string();
+            let max_val = values
+                .iter()
+                .filter(|v| !v.is_empty())
+                .max()
+                .unwrap_or(&"")
+                .to_string();
             ColumnStats::Temporal {
                 min: min_val,
                 max: max_val,
@@ -361,5 +371,28 @@ mod tests {
         // This must not panic — NaN/Infinity should be handled
         let json = serde_json::to_string_pretty(&output);
         assert!(json.is_ok(), "Serialization failed: {:?}", json.err());
+    }
+
+    #[test]
+    fn test_temporal_stats_unsorted_data() {
+        use crate::loader::LoadedData;
+        // Temporal data arriving in non-chronological order
+        let data = LoadedData {
+            headers: vec!["date".to_string()],
+            rows: vec![
+                vec!["2024-03-01".to_string()],
+                vec!["2024-01-15".to_string()],
+                vec!["2024-06-20".to_string()],
+                vec!["2024-02-10".to_string()],
+            ],
+        };
+        let stats = compute_column_stats(0, &DataType::Temporal, &data);
+        match stats {
+            ColumnStats::Temporal { min, max } => {
+                assert_eq!(min, "2024-01-15", "min should be earliest date");
+                assert_eq!(max, "2024-06-20", "max should be latest date");
+            }
+            _ => panic!("Expected Temporal stats"),
+        }
     }
 }

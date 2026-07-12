@@ -2890,3 +2890,13 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: src/render/histogram.rs, tests/snapshots/snapshot_test__snapshot_histogram.snap
 - テスト追加: 4 unit (format_bin_label_fits, _abbreviates, _very_narrow, abbreviate_number)
 - 検証: PASS (509 tests: 388 unit + 117 integration + 4 snapshot)
+
+---
+
+## Cycle 172 — 2026-07-12T15:26
+- 種別: バグ修正
+- スコア: RICE = (4×2×9)/0.5 = 14.4
+- 改善: `--info` の temporal 列 min/max がソート順に依存していたバグを修正。実際の min/max を iter で取得。
+- 影響: src/output/mod.rs
+- テスト追加: 1 unit (test_temporal_stats_unsorted_data)
+- 検証: PASS (510 tests: 389 unit + 117 integration + 4 snapshot)
