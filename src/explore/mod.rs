@@ -46,7 +46,7 @@ impl ExploreApp {
             should_quit: false,
             view_mode: ViewMode::Chart,
             table_offset: 0,
-            status_message: None,
+            status_message: Some("? help │ h/l axis │ j/k col │ d table │ q quit".to_string()),
             show_help: false,
             theme,
         }
@@ -684,5 +684,14 @@ mod tests {
         assert!(!app.show_help, "any key should close help");
         // The 'x' key should not have done anything else (not quit, etc.)
         assert!(!app.should_quit);
+    }
+
+    #[test]
+    fn test_initial_status_message_shows_hints() {
+        let app = make_test_app();
+        let msg = app.status_message.as_deref().unwrap();
+        assert!(msg.contains("?"), "should mention help key");
+        assert!(msg.contains("h/l"), "should mention axis navigation");
+        assert!(msg.contains("q"), "should mention quit");
     }
 }

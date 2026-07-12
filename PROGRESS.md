@@ -2905,6 +2905,16 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 
 ## STOP — 2026-07-12T15:26 (Session — 13 cycles: 160-172)
 
+---
+
+## Cycle 173 — 2026-07-12T16:15
+- 種別: UX改善
+- スコア: RICE = (6×5×9)/1 = 270
+- 改善: Explore モード起動時にキーバインドヒントをステータスバーに表示。初見ユーザーが操作方法を即座に把握できるようにした。
+- 影響: src/explore/mod.rs
+- テスト追加: 1 unit (test_initial_status_message_shows_hints)
+- 検証: PASS (511 tests: 390 unit + 117 integration + 4 snapshot)
+
 **停止条件:**
 1. ✅ cargo test 全パス: 510 tests (389 unit + 117 integration + 4 snapshot)
 2. ✅ clippy 0 warnings, fmt clean
