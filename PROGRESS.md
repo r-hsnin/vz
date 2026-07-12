@@ -2425,3 +2425,18 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 
 **テスト数推移:** 454 → 474 (+20)
 **コミット:** 10 commits on main
+
+---
+
+## Cycle 141 — 2026-07-12T13:12
+- 種別: UX改善
+- ユーザーストーリー: データアナリストとして、一部の行がスキップされた事実をsummaryで把握し、データ品質の問題に気付きたい。
+- スコア: RICE = (7×6×8)/2 = 168
+- 改善:
+  1. summary行で常にスキップされた行数を表示（例: `5 rows (2 skipped)`）
+  2. `SummaryContext` struct を導入して clippy too_many_arguments を解消
+  3. `count_skipped_y_rows()` ヘルパー追加
+- 影響: src/oneshot/mod.rs, src/oneshot/summary.rs, tests/integration_test.rs, fixtures/mixed_values.csv
+- テスト追加: 1 unit + 1 integration
+- 検証: PASS (476 tests: 359 unit + 113 integration + 4 snapshot)
+- 次の候補: Explore mode color discoverability (RICE=135) or test coverage for table.rs/builders.rs

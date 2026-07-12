@@ -2425,3 +2425,17 @@ fn test_theme_flag_invalid_rejected() {
         .expect("Failed to run vz");
     assert!(!output.status.success());
 }
+
+#[test]
+fn test_summary_shows_skipped_rows() {
+    let output = vz_binary()
+        .args(["fixtures/mixed_values.csv"])
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("5 rows (2 skipped)"),
+        "Expected '5 rows (2 skipped)' in stderr: {}",
+        stderr
+    );
+}

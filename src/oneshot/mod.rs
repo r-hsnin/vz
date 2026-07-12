@@ -61,15 +61,18 @@ pub fn render_oneshot(
         None
     };
 
-    summary::print_summary(
+    let skipped_rows = count_skipped_y_rows(recommendation, headers, rows);
+
+    summary::print_summary(&summary::SummaryContext {
         recommendation,
         chart_type,
         headers,
         rows,
-        &opts.extra_y_columns,
-        opts.agg,
+        extra_y_columns: &opts.extra_y_columns,
+        agg: opts.agg,
         agg_stats,
-    );
+        skipped_rows,
+    });
 
     if opts.sort_order.is_some()
         && opts.sort_order != Some(SortOrder::None)
@@ -299,6 +302,29 @@ pub(crate) fn warn_skipped_rows(
             );
         }
     }
+}
+
+/// Count rows that would be skipped due to non-parseable Y values.
+/// Used by the summary line to show "(N skipped)".
+fn count_skipped_y_rows(
+    recommendation: &ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+) -> usize {
+    let y_idx = recommendation
+        .y_column
+        .as_deref()
+        .and_then(|name| headers.iter().position(|h| h == name));
+    let Some(idx) = y_idx else {
+        return 0;
+    };
+    rows.iter()
+        .filter(|row| {
+            row.get(idx)
+                .map(|v| v.trim().parse::<f64>().is_err())
+                .unwrap_or(true)
+        })
+        .count()
 }
 
 // Re-export builder functions for use in tests

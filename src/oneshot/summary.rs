@@ -6,71 +6,67 @@ use crate::render::format_number_pub;
 
 use super::ansi;
 
+/// Context for building a summary line.
+pub struct SummaryContext<'a> {
+    pub recommendation: &'a ChartRecommendation,
+    pub chart_type: ChartType,
+    pub headers: &'a [String],
+    pub rows: &'a [Vec<String>],
+    pub extra_y_columns: &'a [(String, Option<String>)],
+    pub agg: AggFunction,
+    pub agg_stats: Option<(f64, f64)>,
+    pub skipped_rows: usize,
+}
+
 /// Print a one-line summary before the chart.
-pub fn print_summary(
-    recommendation: &ChartRecommendation,
-    chart_type: ChartType,
-    headers: &[String],
-    rows: &[Vec<String>],
-    extra_y_columns: &[(String, Option<String>)],
-    agg: AggFunction,
-    agg_stats: Option<(f64, f64)>,
-) {
-    let parts = build_summary_parts(
-        recommendation,
-        chart_type,
-        headers,
-        rows,
-        extra_y_columns,
-        agg,
-        agg_stats,
-    );
+pub fn print_summary(ctx: &SummaryContext<'_>) {
+    let parts = build_summary_parts(ctx);
     format_and_print_parts(&parts);
 }
 
 /// Build the summary parts vector (pure logic, no IO).
-pub fn build_summary_parts(
-    recommendation: &ChartRecommendation,
-    chart_type: ChartType,
-    headers: &[String],
-    rows: &[Vec<String>],
-    extra_y_columns: &[(String, Option<String>)],
-    agg: AggFunction,
-    agg_stats: Option<(f64, f64)>,
-) -> Vec<String> {
-    let mut parts = vec![format!("{:?}", chart_type)];
-    parts.push(format!("x={}", recommendation.x_column));
+pub fn build_summary_parts(ctx: &SummaryContext<'_>) -> Vec<String> {
+    let mut parts = vec![format!("{:?}", ctx.chart_type)];
+    parts.push(format!("x={}", ctx.recommendation.x_column));
 
-    if let Some(ref y) = recommendation.y_column {
-        let y_idx = headers.iter().position(|h| h == y);
-        let y_part = format_y_part(y, agg, agg_stats, rows, y_idx, chart_type);
+    if let Some(ref y) = ctx.recommendation.y_column {
+        let y_idx = ctx.headers.iter().position(|h| h == y);
+        let y_part = format_y_part(y, ctx.agg, ctx.agg_stats, ctx.rows, y_idx, ctx.chart_type);
         parts.push(y_part);
         // Add trend annotation for line/scatter
-        if chart_type != ChartType::Bar
+        if ctx.chart_type != ChartType::Bar
             && let Some(idx) = y_idx
-            && let Some(trend) = trend_annotation(rows, idx)
+            && let Some(trend) = trend_annotation(ctx.rows, idx)
         {
             parts.push(trend);
         }
     }
 
-    if !extra_y_columns.is_empty() {
-        let names: Vec<&str> = extra_y_columns
+    if !ctx.extra_y_columns.is_empty() {
+        let names: Vec<&str> = ctx
+            .extra_y_columns
             .iter()
             .map(|(col, label)| label.as_deref().unwrap_or(col.as_str()))
             .collect();
         parts.push(format!("y+={}", names.join(",")));
     }
-    if let Some(ref c) = recommendation.color_column {
-        parts.push(color_legend_hint(c, headers, rows));
+    if let Some(ref c) = ctx.recommendation.color_column {
+        parts.push(color_legend_hint(c, ctx.headers, ctx.rows));
     }
-    parts.push(format!("{} rows", rows.len()));
+    parts.push(if ctx.skipped_rows > 0 {
+        format!("{} rows ({} skipped)", ctx.rows.len(), ctx.skipped_rows)
+    } else {
+        format!("{} rows", ctx.rows.len())
+    });
 
-    let extra_names: Vec<&str> = extra_y_columns
+    let extra_names: Vec<&str> = ctx
+        .extra_y_columns
         .iter()
         .map(|(col, _)| col.as_str())
         .collect();
-    if let Some(hint) = unused_columns_hint_with_extra(recommendation, headers, &extra_names) {
+    if let Some(hint) =
+        unused_columns_hint_with_extra(ctx.recommendation, ctx.headers, &extra_names)
+    {
         parts.push(hint);
     }
     parts
@@ -480,15 +476,16 @@ fn test_build_summary_parts_basic() {
         vec!["2024-01".to_string(), "1000".to_string()],
         vec!["2024-02".to_string(), "2000".to_string()],
     ];
-    let parts = build_summary_parts(
-        &rec,
-        ChartType::Line,
-        &headers,
-        &rows,
-        &[],
-        AggFunction::Sum,
-        None,
-    );
+    let parts = build_summary_parts(&SummaryContext {
+        recommendation: &rec,
+        chart_type: ChartType::Line,
+        headers: &headers,
+        rows: &rows,
+        extra_y_columns: &[],
+        agg: AggFunction::Sum,
+        agg_stats: None,
+        skipped_rows: 0,
+    });
     assert_eq!(parts[0], "Line");
     assert_eq!(parts[1], "x=date");
     assert!(parts[2].starts_with("y=revenue"));
@@ -511,15 +508,16 @@ fn test_build_summary_parts_with_agg_stats() {
         vec!["Tokyo".to_string(), "2000".to_string()],
     ];
     // With agg_stats override, summary should use provided stats
-    let parts = build_summary_parts(
-        &rec,
-        ChartType::Bar,
-        &headers,
-        &rows,
-        &[],
-        AggFunction::Sum,
-        Some((800.0, 4200.0)),
-    );
+    let parts = build_summary_parts(&SummaryContext {
+        recommendation: &rec,
+        chart_type: ChartType::Bar,
+        headers: &headers,
+        rows: &rows,
+        extra_y_columns: &[],
+        agg: AggFunction::Sum,
+        agg_stats: Some((800.0, 4200.0)),
+        skipped_rows: 0,
+    });
     assert!(
         parts[2].contains("4.2k"),
         "Expected 4.2k in parts: {:?}",
@@ -537,15 +535,16 @@ fn test_build_summary_parts_non_sum_agg() {
     };
     let headers = vec!["city".to_string(), "revenue".to_string()];
     let rows = vec![vec!["Tokyo".to_string(), "1000".to_string()]];
-    let parts = build_summary_parts(
-        &rec,
-        ChartType::Bar,
-        &headers,
-        &rows,
-        &[],
-        AggFunction::Mean,
-        None,
-    );
+    let parts = build_summary_parts(&SummaryContext {
+        recommendation: &rec,
+        chart_type: ChartType::Bar,
+        headers: &headers,
+        rows: &rows,
+        extra_y_columns: &[],
+        agg: AggFunction::Mean,
+        agg_stats: None,
+        skipped_rows: 0,
+    });
     // Should show mean(revenue) without range (since range is misleading for non-sum)
     assert!(
         parts[2].contains("mean(revenue)"),
@@ -577,15 +576,16 @@ fn test_build_summary_parts_extra_y() {
         "200".to_string(),
     ]];
     let extra = vec![("profit".to_string(), None)];
-    let parts = build_summary_parts(
-        &rec,
-        ChartType::Line,
-        &headers,
-        &rows,
-        &extra,
-        AggFunction::Sum,
-        None,
-    );
+    let parts = build_summary_parts(&SummaryContext {
+        recommendation: &rec,
+        chart_type: ChartType::Line,
+        headers: &headers,
+        rows: &rows,
+        extra_y_columns: &extra,
+        agg: AggFunction::Sum,
+        agg_stats: None,
+        skipped_rows: 0,
+    });
     assert!(
         parts.iter().any(|p| p.contains("y+=profit")),
         "Expected y+=profit: {:?}",
@@ -697,4 +697,35 @@ fn test_truncate_to_width_overflow() {
 #[test]
 fn test_truncate_to_width_one() {
     assert_eq!(truncate_to_width("hello", 1), "…");
+}
+
+#[test]
+fn test_build_summary_parts_shows_skipped_rows() {
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Line,
+        x_column: "date".to_string(),
+        y_column: Some("revenue".to_string()),
+        color_column: None,
+    };
+    let headers = vec!["date".to_string(), "revenue".to_string()];
+    let rows = vec![
+        vec!["2024-01".to_string(), "1000".to_string()],
+        vec!["2024-02".to_string(), "N/A".to_string()],
+        vec!["2024-03".to_string(), "2000".to_string()],
+    ];
+    let parts = build_summary_parts(&SummaryContext {
+        recommendation: &rec,
+        chart_type: ChartType::Line,
+        headers: &headers,
+        rows: &rows,
+        extra_y_columns: &[],
+        agg: AggFunction::Sum,
+        agg_stats: None,
+        skipped_rows: 1,
+    });
+    assert!(
+        parts.iter().any(|p| p.contains("3 rows (1 skipped)")),
+        "Expected '3 rows (1 skipped)' in parts: {:?}",
+        parts
+    );
 }
