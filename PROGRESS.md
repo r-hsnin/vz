@@ -2275,3 +2275,17 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 3 unit (stdin拒否, 非存在ファイル, 初回render呼出) + 3 integration (rerenders on change, nonexistent error, stdin error)
 - 検証: PASS (460 tests: 349 unit + 107 integration + 4 snapshot)
 - 次の候補: present/mod.rs 1071行の分割 or summary width truncation
+
+---
+
+## Cycle 132 — 2026-07-12T12:03
+- 種別: リファクタリング
+- 選定: present/mod.rs 1071行→800行以下に分割 (RICE=168: R8×I7×C9/E3)
+- 改善:
+  1. `src/present/render.rs` 新規作成 (223行): draw_slide, render_slide_content, render_slide_body, element_constraint, render_element, render_code_block, render_chart_placeholder
+  2. `src/present/chart_loader.rs` 新規作成 (137行): resolve_chart_source_path, load_chart_data, infer_chart_type_from_data, build_chart_data_for_type
+  3. `present/mod.rs`: 1071行→751行 (320行削減, 800行制約達成)
+- 影響: src/present/mod.rs, src/present/render.rs (新規), src/present/chart_loader.rs (新規)
+- テスト追加: 0 (リファクタリングのみ、既存テスト全パスで振る舞い保持確認)
+- 検証: PASS (460 tests: 349 unit + 107 integration + 4 snapshot)
+- 次の候補: oneshot/mod.rs 分割 or render_oneshot短縮

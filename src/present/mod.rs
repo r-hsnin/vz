@@ -1,17 +1,12 @@
 use anyhow::{Context, Result};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
-    Frame,
-    layout::{Constraint, Layout},
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    style::{Modifier, Style},
+    text::Span,
 };
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use crate::chart::data_builder;
 use crate::chart::selector::ChartType;
-use crate::cli::AggFunction;
 
 /// A single slide in a presentation.
 #[derive(Debug, Clone, PartialEq)]
@@ -237,7 +232,7 @@ pub fn run_present(path: &Path) -> Result<()> {
     let mut app = PresentApp::new(presentation, base_dir);
 
     loop {
-        terminal.draw(|frame| draw_slide(frame, &app))?;
+        terminal.draw(|frame| render::draw_slide(frame, &app))?;
 
         if let Event::Key(key) = event::read()?
             && key.kind == KeyEventKind::Press
@@ -254,330 +249,15 @@ pub fn run_present(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn draw_slide(frame: &mut Frame, app: &PresentApp) {
-    let chunks = Layout::vertical([
-        Constraint::Min(3),    // content
-        Constraint::Length(1), // footer
-    ])
-    .split(frame.area());
+mod chart_loader;
+mod render;
 
-    if let Some(slide) = app.current_slide() {
-        let content_area = chunks[0];
-
-        // Split content area for title + body
-        let inner_chunks = Layout::vertical([
-            Constraint::Length(if slide.title.is_some() { 3 } else { 0 }),
-            Constraint::Min(1),
-        ])
-        .split(content_area);
-
-        // Title
-        if let Some(ref title) = slide.title {
-            let title_widget = Paragraph::new(Line::from(vec![Span::styled(
-                title.clone(),
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )]))
-            .block(Block::default().borders(Borders::BOTTOM));
-            frame.render_widget(title_widget, inner_chunks[0]);
-        }
-
-        // Body elements
-        let body_area = if slide.title.is_some() {
-            inner_chunks[1]
-        } else {
-            inner_chunks[0]
-        };
-
-        render_slide_body(frame, &slide.content, body_area, &app.base_dir);
-    }
-
-    // Footer with slide indicator
-    let footer = Paragraph::new(Line::from(vec![
-        Span::styled(
-            format!(" {} ", app.slide_indicator()),
-            Style::default().fg(Color::DarkGray),
-        ),
-        Span::raw("  "),
-        Span::styled("←/→", Style::default().fg(Color::Yellow)),
-        Span::raw(" navigate  "),
-        Span::styled("q", Style::default().fg(Color::Yellow)),
-        Span::raw(" quit"),
-    ]));
-    frame.render_widget(footer, chunks[1]);
-}
-
-fn render_slide_body(
-    frame: &mut Frame,
-    elements: &[SlideElement],
-    area: ratatui::layout::Rect,
-    base_dir: &Path,
-) {
-    let constraints: Vec<Constraint> = elements.iter().map(element_constraint).collect();
-
-    if constraints.is_empty() {
-        return;
-    }
-
-    let chunks = Layout::vertical(constraints).spacing(1).split(area);
-
-    for (i, element) in elements.iter().enumerate() {
-        if i >= chunks.len() {
-            break;
-        }
-        render_element(frame, element, chunks[i], base_dir);
-    }
-}
-
-/// Compute the layout constraint for a single slide element.
-fn element_constraint(el: &SlideElement) -> Constraint {
-    match el {
-        SlideElement::Chart(_) => Constraint::Min(10),
-        SlideElement::Text(_) => Constraint::Length(2),
-        SlideElement::Bullets(items) => Constraint::Length(items.len() as u16 + 1),
-        SlideElement::Code { content, .. } => {
-            Constraint::Length(content.lines().count() as u16 + 2)
-        }
-        SlideElement::Heading { .. } => Constraint::Length(2),
-        SlideElement::OrderedList(items) => Constraint::Length(items.len() as u16 + 1),
-    }
-}
-
-/// Render a single slide element into the given area.
-fn render_element(
-    frame: &mut Frame,
-    element: &SlideElement,
-    area: ratatui::layout::Rect,
-    base_dir: &Path,
-) {
-    match element {
-        SlideElement::Text(text) => {
-            let spans = parse_inline_spans(text);
-            let paragraph = Paragraph::new(Line::from(spans)).wrap(Wrap { trim: true });
-            frame.render_widget(paragraph, area);
-        }
-        SlideElement::Bullets(items) => {
-            let lines: Vec<Line> = items
-                .iter()
-                .map(|item| {
-                    Line::from(vec![
-                        Span::styled("  • ", Style::default().fg(Color::Yellow)),
-                        Span::raw(item.clone()),
-                    ])
-                })
-                .collect();
-            frame.render_widget(Paragraph::new(lines), area);
-        }
-        SlideElement::Chart(chart_block) => {
-            render_chart_placeholder(frame, chart_block, area, base_dir);
-        }
-        SlideElement::Code { language, content } => {
-            render_code_block(frame, language.as_deref(), content, area);
-        }
-        SlideElement::Heading { level, text } => {
-            let style = match level {
-                2 => Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-                _ => Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            };
-            let paragraph = Paragraph::new(Line::from(Span::styled(text.clone(), style)));
-            frame.render_widget(paragraph, area);
-        }
-        SlideElement::OrderedList(items) => {
-            let lines: Vec<Line> = items
-                .iter()
-                .enumerate()
-                .map(|(idx, item)| {
-                    Line::from(vec![
-                        Span::styled(
-                            format!("  {}. ", idx + 1),
-                            Style::default().fg(Color::Yellow),
-                        ),
-                        Span::raw(item.clone()),
-                    ])
-                })
-                .collect();
-            frame.render_widget(Paragraph::new(lines), area);
-        }
-    }
-}
-
-/// Render a fenced code block with syntax-highlighted border.
-fn render_code_block(
-    frame: &mut Frame,
-    language: Option<&str>,
-    content: &str,
-    area: ratatui::layout::Rect,
-) {
-    let title = language.map(|l| format!(" {} ", l)).unwrap_or_default();
-    let code_lines: Vec<Line> = content
-        .lines()
-        .map(|l| {
-            Line::from(Span::styled(
-                l.to_string(),
-                Style::default().fg(Color::Green),
-            ))
-        })
-        .collect();
-    let block_widget = Block::default()
-        .title(title)
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
-    let paragraph = Paragraph::new(code_lines).block(block_widget);
-    frame.render_widget(paragraph, area);
-}
-
-fn render_chart_placeholder(
-    frame: &mut Frame,
+/// Load chart data for a presentation chart block (delegated to chart_loader module).
+pub(crate) fn load_chart_data(
     block: &ChartBlock,
-    area: ratatui::layout::Rect,
     base_dir: &Path,
-) {
-    use crate::render::ChartWidget;
-
-    if let Ok(chart_data) = load_chart_data(block, base_dir) {
-        frame.render_widget(ChartWidget(&chart_data), area);
-    } else {
-        // Fallback: show chart block info
-        let info = format!(
-            "📊 Chart: source={}, type={:?}",
-            block.source,
-            block.chart_type.unwrap_or(ChartType::Line)
-        );
-        let placeholder =
-            Paragraph::new(info).block(Block::default().title("Chart").borders(Borders::ALL));
-        frame.render_widget(placeholder, area);
-    }
-}
-
-/// Resolve the chart source file path relative to the markdown file's directory.
-fn resolve_chart_source_path(source: &str, base_dir: &Path) -> PathBuf {
-    let source_path = Path::new(source);
-    if source_path.is_absolute() {
-        return source_path.to_path_buf();
-    }
-    let relative_to_md = base_dir.join(source_path);
-    if relative_to_md.exists() {
-        relative_to_md
-    } else {
-        source_path.to_path_buf()
-    }
-}
-
-fn load_chart_data(block: &ChartBlock, base_dir: &Path) -> Result<crate::render::ChartData> {
-    let path = resolve_chart_source_path(&block.source, base_dir);
-
-    let mut data = crate::loader::load_data(&path).with_context(|| {
-        format!(
-            "Chart source not found: {} (tried: {:?})",
-            block.source, path
-        )
-    })?;
-
-    // Apply filter if specified in chart block.
-    if !block.filter.is_empty() {
-        let predicates: Vec<crate::filter::Predicate> = block
-            .filter
-            .iter()
-            .map(|expr| crate::filter::parse_predicate(expr))
-            .collect::<Result<Vec<_>>>()?;
-        data = crate::filter::filter_data(data, &predicates)?;
-    }
-
-    let headers = &data.headers;
-    let rows = &data.rows;
-
-    let chart_type = block
-        .chart_type
-        .unwrap_or_else(|| infer_chart_type_from_data(headers, rows, block));
-
-    let axes = data_builder::ResolvedAxes::from_explicit(
-        block.x_col.as_deref(),
-        block.y_col.as_deref(),
-        block.color_col.as_deref(),
-        headers,
-    );
-    build_chart_data_for_type(chart_type, block, rows, &axes)
-}
-
-/// Infer chart type from data when not explicitly specified in chart block.
-fn infer_chart_type_from_data(
-    headers: &[String],
-    rows: &[Vec<String>],
-    block: &ChartBlock,
-) -> ChartType {
-    let h_refs: Vec<&str> = headers.iter().map(|s| s.as_str()).collect();
-    let row_refs: Vec<Vec<&str>> = rows
-        .iter()
-        .map(|r| r.iter().map(|s| s.as_str()).collect())
-        .collect();
-    let schema = crate::infer::infer_schema(&h_refs, &row_refs);
-    let x_hint = block.x_col.as_deref();
-    let y_hint = block.y_col.as_deref();
-    crate::chart::select_chart(&schema, x_hint, y_hint)
-        .map(|rec| rec.chart_type)
-        .unwrap_or(ChartType::Line)
-}
-
-/// Build the appropriate ChartData variant from resolved parameters.
-fn build_chart_data_for_type(
-    chart_type: ChartType,
-    block: &ChartBlock,
-    rows: &[Vec<String>],
-    cols: &data_builder::ResolvedAxes,
 ) -> Result<crate::render::ChartData> {
-    use crate::render::ChartData;
-
-    match chart_type {
-        ChartType::Heatmap => {
-            let title = block
-                .title
-                .clone()
-                .unwrap_or_else(|| format!("{} × {}", cols.x_label, cols.y_label));
-            let data = data_builder::build_heatmap_data(rows, cols.x_idx, cols.y_idx, Some(title));
-            Ok(ChartData::Heatmap(data))
-        }
-        ChartType::Bar => {
-            let (data, _) = data_builder::aggregate_bar(
-                rows,
-                cols.x_idx,
-                cols.y_idx,
-                block.title.clone(),
-                cols.y_label.clone(),
-                AggFunction::Sum,
-            );
-            Ok(ChartData::Bar(data))
-        }
-        ChartType::Histogram => {
-            let data = data_builder::build_histogram(
-                rows,
-                cols.x_idx,
-                block.title.clone(),
-                cols.x_label.clone(),
-            );
-            Ok(ChartData::Histogram(data))
-        }
-        ChartType::Line | ChartType::Scatter => {
-            let config = data_builder::build_chart_config(
-                rows,
-                cols.x_idx,
-                cols.y_idx,
-                cols.color_idx,
-                cols.x_label.clone(),
-                cols.y_label.clone(),
-                block.title.clone(),
-            );
-            if chart_type == ChartType::Scatter {
-                Ok(ChartData::Scatter(config))
-            } else {
-                Ok(ChartData::Line(config))
-            }
-        }
-    }
+    chart_loader::load_chart_data(block, base_dir)
 }
 
 #[cfg(test)]
