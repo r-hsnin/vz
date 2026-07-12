@@ -2836,3 +2836,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存501テスト全パス
 - 検証: PASS
 - 次の候補: auto_select リファクタ (RICE=60) or 新評価
+
+---
+
+## Cycle 167 — 2026-07-12T15:26
+- 種別: 設計整合 (theme 完全適用)
+- スコア: RICE = (4×2×9)/0.5 = 14.4 (Histogram Y-axis theme)
+- 改善: Histogram にも `axis_color` フィールド追加・テーマ適用。Bar(Cycle158) + Histogram(本Cycle) で全チャートの Y 軸テーマ化完了。
+- 影響: src/render/mod.rs, src/render/histogram.rs, src/chart/data_builder.rs, src/oneshot/mod.rs, src/present/chart_loader.rs
+- テスト: 既存501テスト全パス
+- 検証: PASS (501 tests: 380 unit + 117 integration + 4 snapshot)
+- テーマ完全性: 全5チャート種別(Line/Scatter/Bar/Histogram/Heatmap) × 全3モード(oneshot/explore/present) で axis_color 統一

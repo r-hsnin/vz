@@ -190,7 +190,8 @@ fn render_chart_to_buffer(
             ChartData::Bar(data)
         }
         ChartType::Histogram => {
-            let data = builders::build_histogram_data(recommendation, headers, rows);
+            let mut data = builders::build_histogram_data(recommendation, headers, rows);
+            data.axis_color = Some(opts.theme.axis_color);
             let rendered = data.values.len();
             warn_skipped_rows(rows.len(), rendered, recommendation, ChartType::Histogram);
             ChartData::Histogram(data)

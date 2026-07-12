@@ -116,12 +116,13 @@ fn build_chart_data_for_type(
             Ok(ChartData::Bar(data))
         }
         ChartType::Histogram => {
-            let data = data_builder::build_histogram(
+            let mut data = data_builder::build_histogram(
                 rows,
                 cols.x_idx,
                 block.title.clone(),
                 cols.x_label.clone(),
             );
+            data.axis_color = Some(theme.axis_color);
             Ok(ChartData::Histogram(data))
         }
         ChartType::Line | ChartType::Scatter => {

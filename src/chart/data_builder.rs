@@ -313,6 +313,7 @@ pub fn build_histogram(
         values,
         bin_count: 10,
         x_label,
+        axis_color: None,
     }
 }
 

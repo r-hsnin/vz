@@ -37,10 +37,12 @@ impl<'a> Widget for Histogram<'a> {
             let y_ticks = compute_integer_ticks(max_count.ceil() as usize, 5);
             let y_ticks = super::dedup_tick_labels(&y_ticks);
             let (y_area, chart_area) = super::split_y_axis(area, &y_ticks);
-            super::render_y_axis(&y_ticks, y_area, buf, Color::DarkGray);
+            let color = self.data.axis_color.unwrap_or(Color::DarkGray);
+            super::render_y_axis(&y_ticks, y_area, buf, color);
             chart_area
         } else {
-            super::render_y_axis_frame(max_count, 5, &area, buf)
+            let color = self.data.axis_color.unwrap_or(Color::DarkGray);
+            super::render_y_axis_frame_colored(max_count, 5, &area, buf, false, color)
         };
 
         render_histogram_bars(&bins, &title, chart_area, buf);
@@ -118,6 +120,7 @@ mod tests {
             ],
             bin_count: 5,
             x_label: "Age".to_string(),
+            axis_color: None,
         };
 
         let hist = Histogram::new(&data);
@@ -140,6 +143,7 @@ mod tests {
             values: vec![],
             bin_count: 5,
             x_label: "X".to_string(),
+            axis_color: None,
         };
 
         let hist = Histogram::new(&data);
@@ -155,6 +159,7 @@ mod tests {
             values: vec![5.0, 5.0, 5.0, 5.0],
             bin_count: 1,
             x_label: "X".to_string(),
+            axis_color: None,
         };
 
         let hist = Histogram::new(&data);

@@ -133,6 +133,8 @@ pub struct HistogramData {
     pub values: Vec<f64>,
     pub bin_count: usize,
     pub x_label: String,
+    /// Color for axis lines (from theme). Falls back to DarkGray if not set.
+    pub axis_color: Option<Color>,
 }
 
 /// Data for a heatmap (count matrix of two categorical columns).
