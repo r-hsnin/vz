@@ -2347,3 +2347,17 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 4 unit (truncate_to_width: short/exact/overflow/one) + 1 integration (test_labels_on_non_bar_chart_warns)
 - 検証: PASS (465 tests: 353 unit + 108 integration + 4 snapshot)
 - 次の候補: DESIGN.md更新 or render_oneshot分割
+
+---
+
+## Cycle 137 — 2026-07-12T12:36
+- 種別: ドキュメント同期
+- 選定: DESIGN.md 実装同期 (RICE=240: R8×I3×C10/E1)
+- 改善:
+  1. filter.rs 影響範囲を「oneshot のみ」→「oneshot + explore + present(chart block)」に修正
+  2. モジュール構造に oneshot/{ansi,builders,summary}, present/{parser,render,chart_loader}, watch, output, sparkline, table を追加
+  3. Implemented チェックリストに --watch, --output, --agg, --title, --labels, completions, --sample, --all-y を追加
+  4. Out(future) から「Large dataset sampling」を削除（実装済み）
+- 影響: DESIGN.md
+- 検証: PASS (465 tests)
+- 次の候補: render_oneshot分割 or Theme struct導入

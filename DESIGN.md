@@ -71,8 +71,18 @@ src/
 │   ├── heatmap.rs       — Heatmap widget (categorical × categorical)
 │   └── nice_numbers.rs  — Axis tick calculation (nice numbers algorithm)
 ├── oneshot/mod.rs       — One-shot stdout rendering (Buffer → ANSI, multi-series, summary)
+│   ├── ansi.rs          — ANSI color output, print_buffer
+│   ├── builders.rs      — Chart data construction (bar, histogram, heatmap, line/scatter)
+│   └── summary.rs       — Summary line formatting (sparkline, trend, hints)
 ├── explore/mod.rs       — Interactive TUI mode (chart switching, column selection, data table)
-└── present/mod.rs       — Slide presentation mode (Markdown + ```chart blocks)
+├── present/mod.rs       — Slide presentation mode (Markdown + ```chart blocks)
+│   ├── parser.rs        — Markdown→Slide AST parser
+│   ├── render.rs        — Slide rendering (draw_slide, element rendering)
+│   └── chart_loader.rs  — Chart data loading for embedded chart blocks
+├── watch.rs             — File watching mode (--watch, auto-redraw on changes)
+├── output/mod.rs        — Machine-readable output (JSON metadata, column stats)
+├── sparkline.rs         — Shared sparkline generation (Unicode block chars)
+└── table.rs             — Text table output (--output table)
 ```
 
 ## Data Flow & Dependencies
@@ -99,7 +109,7 @@ main.rs ─── cli/        (parse args)
 
 **変更影響マップ:**
 - `loader/` を変更 → 全モードに影響。統合テスト全実行必須。
-- `filter.rs` を変更 → oneshot モードのみ影響（explore/present は未適用）。
+- `filter.rs` を変更 → oneshot + explore モードに影響（present は chart block 内 where: フィールドで適用）。
 - `infer/` を変更 → chart selection + 全モードに影響。
 - `chart/selector.rs` を変更 → 全モードに影響。
 - `chart/data_builder.rs` を変更 → oneshot, explore, present すべてに影響。
@@ -192,13 +202,20 @@ vz present slides.md
 - [x] Stdin auto-detect (pipe without `-` argument)
 - [x] Column metadata (`--info`)
 - [x] Heatmap (categorical × categorical, count-based)
+- [x] File watch mode (`--watch`)
+- [x] Machine-readable output (`--output json`, `--output table`, `--output spark`)
+- [x] Aggregation functions (`--agg sum/mean/count/max/min`)
+- [x] Custom chart title (`--title`)
+- [x] Value labels on bar charts (`--labels`)
+- [x] Shell completions (`vz completions <shell>`)
+- [x] Sampling for large datasets (`--sample N`)
+- [x] All-Y overlay (`-Y` / `--all-y`)
 
 ### Out (future)
 - Parquet / SQLite / DB connections
 - Export (PNG, SVG)
 - Custom themes / color configuration
 - Streaming / live data
-- Large dataset sampling / pagination
 
 ## Key Design Decisions
 
