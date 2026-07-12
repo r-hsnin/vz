@@ -31,7 +31,7 @@ pub fn build_summary_parts(ctx: &SummaryContext<'_>) -> Vec<String> {
     parts.push(format!("x={}", ctx.recommendation.x_column));
 
     if let Some(ref y) = ctx.recommendation.y_column {
-        let y_idx = ctx.headers.iter().position(|h| h == y);
+        let y_idx = crate::chart::data_builder::column_index(ctx.headers, y);
         let y_part = format_y_part(y, ctx.agg, ctx.agg_stats, ctx.rows, y_idx, ctx.chart_type);
         parts.push(y_part);
         // Add trend annotation for line/scatter
@@ -244,7 +244,7 @@ pub fn color_legend_hint(
     rows: &[Vec<String>],
     series_colors: &[ratatui::style::Color],
 ) -> String {
-    let color_idx = headers.iter().position(|h| h == color_col);
+    let color_idx = crate::chart::data_builder::column_index(headers, color_col);
     let unique_values: Vec<String> = match color_idx {
         Some(idx) => {
             let mut seen: Vec<String> = Vec::new();

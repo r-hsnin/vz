@@ -126,9 +126,9 @@ fn compute_bar_agg_stats(
     rows: &[Vec<String>],
     agg: AggFunction,
 ) -> Option<(f64, f64)> {
-    let x_idx = headers.iter().position(|h| h == &recommendation.x_column)?;
+    let x_idx = data_builder::column_index(headers, &recommendation.x_column)?;
     let y_col = recommendation.y_column.as_ref()?;
-    let y_idx = headers.iter().position(|h| h == y_col)?;
+    let y_idx = data_builder::column_index(headers, y_col)?;
     let y_label = y_col.clone();
     let (data, _) = data_builder::aggregate_bar(rows, x_idx, y_idx, None, y_label, agg);
     if data.values.is_empty() {
@@ -325,7 +325,7 @@ fn count_skipped_y_rows(
     let y_idx = recommendation
         .y_column
         .as_deref()
-        .and_then(|name| headers.iter().position(|h| h == name));
+        .and_then(|name| data_builder::column_index(headers, name));
     let Some(idx) = y_idx else {
         return 0;
     };

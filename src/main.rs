@@ -280,7 +280,7 @@ fn print_spark(
     let y_idx = recommendation
         .y_column
         .as_ref()
-        .and_then(|y| headers.iter().position(|h| h == y));
+        .and_then(|y| chart::data_builder::column_index(headers, y));
     let Some(yi) = y_idx else {
         println!("▄");
         return;
@@ -288,7 +288,7 @@ fn print_spark(
 
     // If color column specified, output one sparkline per group
     if let Some(ref color) = cli.color_col
-        && let Some(ci) = headers.iter().position(|h| h == color)
+        && let Some(ci) = chart::data_builder::column_index(headers, color)
     {
         let mut groups: std::collections::BTreeMap<&str, Vec<f64>> =
             std::collections::BTreeMap::new();

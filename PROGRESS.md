@@ -2802,3 +2802,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存497テスト全パス (移動のみ、新規テストなし)
 - 検証: PASS (497 tests: 376 unit + 117 integration + 4 snapshot)
 - 次の候補: headers.iter().position 重複除去 (RICE=70)
+
+---
+
+## Cycle 164 — 2026-07-12T15:26
+- 種別: 品質改善 (DRY)
+- スコア: RICE = (7×2×10)/2 = 70
+- 改善: `headers.iter().position(|h| h == name)` パターン6箇所を `data_builder::column_index()` に統一。
+- 影響: src/table.rs, src/oneshot/mod.rs, src/oneshot/summary.rs, src/main.rs
+- テスト: 既存497テスト全パス
+- 検証: PASS (497 tests: 376 unit + 117 integration + 4 snapshot)
+- 次の候補: explore/present render.rs テスト追加 (RICE=65)

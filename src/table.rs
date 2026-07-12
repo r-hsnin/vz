@@ -14,11 +14,11 @@ pub fn print_table(
     rows: &[Vec<String>],
     cli: &cli::Cli,
 ) -> Result<()> {
-    let x_idx = headers.iter().position(|h| h == &recommendation.x_column);
+    let x_idx = data_builder::column_index(headers, &recommendation.x_column);
     let y_idx = recommendation
         .y_column
         .as_ref()
-        .and_then(|y| headers.iter().position(|h| h == y));
+        .and_then(|y| data_builder::column_index(headers, y));
 
     let chart_type = oneshot::resolve_chart_type(recommendation, cli.chart_type);
 
@@ -43,7 +43,7 @@ pub fn print_table(
     let color_idx = recommendation
         .color_column
         .as_ref()
-        .and_then(|c| headers.iter().position(|h| h == c));
+        .and_then(|c| data_builder::column_index(headers, c));
 
     match (x_idx, y_idx) {
         (Some(xi), Some(yi)) => {
