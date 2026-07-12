@@ -2791,3 +2791,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 1 unit (test_help_overlay_toggle)
 - 検証: PASS (497 tests: 376 unit + 117 integration + 4 snapshot)
 - 次の候補: oneshot/mod.rs ファイルサイズ修正 (RICE=107)
+
+---
+
+## Cycle 163 — 2026-07-12T15:26
+- 種別: リファクタ
+- スコア: RICE = (8×4×10)/3 = 107
+- 改善: `oneshot/mod.rs` テストを `oneshot/tests.rs` に分離 (882行→375行)。800行制約クリア。
+- 影響: src/oneshot/mod.rs (882→375行), src/oneshot/tests.rs (507行, 新規)
+- テスト: 既存497テスト全パス (移動のみ、新規テストなし)
+- 検証: PASS (497 tests: 376 unit + 117 integration + 4 snapshot)
+- 次の候補: headers.iter().position 重複除去 (RICE=70)
