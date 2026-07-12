@@ -3008,3 +3008,12 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: src/explore/mod.rs
 - テスト追加: 1 unit (test_yank_command_generates_oneshot)
 - 検証: PASS (522 tests: 398 unit + 120 integration + 4 snapshot)
+
+---
+
+## Cycle 180 — 2026-07-12T16:15
+- 種別: UX改善
+- 改善: Explore ヘルプオーバーレイに `y` キー（コマンドヤンク）を追加。
+- 影響: src/explore/render.rs
+- テスト: 既存522テスト全パス
+- 検証: PASS (522 tests: 398 unit + 120 integration + 4 snapshot)

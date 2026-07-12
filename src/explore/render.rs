@@ -160,7 +160,7 @@ fn render_help_overlay(frame: &mut Frame) {
 
     let area = frame.area();
     let help_width = 44.min(area.width.saturating_sub(4));
-    let help_height = 14.min(area.height.saturating_sub(2));
+    let help_height = 15.min(area.height.saturating_sub(2));
     let x = (area.width.saturating_sub(help_width)) / 2;
     let y = (area.height.saturating_sub(help_height)) / 2;
     let popup = ratatui::layout::Rect::new(x, y, help_width, help_height);
@@ -178,6 +178,7 @@ fn render_help_overlay(frame: &mut Frame) {
         Line::raw(" h / l (←/→)   Change X axis column"),
         Line::raw(" j / k (↑/↓)   Change Y axis column"),
         Line::raw(" c              Cycle color/group column"),
+        Line::raw(" y              Yank equivalent command"),
         Line::raw(" 1-4            Force chart type"),
         Line::raw("                (Line/Bar/Scatter/Hist)"),
         Line::raw(" 0              Auto chart type"),
