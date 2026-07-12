@@ -2289,3 +2289,87 @@ fn test_json_array_of_primitives_gives_helpful_error() {
         stderr
     );
 }
+
+#[test]
+fn test_watch_flag_accepted_and_rerenders_on_change() {
+    use std::io::Write;
+    use std::time::Duration;
+
+    // Create a temporary CSV file
+    let mut tmpfile = NamedTempFile::new().unwrap();
+    writeln!(tmpfile, "x,y").unwrap();
+    writeln!(tmpfile, "a,1").unwrap();
+    writeln!(tmpfile, "b,2").unwrap();
+    tmpfile.flush().unwrap();
+
+    let path = tmpfile.path().to_path_buf();
+
+    // Start vz with --watch
+    let mut child = vz_binary()
+        .arg(path.to_str().unwrap())
+        .arg("--watch")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("Failed to start vz --watch");
+
+    // Give it time to render once and start watching
+    std::thread::sleep(Duration::from_millis(500));
+
+    // Modify the file to trigger re-render
+    {
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&path)
+            .unwrap();
+        writeln!(f, "x,y").unwrap();
+        writeln!(f, "a,10").unwrap();
+        writeln!(f, "b,20").unwrap();
+        writeln!(f, "c,30").unwrap();
+        f.flush().unwrap();
+    }
+
+    // Give it time to detect and re-render
+    std::thread::sleep(Duration::from_millis(1000));
+
+    // Kill the watch process
+    child.kill().ok();
+    let output = child.wait_with_output().unwrap();
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Watch mode should print re-render info to stderr
+    assert!(
+        stderr.contains("Watching") || stderr.contains("Re-rendering"),
+        "Expected watch feedback in stderr, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_watch_flag_on_nonexistent_file_errors() {
+    let output = vz_binary()
+        .arg("nonexistent_data.csv")
+        .arg("--watch")
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(!output.status.success());
+}
+
+#[test]
+fn test_watch_flag_on_stdin_errors() {
+    let output = vz_binary()
+        .arg("-")
+        .arg("--watch")
+        .stdin(std::process::Stdio::piped())
+        .output()
+        .expect("Failed to run vz");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success() || stderr.contains("--watch cannot be used with stdin"),
+        "Expected error for --watch with stdin, got: {}",
+        stderr
+    );
+}

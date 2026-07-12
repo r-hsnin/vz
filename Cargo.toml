@@ -26,6 +26,7 @@ regex = "1"
 
 # Error handling
 anyhow = "1"
+notify = "7"
 
 [dev-dependencies]
 insta = "1.48.0"

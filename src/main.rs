@@ -10,6 +10,7 @@ pub mod present;
 pub mod render;
 pub mod sparkline;
 pub mod table;
+pub mod watch;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
@@ -333,7 +334,19 @@ fn expand_all_y(
 /// Run the oneshot (default) mode: load data, infer types, render chart.
 fn run_oneshot(cli: &Cli) -> Result<()> {
     let file = resolve_input_file(cli)?;
-    let data = loader::load_data_full(&file, cli.no_header, format_override(cli))?;
+
+    // If --watch is set, enter the file-watching loop
+    if cli.watch {
+        let cli_clone = cli.clone();
+        return watch::run_watch(&file, || render_once(&cli_clone, &file));
+    }
+
+    render_once(cli, &file)
+}
+
+/// Single render pass: load → infer → render. Used by both normal and watch modes.
+fn render_once(cli: &Cli, file: &Path) -> Result<()> {
+    let data = loader::load_data_full(file, cli.no_header, format_override(cli))?;
     let pre_filter_count = data.rows.len();
     let data = apply_filters(data, &cli.filter)?;
     let data = if let Some(max_rows) = cli.sample {
@@ -359,16 +372,16 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
 
     if cli.info {
         if cli.output == Some(cli::OutputFormat::Json) {
-            print_info_json(&file, &data, &schema)?;
+            print_info_json(file, &data, &schema)?;
         } else {
-            print_info(&file, &data, &schema);
+            print_info(file, &data, &schema);
         }
         return Ok(());
     }
 
     // JSON output without --info: output chart metadata + data summary
     if cli.output == Some(cli::OutputFormat::Json) {
-        print_info_json(&file, &data, &schema)?;
+        print_info_json(file, &data, &schema)?;
         return Ok(());
     }
 

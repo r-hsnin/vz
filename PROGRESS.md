@@ -2257,3 +2257,21 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: docs/ (新規), .github/workflows/docs.yml (新規)
 - 検証: agent-browser で全ページ視覚確認。ビルド成功 (2.48s)。
 - コミット: `9469593`
+
+---
+
+## Cycle 131 — 2026-07-12T12:03
+- 種別: 機能追加
+- ユーザーストーリー: データアナリストとして、CSV/JSONファイルを編集しながら `vz data.csv --watch` でリアルタイムにチャートが更新されることで、データ変更の影響を即座に確認したい。
+- スコア: RICE = (7×7×9)/2 = 220
+- 改善:
+  1. `src/watch.rs` 新規作成: `run_watch()` — `notify` crateでファイル変更を検知し自動再描画
+  2. デバウンス (200ms) で高頻度変更時のフリッカー防止
+  3. 親ディレクトリ監視 (atomic write 対応)
+  4. stdin 入力は明示的に拒否 (エラーメッセージ付き)
+  5. ANSI clear screen + cursor reset でクリーンな再描画
+  6. `run_oneshot()` → `render_once()` 抽出で watch/normal 両モードが共有
+- 影響: src/watch.rs (新規), src/main.rs (run_oneshot分割), src/cli/mod.rs (--watch flag), Cargo.toml (notify v7), tests/integration_test.rs (+3)
+- テスト追加: 3 unit (stdin拒否, 非存在ファイル, 初回render呼出) + 3 integration (rerenders on change, nonexistent error, stdin error)
+- 検証: PASS (460 tests: 349 unit + 107 integration + 4 snapshot)
+- 次の候補: present/mod.rs 1071行の分割 or summary width truncation

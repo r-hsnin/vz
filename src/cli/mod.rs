@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 /// vz — CLI BI tool with smart visualization and terminal presentation.
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(name = "vz", version, about)]
 pub struct Cli {
     #[command(subcommand)]
@@ -95,9 +95,13 @@ pub struct Cli {
     /// Show value labels with percentages on bar chart bars.
     #[arg(long = "labels")]
     pub labels: bool,
+
+    /// Watch the input file for changes and re-render automatically.
+    #[arg(long = "watch")]
+    pub watch: bool,
 }
 
-#[derive(Subcommand, Debug, PartialEq)]
+#[derive(Subcommand, Debug, PartialEq, Clone)]
 pub enum Command {
     /// Interactive exploration mode (TUI).
     Explore {
