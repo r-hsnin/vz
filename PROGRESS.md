@@ -2768,3 +2768,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 1 integration (test_output_table_includes_color_column)
 - 検証: PASS (496 tests: 375 unit + 117 integration + 4 snapshot)
 - 次の候補: build_status_bar refactor (RICE=125)
+
+---
+
+## Cycle 161 — 2026-07-12T15:26
+- 種別: リファクタ
+- スコア: RICE = (5×5×10)/2 = 125
+- 改善: `build_status_bar`(67行)を3関数に分割: `build_column_display`(17行), `build_binding_spans`(30行), `build_status_bar`(14行)。全て50行以下。
+- 影響: src/explore/render.rs
+- テスト: 既存496テスト全パス
+- 検証: PASS (496 tests: 375 unit + 117 integration + 4 snapshot)
+- 次の候補: Explore help overlay (RICE=80)

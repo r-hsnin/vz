@@ -149,9 +149,8 @@ fn build_header(app: &ExploreApp) -> Paragraph<'static> {
     Paragraph::new(text).block(Block::default().borders(Borders::BOTTOM))
 }
 
-fn build_status_bar(app: &ExploreApp) -> Paragraph<'static> {
-    let col_display: String = app
-        .schema
+fn build_column_display(app: &ExploreApp) -> String {
+    app.schema
         .columns
         .iter()
         .enumerate()
@@ -168,8 +167,10 @@ fn build_status_bar(app: &ExploreApp) -> Paragraph<'static> {
             format!("[{}]{}", marker, col.name)
         })
         .collect::<Vec<_>>()
-        .join(" ");
+        .join(" ")
+}
 
+fn build_binding_spans(app: &ExploreApp) -> Vec<Span<'static>> {
     let color_label = match app.selected_color {
         Some(idx) => app
             .schema
@@ -187,6 +188,7 @@ fn build_status_bar(app: &ExploreApp) -> Paragraph<'static> {
         ("1-4", "type".to_string()),
         ("0", "auto".to_string()),
         ("d", "data".to_string()),
+        ("?", "help".to_string()),
         ("q", "quit".to_string()),
     ];
 
@@ -198,6 +200,12 @@ fn build_status_bar(app: &ExploreApp) -> Paragraph<'static> {
         ));
         spans.push(Span::raw(format!("={} ", desc)));
     }
+    spans
+}
+
+fn build_status_bar(app: &ExploreApp) -> Paragraph<'static> {
+    let col_display = build_column_display(app);
+    let mut spans = build_binding_spans(app);
     spans.push(Span::raw("│ ".to_string()));
     spans.push(Span::styled(
         col_display,
@@ -205,7 +213,6 @@ fn build_status_bar(app: &ExploreApp) -> Paragraph<'static> {
     ));
 
     let text = Line::from(spans);
-
     let mut lines = vec![text];
     if let Some(ref msg) = app.status_message {
         lines.push(Line::from(Span::styled(
