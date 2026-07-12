@@ -57,6 +57,9 @@ vz data.tsv
 # Show column metadata instead of chart
 vz sales.csv --info
 
+# Export chart as SVG image
+vz sales.csv --svg > chart.svg
+
 # Custom chart dimensions
 vz sales.csv -W 80 -H 20
 

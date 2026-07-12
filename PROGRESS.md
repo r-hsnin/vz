@@ -2997,3 +2997,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: 新規 src/svg.rs (144行), src/main.rs, src/cli/mod.rs, src/oneshot/mod.rs (公開化), README.md, tests/integration_test.rs
 - テスト追加: 3 unit (buffer_to_svg_basic, _colored, xml_escape) + 1 integration (test_output_svg_basic)
 - 検証: PASS (521 tests: 397 unit + 120 integration + 4 snapshot)
+
+---
+
+## Cycle 179 — 2026-07-12T16:15
+- 種別: 機能追加
+- ユーザーストーリー: Explore で見つけた良いビューを oneshot コマンドとして再現・共有したい。
+- スコア: RICE = (6×5×9)/1 = 270
+- 改善: `y` キーで現在のビューに対応する `vz <FILE> -x ... -y ... -t ...` コマンドをステータスバーに表示。
+- 影響: src/explore/mod.rs
+- テスト追加: 1 unit (test_yank_command_generates_oneshot)
+- 検証: PASS (522 tests: 398 unit + 120 integration + 4 snapshot)

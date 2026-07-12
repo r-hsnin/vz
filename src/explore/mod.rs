@@ -94,6 +94,7 @@ impl ExploreApp {
             KeyCode::Char('4') => self.chart_type_override = Some(ChartType::Histogram),
             KeyCode::Char('0') => self.chart_type_override = None,
             KeyCode::Char('c') => self.cycle_color_column(),
+            KeyCode::Char('y') => self.yank_command(),
             _ => {}
         }
 
@@ -181,6 +182,27 @@ impl ExploreApp {
                 }
             }
         };
+    }
+
+    /// Generate the equivalent oneshot command for the current view.
+    fn yank_command(&mut self) {
+        let x = self.x_label();
+        let y = self.y_label();
+        let chart_type = self.effective_chart_type();
+        let type_flag = match chart_type {
+            ChartType::Line => " -t line",
+            ChartType::Bar => " -t bar",
+            ChartType::Scatter => " -t scatter",
+            ChartType::Histogram => " -t histogram",
+            ChartType::Heatmap => " -t heatmap",
+        };
+        let color_part = self
+            .selected_color
+            .and_then(|i| self.schema.columns.get(i))
+            .map(|c| format!(" -c {}", c.name))
+            .unwrap_or_default();
+        let cmd = format!("vz <FILE> -x {x} -y {y}{type_flag}{color_part}");
+        self.status_message = Some(cmd);
     }
 
     /// Extract Y column values as f64.
@@ -681,5 +703,16 @@ mod tests {
         assert!(msg.contains("?"), "should mention help key");
         assert!(msg.contains("h/l"), "should mention axis navigation");
         assert!(msg.contains("q"), "should mention quit");
+    }
+
+    #[test]
+    fn test_yank_command_generates_oneshot() {
+        let mut app = make_test_app();
+        app.handle_key(KeyCode::Char('y'));
+        let msg = app.status_message.as_deref().unwrap();
+        assert!(msg.starts_with("vz <FILE>"), "should generate vz command");
+        assert!(msg.contains("-x "), "should contain -x flag");
+        assert!(msg.contains("-y "), "should contain -y flag");
+        assert!(msg.contains("-t "), "should contain -t flag");
     }
 }
