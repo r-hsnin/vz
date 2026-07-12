@@ -115,7 +115,7 @@ impl ParseContext {
             return false;
         }
         self.flush_text();
-        let lang = trimmed.strip_prefix("```").unwrap().trim();
+        let lang = trimmed.strip_prefix("```").unwrap_or("").trim();
         if lang == "chart" {
             self.in_chart_block = true;
             self.chart_lines.clear();

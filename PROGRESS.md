@@ -2577,3 +2577,16 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 純減3（重複除去）、エッジケースは builders.rs に残存
 - 検証: PASS (489 tests: 372 unit + 113 integration + 4 snapshot)
 - 次の候補: Explore mode filter/search or re-evaluate
+
+---
+
+## Cycle 151 — 2026-07-12T13:45
+- 種別: リファクタ
+- スコア: RICE = (8×4×9)/3 = 96 (primary), (3×5×6)/1 = 90 (secondary)
+- 改善:
+  1. `format_and_print_parts` をリファクタ: ANSI/non-ANSI 重複ロジックを統一（63行→30行）
+  2. `present/parser.rs` の `unwrap()` を `unwrap_or("")` に修正（防御的コーディング）
+- 影響: src/oneshot/summary.rs, src/present/parser.rs
+- テスト: 既存489テスト全パス
+- 検証: PASS (489 tests: 372 unit + 113 integration + 4 snapshot)
+- 次の候補: theme dead code の活用 (axis_color等) or explore/mod.rs のファイル分割

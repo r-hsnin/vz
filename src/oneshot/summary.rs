@@ -158,65 +158,37 @@ fn sparkline(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
 /// Format and print parts with optional ANSI coloring.
 fn format_and_print_parts(parts: &[String]) {
     let max_width = summary_max_width();
+    let colorize = ansi::should_colorize();
+    let sep = if colorize { " │ " } else { " | " };
 
-    if ansi::should_colorize() {
-        let main_parts: Vec<&String> = parts.iter().take(parts.len().saturating_sub(1)).collect();
-        if let Some(hint) = parts.last() {
-            if hint.starts_with('+') || hint.contains("try ") {
-                let main_line = main_parts
-                    .iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .join(" │ ");
-                let full = format!("{} │ {}", main_line, hint);
-                if full.chars().count() <= max_width {
-                    eprintln!("\x1b[90m{}\x1b[0m", full);
-                } else {
-                    // Hint would be truncated: show on separate line
-                    let truncated_main = truncate_to_width(&main_line, max_width);
-                    let truncated_hint = truncate_to_width(hint, max_width);
-                    eprintln!("\x1b[90m{}\x1b[0m", truncated_main);
-                    eprintln!("\x1b[90m  {}\x1b[0m", truncated_hint);
-                }
-            } else {
-                let full = parts.join(" │ ");
-                let truncated = truncate_to_width(&full, max_width);
-                eprintln!("\x1b[90m{}\x1b[0m", truncated);
-            }
+    let is_hint = |s: &str| s.starts_with('+') || s.contains("try ");
+    let emit = |line: &str| {
+        if colorize {
+            eprintln!("\x1b[90m{}\x1b[0m", line);
         } else {
-            let full = parts.join(" │ ");
-            let truncated = truncate_to_width(&full, max_width);
-            eprintln!("\x1b[90m{}\x1b[0m", truncated);
+            eprintln!("{}", line);
+        }
+    };
+
+    let last = parts.last();
+    let has_hint = last.is_some_and(|h| is_hint(h));
+
+    if has_hint {
+        let hint = last.unwrap();
+        let main_line = parts[..parts.len() - 1].join(sep);
+        let full = format!("{}{}{}", main_line, sep, hint);
+        if full.chars().count() <= max_width {
+            emit(&full);
+        } else {
+            emit(&truncate_to_width(&main_line, max_width));
+            emit(&format!(
+                "  {}",
+                truncate_to_width(hint, max_width.saturating_sub(2))
+            ));
         }
     } else {
-        // Non-colorized: same logic for hint preservation
-        let main_parts: Vec<&String> = parts.iter().take(parts.len().saturating_sub(1)).collect();
-        if let Some(hint) = parts.last() {
-            if hint.starts_with('+') || hint.contains("try ") {
-                let main_line = main_parts
-                    .iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .join(" | ");
-                let full = format!("{} | {}", main_line, hint);
-                if full.chars().count() <= max_width {
-                    eprintln!("{}", full);
-                } else {
-                    let truncated_main = truncate_to_width(&main_line, max_width);
-                    let truncated_hint = truncate_to_width(hint, max_width);
-                    eprintln!("{}", truncated_main);
-                    eprintln!("  {}", truncated_hint);
-                }
-            } else {
-                let full = parts.join(" | ");
-                let truncated = truncate_to_width(&full, max_width);
-                eprintln!("{}", truncated);
-            }
-        } else {
-            let full = parts.join(" | ");
-            let truncated = truncate_to_width(&full, max_width);
-            eprintln!("{}", truncated);
-        }
+        let full = parts.join(sep);
+        emit(&truncate_to_width(&full, max_width));
     }
 }
 
