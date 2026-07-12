@@ -1,5 +1,5 @@
 pub mod ansi;
-mod builders;
+pub mod builders;
 mod summary;
 
 use std::io;

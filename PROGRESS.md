@@ -2965,3 +2965,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: src/explore/mod.rs
 - テスト: 既存515テスト全パス
 - 検証: PASS (515 tests: 394 unit + 117 integration + 4 snapshot)
+
+---
+
+## Cycle 176 — 2026-07-12T16:15
+- 種別: 機能追加
+- ユーザーストーリー: パイプラインに組み込むため、`--output json` で集計・ソート済みチャートデータもJSON出力したい。
+- スコア: RICE = (7×8×9)/4 = 126
+- 改善: `--output json` に `chart_data` フィールドを追加。メタデータ（後方互換）+ 集計済みデータの両方を出力。Bar のソート/top/agg も反映。
+- 影響: src/main.rs, src/oneshot/mod.rs (builders public化), tests/integration_test.rs
+- テスト追加: 2 integration (test_output_json_chart_data_line, _bar_sorted)
+- 検証: PASS (517 tests: 394 unit + 119 integration + 4 snapshot)

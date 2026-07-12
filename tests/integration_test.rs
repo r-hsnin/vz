@@ -1704,6 +1704,55 @@ fn test_output_json_column_types() {
 }
 
 #[test]
+fn test_output_json_chart_data_line() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--output", "json"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    let chart_data = &json["chart_data"];
+    assert_eq!(chart_data["type"], "line");
+    let series = chart_data["series"].as_array().unwrap();
+    assert!(!series.is_empty());
+    assert_eq!(series[0]["name"], "revenue");
+    let data = series[0]["data"].as_array().unwrap();
+    assert_eq!(data.len(), 6);
+    assert_eq!(data[0]["x"], "2024-01-01");
+    assert_eq!(data[0]["y"], 1000.0);
+}
+
+#[test]
+fn test_output_json_chart_data_bar_sorted() {
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-t",
+            "bar",
+            "-x",
+            "city",
+            "--sort",
+            "desc",
+            "--output",
+            "json",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    let chart_data = &json["chart_data"];
+    assert_eq!(chart_data["type"], "bar");
+    let cats = chart_data["categories"].as_array().unwrap();
+    let vals = chart_data["values"].as_array().unwrap();
+    assert_eq!(cats.len(), 3);
+    // Sorted desc: Tokyo(4200) > Osaka(3300) > Nagoya(800)
+    assert_eq!(cats[0], "Tokyo");
+    assert!(vals[0].as_f64().unwrap() > vals[1].as_f64().unwrap());
+}
+
+#[test]
 fn test_output_json_info_flag() {
     let output = vz_binary()
         .args(["fixtures/sales.csv", "--info", "--output", "json"])

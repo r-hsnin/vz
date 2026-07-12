@@ -69,6 +69,109 @@ fn print_info_json(file: &Path, data: &LoadedData, schema: &Schema) -> anyhow::R
     Ok(())
 }
 
+/// Print chart data as JSON (includes metadata for backward compat + chart_data field).
+#[allow(clippy::too_many_arguments)]
+fn print_chart_json(
+    file: &Path,
+    data: &loader::LoadedData,
+    schema: &infer::types::Schema,
+    recommendation: &chart::ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    cli: &Cli,
+    y_opts: &YOptions,
+) -> anyhow::Result<()> {
+    use chart::data_builder;
+    use chart::selector::ChartType;
+    use serde_json::json;
+
+    // Build base info output (backward compatible)
+    let output = output::build_info_output(
+        &file.display().to_string(),
+        data,
+        schema,
+        Some(recommendation),
+    );
+
+    // Compute chart_data from aggregation/sort
+    let chart_type = cli
+        .chart_type
+        .map(|ct| ct.to_chart_type())
+        .unwrap_or(recommendation.chart_type);
+    let sort = effective_sort(cli);
+    let agg = cli.agg.unwrap_or(cli::AggFunction::Sum);
+    let limit = cli.top.or(cli.tail);
+
+    let x_idx = data_builder::column_index(headers, &recommendation.x_column).unwrap_or(0);
+    let y_idx = recommendation
+        .y_column
+        .as_ref()
+        .and_then(|y| data_builder::column_index(headers, y))
+        .unwrap_or(x_idx);
+
+    let chart_data = match chart_type {
+        ChartType::Bar => {
+            let (mut bar_data, _) =
+                data_builder::aggregate_bar(rows, x_idx, y_idx, None, String::new(), agg);
+            oneshot::builders::sort_bar_data(&mut bar_data, sort);
+            if let Some(n) = limit {
+                bar_data.labels.truncate(n);
+                bar_data.values.truncate(n);
+            }
+            json!({ "type": "bar", "categories": bar_data.labels, "values": bar_data.values })
+        }
+        ChartType::Histogram => {
+            let hist_data = data_builder::build_histogram(rows, x_idx, None, String::new());
+            let bins = render::compute_bins(&hist_data.values, hist_data.bin_count);
+            let bin_data: Vec<serde_json::Value> = bins
+                .iter()
+                .map(|(s, e, c)| json!({"range": format!("{:.0}-{:.0}", s, e), "count": c}))
+                .collect();
+            json!({ "type": "histogram", "bins": bin_data })
+        }
+        _ => {
+            let extra_y: Vec<usize> = y_opts
+                .extra_columns
+                .iter()
+                .filter_map(|(name, _)| headers.iter().position(|h| h == name))
+                .collect();
+            let mut series: Vec<serde_json::Value> = Vec::new();
+            let y_name = headers.get(y_idx).cloned().unwrap_or_default();
+            let points: Vec<serde_json::Value> = rows
+                .iter()
+                .filter_map(|r| {
+                    let x = r.get(x_idx)?.clone();
+                    let y: f64 = r.get(y_idx)?.replace(',', "").parse().ok()?;
+                    Some(json!({"x": x, "y": y}))
+                })
+                .collect();
+            series.push(json!({"name": y_name, "data": points}));
+            for &ey in &extra_y {
+                let name = headers.get(ey).cloned().unwrap_or_default();
+                let pts: Vec<serde_json::Value> = rows
+                    .iter()
+                    .filter_map(|r| {
+                        let x = r.get(x_idx)?.clone();
+                        let y: f64 = r.get(ey)?.replace(',', "").parse().ok()?;
+                        Some(json!({"x": x, "y": y}))
+                    })
+                    .collect();
+                series.push(json!({"name": name, "data": pts}));
+            }
+            json!({ "type": format!("{chart_type:?}").to_lowercase(), "series": series })
+        }
+    };
+
+    // Merge chart_data into the output
+    let mut output_value = serde_json::to_value(&output)?;
+    if let serde_json::Value::Object(ref mut map) = output_value {
+        map.insert("chart_data".to_string(), chart_data);
+    }
+
+    println!("{}", serde_json::to_string_pretty(&output_value)?);
+    Ok(())
+}
+
 /// Print the auto-detected chart recommendation for the data.
 fn print_recommendation(schema: &Schema) {
     match chart::select_chart(schema, None, None) {
@@ -381,9 +484,23 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
         return Ok(());
     }
 
-    // JSON output without --info: output chart metadata + data summary
+    // JSON output without --info: output metadata + chart data
     if cli.output == Some(cli::OutputFormat::Json) {
-        print_info_json(file, &data, &schema)?;
+        let mut y_opts = parse_y_options(cli);
+        let recommendation = build_recommendation(cli, &schema, &y_opts)?;
+        if cli.all_y {
+            expand_all_y(&recommendation, &schema, &mut y_opts);
+        }
+        print_chart_json(
+            file,
+            &data,
+            &schema,
+            &recommendation,
+            &data.headers,
+            &data.rows,
+            cli,
+            &y_opts,
+        )?;
         return Ok(());
     }
 
