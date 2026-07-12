@@ -249,7 +249,7 @@ fn run(cli: &Cli) -> Result<()> {
             let data = loader::load_data(file)?;
             let data = apply_filters(data, filter)?;
             let schema = infer_from_data(&data);
-            explore::run_explore(schema, data.rows)?;
+            explore::run_explore(schema, data.rows, resolve_theme(cli))?;
         }
         Some(Command::Present { file }) => {
             present::run_present(file)?;

@@ -34,10 +34,12 @@ pub struct ExploreApp {
     pub table_offset: usize,
     /// Transient status message shown for one render cycle.
     pub status_message: Option<String>,
+    /// Color theme for chart rendering.
+    pub theme: crate::theme::Theme,
 }
 
 impl ExploreApp {
-    pub fn new(schema: Schema, data: Vec<Vec<String>>) -> Self {
+    pub fn new(schema: Schema, data: Vec<Vec<String>>, theme: crate::theme::Theme) -> Self {
         let (x_idx, y_idx) = initial_axes(&schema);
         Self {
             schema,
@@ -50,6 +52,7 @@ impl ExploreApp {
             view_mode: ViewMode::Chart,
             table_offset: 0,
             status_message: None,
+            theme,
         }
     }
 
@@ -201,7 +204,7 @@ impl ExploreApp {
         });
 
         let title = format!("{} vs {}", y_label, x_label);
-        data_builder::build_chart_config(
+        let mut config = data_builder::build_chart_config(
             &self.data,
             self.selected_x,
             self.selected_y,
@@ -209,7 +212,9 @@ impl ExploreApp {
             x_label,
             y_label,
             Some(title),
-        )
+        );
+        config.series_colors = self.theme.series_colors.clone();
+        config
     }
 
     /// Build bar chart data (aggregated by category).
@@ -301,12 +306,16 @@ fn initial_axes(schema: &Schema) -> (usize, usize) {
 }
 
 /// Run the Explore TUI app.
-pub fn run_explore(schema: Schema, data: Vec<Vec<String>>) -> Result<()> {
+pub fn run_explore(
+    schema: Schema,
+    data: Vec<Vec<String>>,
+    theme: crate::theme::Theme,
+) -> Result<()> {
     if data.is_empty() {
         anyhow::bail!("No data rows to explore");
     }
     let mut terminal = ratatui::init();
-    let mut app = ExploreApp::new(schema, data);
+    let mut app = ExploreApp::new(schema, data, theme);
 
     loop {
         terminal.draw(|frame| draw_ui(frame, &app))?;
@@ -562,7 +571,7 @@ mod tests {
             vec!["2024-03-01".into(), "Tokyo".into(), "150".into()],
             vec!["2024-04-01".into(), "Nagoya".into(), "300".into()],
         ];
-        ExploreApp::new(schema, data)
+        ExploreApp::new(schema, data, crate::theme::Theme::dark())
     }
 
     #[test]
@@ -805,7 +814,7 @@ mod tests {
             },
         ]);
         let data = vec![vec!["1".into(), "2".into()]];
-        let mut app = ExploreApp::new(schema, data);
+        let mut app = ExploreApp::new(schema, data, crate::theme::Theme::dark());
         app.handle_key(KeyCode::Char('c'));
         assert_eq!(
             app.status_message.as_deref(),
