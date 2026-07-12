@@ -1,0 +1,11 @@
+endpoint	method	p50_ms	p95_ms	p99_ms	requests_per_sec
+/api/users	GET	12	45	120	8500
+/api/users/:id	GET	8	28	85	12000
+/api/orders	GET	18	62	180	5200
+/api/orders	POST	25	95	250	3100
+/api/auth/login	POST	35	120	350	2800
+/api/search	GET	45	180	520	4500
+/api/products	GET	15	52	150	7200
+/api/analytics	GET	85	320	850	1800
+/api/upload	POST	120	450	1200	900
+/api/webhook	POST	5	15	45	15000

@@ -1,0 +1,13 @@
+/* Fix terminal output alignment — force consistent monospace rendering */
+div[class*="language-"] pre code {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace;
+  font-variant-ligatures: none;
+  -webkit-font-feature-settings: "liga" 0, "calt" 0;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+/* Ensure braille and box-drawing characters render at consistent width */
+div[class*="language-"] pre {
+  tab-size: 8;
+  line-height: 1.5;
+}

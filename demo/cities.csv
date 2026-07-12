@@ -1,0 +1,21 @@
+city,population_k,avg_rent,median_income,country
+Tokyo,13960,1800,52000,Japan
+New York,8336,3200,67000,USA
+London,8982,2400,58000,UK
+Paris,2161,1900,48000,France
+San Francisco,874,3800,82000,USA
+Berlin,3645,1400,45000,Germany
+Singapore,5454,2600,62000,Singapore
+Sydney,5312,2200,55000,Australia
+Toronto,2930,2100,51000,Canada
+Stockholm,975,1600,54000,Sweden
+Amsterdam,872,1700,53000,Netherlands
+Zurich,421,2800,75000,Switzerland
+Seoul,9776,1300,42000,South Korea
+Shanghai,24870,1500,38000,China
+Dubai,3490,2000,65000,UAE
+Austin,964,1800,68000,USA
+Portland,652,1600,58000,USA
+Denver,716,1700,62000,USA
+Seattle,737,2400,78000,USA
+Munich,1472,1800,56000,Germany

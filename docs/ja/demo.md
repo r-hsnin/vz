@@ -1,0 +1,149 @@
+# デモ
+
+同梱のサンプルデータで実際に動かした出力。
+
+## 折れ線グラフ — 時系列 × マルチシリーズ
+
+```bash
+$ vz sales.csv
+```
+
+```
+Line │ x=date │ y=revenue (800–2.0k) ▂▅▃▁█▇ │ ↑ +80% │ color=city │ 6 rows
+┌revenue vs date───────────────────────────────────────────────────────────────┐
+│2.0k     │revenue                                             ⡠⠔⠁     ┌──────┐│
+│         │                                                 ⢀⠔⠊        │Tokyo ││
+│         │                                               ⡠⠒⠁          │Osaka⣀││
+│         │                                            ⢀⠔⠉    ⢀⣀⣀⣀⠤⠤⠤⠤⠒│Nagoya││
+│         │                                     ⣀⣀⣀⣀⠤⠤⠤⠔⠒⠒⠒⠉⠉⠉⠁        └──────┘│
+│         │                       ⣀⣀⣀⡠⠤⠤⠤⠒⠒⠒⠊⠉⠉⠉  ⣀⠔⠁                          │
+│         │             ⠠⠤⠔⠒⠒⠒⠉⠉⠉⠉             ⢀⠤⠊                             │
+│1.5k     │                                  ⡠⠔⠁                               │
+│1.0k     │⠒⠊⠉⠉                                                                │
+│         │                                        •                           │
+│500      │                                                                date│
+│         └────────────────────────────────────────────────────────────────────│
+│2024-01-01            2024-02-01 2024-03-01 2024-04-01 2024-05-01   2024-06-01│
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+## 棒グラフ — カテゴリ別集計
+
+```bash
+$ vz sales.csv -x city -y revenue -t bar
+```
+
+```
+Bar │ x=city │ y=revenue (800–4.2k) │ 6 rows
+     revenue by city───────────────────────────────────────────────┐
+4.0k│████████████████████                                          │
+    │████████████████████ ▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅                    │
+3.0k│████████████████████ ████████████████████                      │
+2.0k│████████████████████ ████████████████████                      │
+1.0k│████████████████████ ████████████████████ ████████████████████  │
+   0│████████4.2k████████ ████████3.3k████████ ████████800█████████  │
+            Tokyo                Osaka                Nagoya         │
+     ──────────────────────────────────────────────────────────────┘
+```
+
+## スパークライン
+
+```bash
+$ vz sales.csv --spark
+▂▅▃▁█▇
+
+$ vz stock.csv --spark
+▁▂▂▃▄▇▇█
+```
+
+シェルスクリプトに埋め込める。
+
+```bash
+$ echo "売上: $(vz sales.csv --spark)  株価: $(vz stock.csv --spark)"
+売上: ▂▅▃▁█▇  株価: ▁▂▂▃▄▇▇█
+```
+
+## カラム情報
+
+```bash
+$ vz sales.csv --info
+```
+
+```
+File: sales.csv
+Rows: 6
+Columns: 4
+
+Name                 Type             Nulls  Stats
+----------------------------------------------------------------------
+date                 Temporal             0  2024-01-01..2024-06-01
+city                 Categorical          0  3 unique
+revenue              Quantitative         0  Min=800  Max=2000  Mean=1383.33
+profit               Quantitative         0  Min=150  Max=500  Mean=313.33
+
+Recommendation: Line (x=date, y=revenue, color=city)
+```
+
+## フィルタリング
+
+```bash
+$ vz sales.csv --where "city=Tokyo" -o table
+date        revenue
+----------  -------
+2024-01-01     1000
+2024-03-01     1200
+2024-05-01     2000
+
+$ vz sales.csv --where "revenue>1500" -o table
+date        revenue
+----------  -------
+2024-05-01     2000
+2024-06-01     1800
+```
+
+## SVG エクスポート
+
+```bash
+$ vz sales.csv -x city -y revenue -t bar --svg > chart.svg
+```
+
+ターミナル表示と同じモノスペーステキストの SVG 画像を生成。`--theme light` で白背景（ドキュメント向け）。
+
+## Markdown 出力
+
+```bash
+$ vz sales.csv -x city -y revenue -t bar --markdown
+```
+
+```markdown
+| city | revenue |
+|---|---|
+| Tokyo | 4200 |
+| Osaka | 3300 |
+| Nagoya | 800 |
+```
+
+README や GitHub Issue に集計結果を埋め込むのに便利。
+
+## ラベル表示
+
+```bash
+$ vz sales.csv -x city -y revenue -t bar --labels
+```
+
+各バーに値とパーセンテージを表示: `████ 4.2k (51%)`
+
+## 集計関数
+
+```bash
+# デフォルト: 合計
+$ vz data.csv -x product -y revenue --agg sum
+
+# カテゴリごとの平均
+$ vz data.csv -x product -y revenue --agg mean
+
+# カテゴリごとの行数
+$ vz data.csv -x region -y id --agg count
+```
+
+サマリー行に関数が反映される: `y=mean(revenue)`

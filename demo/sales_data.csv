@@ -1,0 +1,37 @@
+product,region,quarter,units_sold,revenue,channel
+Widget A,North America,Q1,1200,48000,Online
+Widget A,North America,Q2,1450,58000,Online
+Widget A,North America,Q3,1680,67200,Online
+Widget A,North America,Q4,2100,84000,Online
+Widget A,Europe,Q1,800,36000,Retail
+Widget A,Europe,Q2,950,42750,Retail
+Widget A,Europe,Q3,1100,49500,Online
+Widget A,Europe,Q4,1300,58500,Online
+Widget A,Asia,Q1,2200,77000,Online
+Widget A,Asia,Q2,2500,87500,Online
+Widget A,Asia,Q3,2800,98000,Online
+Widget A,Asia,Q4,3200,112000,Online
+Widget B,North America,Q1,600,72000,Retail
+Widget B,North America,Q2,720,86400,Retail
+Widget B,North America,Q3,850,102000,Online
+Widget B,North America,Q4,980,117600,Online
+Widget B,Europe,Q1,450,58500,Retail
+Widget B,Europe,Q2,520,67600,Retail
+Widget B,Europe,Q3,610,79300,Retail
+Widget B,Europe,Q4,700,91000,Online
+Widget B,Asia,Q1,900,108000,Online
+Widget B,Asia,Q2,1050,126000,Online
+Widget B,Asia,Q3,1200,144000,Online
+Widget B,Asia,Q4,1400,168000,Online
+Gadget X,North America,Q1,3500,35000,Online
+Gadget X,North America,Q2,4200,42000,Online
+Gadget X,North America,Q3,4800,48000,Online
+Gadget X,North America,Q4,5500,55000,Online
+Gadget X,Europe,Q1,2800,28000,Retail
+Gadget X,Europe,Q2,3100,31000,Retail
+Gadget X,Europe,Q3,3500,35000,Online
+Gadget X,Europe,Q4,3900,39000,Online
+Gadget X,Asia,Q1,5000,50000,Online
+Gadget X,Asia,Q2,5800,58000,Online
+Gadget X,Asia,Q3,6500,65000,Online
+Gadget X,Asia,Q4,7200,72000,Online
