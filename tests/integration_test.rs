@@ -2389,3 +2389,39 @@ fn test_labels_on_non_bar_chart_warns() {
         stderr
     );
 }
+
+#[test]
+fn test_theme_flag_dark() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--theme", "dark"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_theme_flag_light() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--theme", "light"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_theme_flag_high_contrast() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--theme", "high-contrast"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_theme_flag_invalid_rejected() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--theme", "neon"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+}

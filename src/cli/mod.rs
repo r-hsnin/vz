@@ -99,6 +99,10 @@ pub struct Cli {
     /// Watch the input file for changes and re-render automatically.
     #[arg(long = "watch")]
     pub watch: bool,
+
+    /// Color theme: dark (default), light, or high-contrast.
+    #[arg(long = "theme", value_enum)]
+    pub theme: Option<ThemeArg>,
 }
 
 #[derive(Subcommand, Debug, PartialEq, Clone)]
@@ -205,6 +209,17 @@ pub enum OutputFormat {
     Table,
     /// Single-line sparkline for pipeline embedding.
     Spark,
+}
+
+/// Color theme preset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ThemeArg {
+    /// Optimized for dark terminal backgrounds (default).
+    Dark,
+    /// Optimized for light/white terminal backgrounds.
+    Light,
+    /// Maximum visibility, colorblind-friendly.
+    HighContrast,
 }
 
 /// Parse a column spec that may include a label override.

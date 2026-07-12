@@ -2361,3 +2361,19 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: DESIGN.md
 - 検証: PASS (465 tests)
 - 次の候補: render_oneshot分割 or Theme struct導入
+
+---
+
+## Cycle 138 — 2026-07-12T12:36
+- 種別: 機能追加
+- ユーザーストーリー: 明るいターミナル背景のユーザーとして、`vz data.csv --theme light` で見やすい配色に切り替え、チャートの視認性を確保したい。
+- スコア: RICE = (10×7×9)/5 = 126
+- 改善:
+  1. `src/theme.rs` 新規作成: Theme struct + dark/light/high-contrast プリセット
+  2. `--theme` CLI フラグ追加 (ValueEnum: dark/light/high-contrast)
+  3. RenderOptions に theme フィールド追加
+  4. Theme はまだレンダリングパイプラインに未適用（構造体のみ導入、次サイクルで各ウィジェットに適用）
+- 影響: src/theme.rs (新規), src/cli/mod.rs, src/main.rs, src/oneshot/mod.rs, tests/integration_test.rs
+- テスト追加: 5 unit (theme.rs) + 4 integration (dark/light/high-contrast/invalid)
+- 検証: PASS (474 tests: 358 unit + 112 integration + 4 snapshot)
+- 次の候補: Theme をレンダリングに適用 (line.rs, bar.rs, heatmap.rs の Color::* をtheme参照に変更)

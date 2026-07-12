@@ -10,6 +10,7 @@ pub mod present;
 pub mod render;
 pub mod sparkline;
 pub mod table;
+pub mod theme;
 pub mod watch;
 
 use anyhow::Result;
@@ -432,6 +433,16 @@ fn build_render_options<'a>(cli: &'a Cli, y_opts: &'a YOptions) -> oneshot::Rend
         agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
         title: cli.title.clone(),
         labels: cli.labels,
+        theme: resolve_theme(cli),
+    }
+}
+
+/// Resolve the theme from CLI args.
+fn resolve_theme(cli: &Cli) -> theme::Theme {
+    match cli.theme {
+        Some(cli::ThemeArg::Light) => theme::Theme::light(),
+        Some(cli::ThemeArg::HighContrast) => theme::Theme::high_contrast(),
+        _ => theme::Theme::dark(),
     }
 }
 

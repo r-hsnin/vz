@@ -37,6 +37,8 @@ pub struct RenderOptions<'a> {
     pub title: Option<String>,
     /// Show value + percentage labels on bar chart bars.
     pub labels: bool,
+    /// Color theme for rendering.
+    pub theme: crate::theme::Theme,
 }
 
 pub fn render_oneshot(
