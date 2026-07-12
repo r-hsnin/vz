@@ -334,9 +334,9 @@ fn count_skipped_y_rows(
 
 // Re-export builder functions for use in tests
 #[cfg(test)]
-use crate::render::{BarChartData, ChartConfig};
+use crate::render::ChartConfig;
 #[cfg(test)]
-use builders::{build_bar_data, build_histogram_data, sort_bar_data, truncate_bar_data};
+use builders::{build_bar_data, build_histogram_data};
 
 /// Build ChartConfig for line/scatter charts (used by tests).
 #[cfg(test)]
@@ -759,118 +759,6 @@ mod tests {
     fn test_fit_labels_empty() {
         let result = fit_labels_to_width(&[], 80);
         assert!(result.is_empty());
-    }
-
-    #[test]
-    fn test_sort_bar_data_desc() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![10.0, 30.0, 20.0],
-            y_label: String::new(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-        };
-        sort_bar_data(&mut data, Some(SortOrder::Desc));
-        assert_eq!(data.labels, vec!["B", "C", "A"]);
-        assert_eq!(data.values, vec![30.0, 20.0, 10.0]);
-    }
-
-    #[test]
-    fn test_sort_bar_data_asc() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![10.0, 30.0, 20.0],
-            y_label: String::new(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-        };
-        sort_bar_data(&mut data, Some(SortOrder::Asc));
-        assert_eq!(data.labels, vec!["A", "C", "B"]);
-        assert_eq!(data.values, vec![10.0, 20.0, 30.0]);
-    }
-
-    #[test]
-    fn test_sort_bar_data_none_preserves_order() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![10.0, 30.0, 20.0],
-            y_label: String::new(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-        };
-        sort_bar_data(&mut data, None);
-        assert_eq!(data.labels, vec!["A", "B", "C"]);
-        assert_eq!(data.values, vec![10.0, 30.0, 20.0]);
-    }
-
-    #[test]
-    fn test_sort_bar_data_with_nan() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![f64::NAN, 30.0, 20.0],
-            y_label: String::new(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-        };
-        // Should not panic with NaN values
-        sort_bar_data(&mut data, Some(SortOrder::Desc));
-        // NaN.partial_cmp(x) = None → Equal, so stable positioning depends on sort
-        // Key assertion: doesn't panic, and non-NaN values remain correctly ordered
-        let non_nan: Vec<(&str, f64)> = data
-            .labels
-            .iter()
-            .zip(data.values.iter())
-            .filter(|(_, v)| !v.is_nan())
-            .map(|(l, v)| (l.as_str(), *v))
-            .collect();
-        assert_eq!(non_nan, vec![("B", 30.0), ("C", 20.0)]);
-    }
-
-    #[test]
-    fn test_truncate_bar_data() {
-        let mut data = BarChartData {
-            title: None,
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![100.0, 50.0, 25.0],
-            y_label: "val".into(),
-            show_labels: false,
-            series_colors: vec![],
-        };
-        truncate_bar_data(&mut data, Some(2));
-        assert_eq!(data.labels, vec!["A", "B"]);
-        assert_eq!(data.values, vec![100.0, 50.0]);
-    }
-
-    #[test]
-    fn test_truncate_bar_data_none() {
-        let mut data = BarChartData {
-            title: None,
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![100.0, 50.0, 25.0],
-            y_label: "val".into(),
-            show_labels: false,
-            series_colors: vec![],
-        };
-        truncate_bar_data(&mut data, None);
-        assert_eq!(data.labels.len(), 3);
-    }
-
-    #[test]
-    fn test_truncate_bar_data_larger_than_data() {
-        let mut data = BarChartData {
-            title: None,
-            labels: vec!["A".into(), "B".into()],
-            values: vec![100.0, 50.0],
-            y_label: "val".into(),
-            show_labels: false,
-            series_colors: vec![],
-        };
-        truncate_bar_data(&mut data, Some(10));
-        assert_eq!(data.labels.len(), 2);
     }
 
     #[test]

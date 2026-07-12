@@ -2565,3 +2565,15 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 検証: PASS (492 tests: 375 unit + 113 integration + 4 snapshot)
 - 設計一貫性: 3モード全てで `--theme` が有効に（oneshot/explore/present）
 - 次の候補: oneshot/mod.rs テスト移動 or Explore filter/search
+
+---
+
+## Cycle 150 — 2026-07-12T13:45
+- 種別: リファクタ（テスト整理）
+- スコア: RICE = (6×5×8)/4 = 60
+- 改善: sort/truncate テスト7件を `oneshot/mod.rs` から削除し、うち4件のエッジケース（NaN、None、oversize）を `builders.rs` に移動。重複3件は削除（builders.rs に既存）。
+- 影響: src/oneshot/mod.rs (-107行), src/oneshot/builders.rs (+54行)
+- ファイルサイズ: oneshot/mod.rs 969→862行
+- テスト: 純減3（重複除去）、エッジケースは builders.rs に残存
+- 検証: PASS (489 tests: 372 unit + 113 integration + 4 snapshot)
+- 次の候補: Explore mode filter/search or re-evaluate

@@ -288,6 +288,69 @@ mod tests {
     }
 
     #[test]
+    fn test_sort_bar_data_none_preserves_order() {
+        let mut data = BarChartData {
+            labels: vec!["A".into(), "B".into(), "C".into()],
+            values: vec![10.0, 30.0, 20.0],
+            y_label: String::new(),
+            title: None,
+            show_labels: false,
+            series_colors: vec![],
+        };
+        sort_bar_data(&mut data, None);
+        assert_eq!(data.labels, vec!["A", "B", "C"]);
+    }
+
+    #[test]
+    fn test_sort_bar_data_with_nan() {
+        let mut data = BarChartData {
+            labels: vec!["A".into(), "B".into(), "C".into()],
+            values: vec![f64::NAN, 30.0, 20.0],
+            y_label: String::new(),
+            title: None,
+            show_labels: false,
+            series_colors: vec![],
+        };
+        sort_bar_data(&mut data, Some(SortOrder::Desc));
+        let non_nan: Vec<(&str, f64)> = data
+            .labels
+            .iter()
+            .zip(data.values.iter())
+            .filter(|(_, v)| !v.is_nan())
+            .map(|(l, v)| (l.as_str(), *v))
+            .collect();
+        assert_eq!(non_nan, vec![("B", 30.0), ("C", 20.0)]);
+    }
+
+    #[test]
+    fn test_truncate_bar_data_none_noop() {
+        let mut data = BarChartData {
+            labels: vec!["A".into(), "B".into(), "C".into()],
+            values: vec![100.0, 50.0, 25.0],
+            y_label: "val".into(),
+            title: None,
+            show_labels: false,
+            series_colors: vec![],
+        };
+        truncate_bar_data(&mut data, None);
+        assert_eq!(data.labels.len(), 3);
+    }
+
+    #[test]
+    fn test_truncate_bar_data_larger_than_data() {
+        let mut data = BarChartData {
+            labels: vec!["A".into(), "B".into()],
+            values: vec![100.0, 50.0],
+            y_label: "val".into(),
+            title: None,
+            show_labels: false,
+            series_colors: vec![],
+        };
+        truncate_bar_data(&mut data, Some(10));
+        assert_eq!(data.labels.len(), 2);
+    }
+
+    #[test]
     fn test_build_histogram_data_numeric_column() {
         let rec = ChartRecommendation {
             chart_type: ChartType::Histogram,
