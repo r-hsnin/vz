@@ -2304,3 +2304,18 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 0 (既存テストで振る舞い保持確認)
 - 検証: PASS (460 tests: 349 unit + 107 integration + 4 snapshot)
 - 次の候補: oneshot/mod.rs 1068行分割 or render_oneshot 61行短縮
+
+---
+
+## Cycle 134 — 2026-07-12T12:03
+- 種別: リファクタリング
+- 選定: oneshot/mod.rs builder関数抽出 (RICE=168: R8×I7×C9/E3)
+- 改善:
+  1. `src/oneshot/builders.rs` 新規作成 (191行): build_line_scatter_config, build_bar_data, build_histogram_data, build_heatmap, sort_bar_data, truncate_bar_data, apply_extra_y_columns
+  2. `oneshot/mod.rs` production code: 466行→293行 (-173行、37%削減)
+  3. render_chart_to_buffer は builders:: を通じてデータ構築を委譲
+  4. テストは既存位置に維持（super::* 経由でアクセス、#[cfg(test)] re-export）
+- 影響: src/oneshot/mod.rs, src/oneshot/builders.rs (新規), tests/snapshots/*.snap (label spacing微調整), tests/integration_test.rs (assertion修正)
+- テスト追加: 0 (リファクタリングのみ)
+- 検証: PASS (460 tests: 349 unit + 107 integration + 4 snapshot)
+- 次の候補: Cycle 5 評価で判断

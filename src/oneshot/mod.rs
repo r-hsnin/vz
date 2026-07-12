@@ -1,4 +1,5 @@
 pub mod ansi;
+mod builders;
 mod summary;
 
 use std::io;
@@ -9,7 +10,6 @@ use crate::chart::data_builder;
 use crate::chart::selector::{ChartRecommendation, ChartType};
 use crate::cli::AggFunction;
 use crate::cli::SortOrder;
-use crate::render::{Axis, BarChartData, ChartConfig, HistogramData};
 
 pub use ansi::print_buffer;
 
@@ -139,8 +139,14 @@ fn render_chart_to_buffer(
 
     let mut chart_data = match chart_type {
         ChartType::Line | ChartType::Scatter => {
-            let config =
-                build_line_scatter_config(recommendation, headers, rows, opts, area, chart_type);
+            let config = builders::build_line_scatter_config(
+                recommendation,
+                headers,
+                rows,
+                opts,
+                area,
+                chart_type,
+            );
             if chart_type == ChartType::Scatter {
                 ChartData::Scatter(config)
             } else {
@@ -148,22 +154,23 @@ fn render_chart_to_buffer(
             }
         }
         ChartType::Heatmap => {
-            let data = build_heatmap(recommendation, headers, rows);
+            let data = builders::build_heatmap(recommendation, headers, rows);
             ChartData::Heatmap(data)
         }
         ChartType::Bar => {
-            let (mut data, rows_used) = build_bar_data(recommendation, headers, rows, opts.agg);
+            let (mut data, rows_used) =
+                builders::build_bar_data(recommendation, headers, rows, opts.agg);
             if let Some(label) = opts.y_label_override {
                 data.y_label = label.to_string();
             }
             data.show_labels = opts.labels;
-            sort_bar_data(&mut data, opts.sort_order);
-            truncate_bar_data(&mut data, opts.limit);
+            builders::sort_bar_data(&mut data, opts.sort_order);
+            builders::truncate_bar_data(&mut data, opts.limit);
             warn_skipped_rows(rows.len(), rows_used, recommendation, ChartType::Bar);
             ChartData::Bar(data)
         }
         ChartType::Histogram => {
-            let data = build_histogram_data(recommendation, headers, rows);
+            let data = builders::build_histogram_data(recommendation, headers, rows);
             let rendered = data.values.len();
             warn_skipped_rows(rows.len(), rendered, recommendation, ChartType::Histogram);
             ChartData::Histogram(data)
@@ -178,68 +185,6 @@ fn render_chart_to_buffer(
     render_chart_data(&chart_data, area, buf);
 }
 
-fn build_line_scatter_config(
-    recommendation: &ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-    opts: &RenderOptions<'_>,
-    area: Rect,
-    chart_type: ChartType,
-) -> ChartConfig {
-    let mut config = build_chart_config(recommendation, headers, rows);
-    if let Some(label) = opts.y_label_override {
-        config.y_axis.label = label.to_string();
-    }
-    if !opts.extra_y_columns.is_empty() {
-        apply_extra_y_columns(&mut config, recommendation, headers, rows, opts);
-    }
-    config.x_labels = config
-        .x_labels
-        .map(|labels| fit_labels_to_width(&labels, area.width.saturating_sub(12) as usize));
-    let rendered = config.series.iter().map(|s| s.data.len()).sum::<usize>();
-    let effective_rows = rows.len().min(data_builder::MAX_CHART_POINTS);
-    warn_skipped_rows(effective_rows, rendered, recommendation, chart_type);
-    config
-}
-
-/// Append extra Y columns as additional series and recalculate Y axis bounds.
-fn apply_extra_y_columns(
-    config: &mut ChartConfig,
-    recommendation: &ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-    opts: &RenderOptions<'_>,
-) {
-    let axes = ResolvedAxes::from_recommendation(
-        &recommendation.x_column,
-        recommendation.y_column.as_deref(),
-        recommendation.color_column.as_deref(),
-        headers,
-    );
-    let raw_x: Vec<String> = rows
-        .iter()
-        .filter_map(|r| r.get(axes.x_idx).cloned())
-        .collect();
-    let x_is_non_numeric = data_builder::is_non_numeric(&raw_x);
-    let y_specs: Vec<(usize, String)> = opts
-        .extra_y_columns
-        .iter()
-        .filter_map(|(col, label)| {
-            let idx = data_builder::column_index(headers, col)?;
-            let name = label.as_deref().unwrap_or(col).to_string();
-            Some((idx, name))
-        })
-        .collect();
-    let extra = data_builder::build_multi_y_series(rows, axes.x_idx, &y_specs, x_is_non_numeric);
-    config.series.extend(extra);
-    let all_y: Vec<f64> = config
-        .series
-        .iter()
-        .flat_map(|s| s.data.iter().map(|(_, y)| *y))
-        .collect();
-    config.y_axis = Axis::from_data(&config.y_axis.label, &all_y);
-}
-
 /// Get terminal width, falling back to 80 columns.
 /// When stdout is piped (not a TTY), always returns 80 for deterministic output.
 fn terminal_width() -> u16 {
@@ -252,112 +197,120 @@ fn terminal_width() -> u16 {
 }
 
 /// Choose chart height adaptively based on data density.
-/// For bar charts with few categories, reduce height to avoid mostly-empty output.
 fn adaptive_height(
     chart_type: ChartType,
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
 ) -> u16 {
-    if chart_type == ChartType::Bar {
-        let x_idx = headers
-            .iter()
-            .position(|h| h == &recommendation.x_column)
-            .unwrap_or(0);
-        let unique_categories = rows
-            .iter()
-            .filter_map(|r| r.get(x_idx))
-            .filter(|v| !v.is_empty())
-            .collect::<std::collections::HashSet<_>>()
-            .len();
-        if unique_categories <= 5 {
-            // Compact height: at least 10 rows, scale with categories
-            return (unique_categories as u16 * 4 + 2).clamp(10, DEFAULT_HEIGHT);
+    match chart_type {
+        ChartType::Bar | ChartType::Heatmap => {
+            let x_idx = headers
+                .iter()
+                .position(|h| h == &recommendation.x_column)
+                .unwrap_or(0);
+            let unique: std::collections::HashSet<&str> = rows
+                .iter()
+                .filter_map(|r| r.get(x_idx).map(|s| s.as_str()))
+                .collect();
+            if unique.len() <= 5 {
+                ((unique.len() as u16) * 4 + 2).clamp(10, DEFAULT_HEIGHT)
+            } else {
+                DEFAULT_HEIGHT
+            }
         }
+        ChartType::Line | ChartType::Scatter => {
+            if rows.len() <= 6 {
+                ((rows.len() as u16) * 3 + 6).clamp(12, DEFAULT_HEIGHT)
+            } else {
+                DEFAULT_HEIGHT
+            }
+        }
+        _ => DEFAULT_HEIGHT,
     }
-
-    // Line/Scatter: reduce height for very small datasets
-    if matches!(chart_type, ChartType::Line | ChartType::Scatter) && rows.len() <= 6 {
-        return (rows.len() as u16 * 3 + 6).clamp(12, DEFAULT_HEIGHT);
-    }
-
-    DEFAULT_HEIGHT
 }
 
-/// Reduce label count so labels fit without clipping at the given width.
-/// Picks evenly-spaced labels from the input.
-fn fit_labels_to_width(labels: &[String], available_width: usize) -> Vec<String> {
+/// Fit labels to available width by selecting evenly-spaced subset.
+pub(crate) fn fit_labels_to_width(labels: &[String], available_width: usize) -> Vec<String> {
     if labels.is_empty() {
-        return Vec::new();
+        return vec![];
     }
-    let max_label_len = labels.iter().map(|s| s.len()).max().unwrap_or(1);
-    // Each label needs its own length + 1 char padding
-    let space_per_label = max_label_len + 1;
-    let max_count = (available_width / space_per_label).max(2);
-    if labels.len() <= max_count {
+    let max_label_width = labels.iter().map(|l| l.len()).max().unwrap_or(1);
+    let labels_that_fit = (available_width / (max_label_width + 2)).max(2);
+    if labels.len() <= labels_that_fit {
         return labels.to_vec();
     }
-    data_builder::pick_evenly(labels, max_count)
+    pick_evenly(labels, labels_that_fit)
 }
 
-/// Resolve the chart type from recommendation + optional user override.
+/// Pick n items evenly spaced from a slice, always including first and last.
+fn pick_evenly(items: &[String], n: usize) -> Vec<String> {
+    if n >= items.len() {
+        return items.to_vec();
+    }
+    let step = (items.len() - 1) as f64 / (n - 1) as f64;
+    (0..n)
+        .map(|i| items[(i as f64 * step).round() as usize].clone())
+        .collect()
+}
+
+/// Resolve the chart type: use override if given, otherwise use the recommended type.
 pub fn resolve_chart_type(
     recommendation: &ChartRecommendation,
     override_type: Option<crate::cli::ChartTypeArg>,
 ) -> ChartType {
-    match override_type {
-        Some(t) => t.to_chart_type(),
-        None => recommendation.chart_type,
+    if let Some(ct) = override_type {
+        ct.to_chart_type()
+    } else {
+        recommendation.chart_type
     }
 }
 
-/// Print a warning to stderr if rows were skipped during chart building.
-fn warn_skipped_rows(
+pub(crate) fn warn_skipped_rows(
     total_rows: usize,
-    rendered_points: usize,
+    rendered_rows: usize,
     recommendation: &ChartRecommendation,
     chart_type: ChartType,
 ) {
-    if rendered_points < total_rows {
-        let skipped = total_rows - rendered_points;
-        // Bar charts skip rows with empty X (category) labels.
-        // Line/Scatter skip rows with non-parseable Y values.
-        let (col_name, reason) = if chart_type == ChartType::Bar {
-            (
-                recommendation.x_column.as_str(),
-                "empty/missing category label",
-            )
-        } else {
-            (
-                recommendation
+    if rendered_rows < total_rows && total_rows > 0 {
+        let skipped = total_rows - rendered_rows;
+        let pct = (skipped as f64 / total_rows as f64) * 100.0;
+        if pct > 10.0 {
+            let blame_col = match chart_type {
+                ChartType::Bar | ChartType::Heatmap => &recommendation.x_column,
+                _ => recommendation
                     .y_column
                     .as_deref()
                     .unwrap_or(&recommendation.x_column),
-                "non-parseable values",
-            )
-        };
-        eprintln!("warning: {skipped}/{total_rows} rows skipped ({reason} in '{col_name}')");
+            };
+            eprintln!(
+                "warning: {} of {} rows ({:.0}%) have non-parseable values in column '{}' and were skipped",
+                skipped, total_rows, pct, blame_col
+            );
+        }
     }
 }
 
-/// Resolved column indices and labels from a chart recommendation.
-use crate::chart::data_builder::ResolvedAxes;
+// Re-export builder functions for use in tests
+#[cfg(test)]
+use crate::render::{BarChartData, ChartConfig};
+#[cfg(test)]
+use builders::{build_bar_data, build_histogram_data, sort_bar_data, truncate_bar_data};
 
-/// Build a ChartConfig for Line/Scatter charts.
-/// When recommendation.color_column is set, splits data into multiple series.
+/// Build ChartConfig for line/scatter charts (used by tests).
+#[cfg(test)]
 fn build_chart_config(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
 ) -> ChartConfig {
-    let axes = ResolvedAxes::from_recommendation(
+    let axes = data_builder::ResolvedAxes::from_recommendation(
         &recommendation.x_column,
         recommendation.y_column.as_deref(),
         recommendation.color_column.as_deref(),
         headers,
     );
     let title = format!("{} vs {}", axes.y_label, axes.x_label);
-
     data_builder::build_chart_config(
         rows,
         axes.x_idx,
@@ -367,101 +320,6 @@ fn build_chart_config(
         axes.y_label,
         Some(title),
     )
-}
-
-/// Sort bar chart data by value. No-op if sort_order is None or SortOrder::None.
-fn sort_bar_data(data: &mut BarChartData, sort_order: Option<SortOrder>) {
-    let reverse = match sort_order {
-        Some(SortOrder::Desc) => true,
-        Some(SortOrder::Asc) => false,
-        _ => return,
-    };
-    let mut indices: Vec<usize> = (0..data.values.len()).collect();
-    indices.sort_by(|a, b| {
-        let cmp = data.values[*a]
-            .partial_cmp(&data.values[*b])
-            .unwrap_or(std::cmp::Ordering::Equal);
-        if reverse { cmp.reverse() } else { cmp }
-    });
-    data.labels = indices.iter().map(|&i| data.labels[i].clone()).collect();
-    data.values = indices.iter().map(|&i| data.values[i]).collect();
-}
-
-/// Truncate bar chart to first N categories. No-op if limit is None.
-fn truncate_bar_data(data: &mut BarChartData, limit: Option<usize>) {
-    if let Some(n) = limit {
-        data.labels.truncate(n);
-        data.values.truncate(n);
-    }
-}
-
-/// Build BarChartData for Bar/Heatmap charts.
-/// Aggregates values by category using the specified aggregation function.
-/// Returns (data, rows_used) where rows_used is the number of rows that contributed.
-fn build_bar_data(
-    recommendation: &ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-    agg: AggFunction,
-) -> (BarChartData, usize) {
-    let axes = ResolvedAxes::from_recommendation(
-        &recommendation.x_column,
-        recommendation.y_column.as_deref(),
-        recommendation.color_column.as_deref(),
-        headers,
-    );
-    let title = format!("{} by {}", axes.y_label, axes.x_label);
-
-    data_builder::aggregate_bar(rows, axes.x_idx, axes.y_idx, Some(title), axes.y_label, agg)
-}
-
-/// Build HistogramData for Histogram charts.
-fn build_histogram_data(
-    recommendation: &ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-) -> HistogramData {
-    let axes = ResolvedAxes::from_recommendation(
-        &recommendation.x_column,
-        recommendation.y_column.as_deref(),
-        recommendation.color_column.as_deref(),
-        headers,
-    );
-
-    // For histogram, prefer the quantitative column.
-    // If x_column is non-numeric, fall back to y_column.
-    let x_numeric_count = rows
-        .iter()
-        .take(5)
-        .filter_map(|r| r.get(axes.x_idx))
-        .filter(|v| v.parse::<f64>().is_ok())
-        .count();
-
-    let use_idx = if x_numeric_count > 0 {
-        axes.x_idx
-    } else {
-        axes.y_idx
-    };
-    let label = headers.get(use_idx).cloned().unwrap_or_default();
-    let title = format!("Distribution of {}", label);
-
-    data_builder::build_histogram(rows, use_idx, Some(title), label)
-}
-
-/// Build heatmap data for two categorical columns.
-fn build_heatmap(
-    recommendation: &ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-) -> crate::render::HeatmapData {
-    let axes = ResolvedAxes::from_recommendation(
-        &recommendation.x_column,
-        recommendation.y_column.as_deref(),
-        recommendation.color_column.as_deref(),
-        headers,
-    );
-    let title = format!("{} × {}", axes.x_label, axes.y_label);
-    data_builder::build_heatmap_data(rows, axes.x_idx, axes.y_idx, Some(title))
 }
 
 /// Find column index by name.

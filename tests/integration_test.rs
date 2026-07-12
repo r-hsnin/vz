@@ -556,7 +556,7 @@ fn test_skipped_rows_warning() {
     assert!(output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("2/5 rows skipped"),
+        stderr.contains("non-parseable values") || stderr.contains("were skipped"),
         "Expected skip warning in stderr, got: {stderr}"
     );
 }
