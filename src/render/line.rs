@@ -1,7 +1,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::Style,
+    style::{Color, Style},
     symbols::Marker,
     widgets::{Axis as RatatuiAxis, Block, Borders, Chart, Dataset, GraphType, Widget},
 };
@@ -57,6 +57,15 @@ impl<'a> XYChart<'a> {
     pub fn new(config: &'a ChartConfig, mode: XYMode) -> Self {
         Self { config, mode }
     }
+
+    /// Get the color for series at index, using theme colors or fallback.
+    fn color_at(&self, index: usize) -> Color {
+        if self.config.series_colors.is_empty() {
+            SERIES_COLORS[index % SERIES_COLORS.len()]
+        } else {
+            self.config.series_colors[index % self.config.series_colors.len()]
+        }
+    }
 }
 
 impl<'a> Widget for XYChart<'a> {
@@ -72,7 +81,7 @@ impl<'a> Widget for XYChart<'a> {
                     .name(series.name.clone())
                     .marker(spec.marker)
                     .graph_type(spec.graph_type)
-                    .style(Style::default().fg(SERIES_COLORS[i % SERIES_COLORS.len()]))
+                    .style(Style::default().fg(self.color_at(i)))
                     .data(&series.data)
             })
             .collect();
@@ -173,6 +182,7 @@ mod tests {
                 data: vec![(1.0, 100.0), (2.0, 200.0), (3.0, 350.0)],
             }],
             x_labels: None,
+            series_colors: vec![],
         };
 
         let chart = XYChart::new(&config, XYMode::Line);
@@ -213,6 +223,7 @@ mod tests {
                 ],
             }],
             x_labels: None,
+            series_colors: vec![],
         };
 
         let chart = ScatterPlot::new(&config);
@@ -253,6 +264,7 @@ mod tests {
                 },
             ],
             x_labels: None,
+            series_colors: vec![],
         };
 
         let chart = XYChart::new(&config, XYMode::Line);
@@ -306,6 +318,7 @@ mod tests {
                 data: vec![],
             }],
             x_labels: None,
+            series_colors: vec![],
         };
 
         let chart = ScatterPlot::new(&config);
@@ -339,6 +352,7 @@ mod tests {
                 },
             ],
             x_labels: None,
+            series_colors: vec![],
         };
 
         let chart = XYChart::new(&config, XYMode::Line);
@@ -372,6 +386,7 @@ mod tests {
                 },
             ],
             x_labels: None,
+            series_colors: vec![],
         };
 
         let chart = ScatterPlot::new(&config);
@@ -409,6 +424,7 @@ mod tests {
                 data: vec![(-30.0, -50.0), (0.0, 0.0), (30.0, 50.0)],
             }],
             x_labels: None,
+            series_colors: vec![],
         };
 
         let chart = ScatterPlot::new(&config);

@@ -94,6 +94,8 @@ pub struct ChartConfig {
     /// Optional string labels for the X axis (e.g., date strings for temporal data).
     /// When set, these replace numeric tick labels on the X axis.
     pub x_labels: Option<Vec<String>>,
+    /// Color palette for series (from theme). Falls back to SERIES_COLORS if empty.
+    pub series_colors: Vec<Color>,
 }
 
 /// Labels for a bar chart (categorical x-axis).

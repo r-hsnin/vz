@@ -2377,3 +2377,13 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 5 unit (theme.rs) + 4 integration (dark/light/high-contrast/invalid)
 - 検証: PASS (474 tests: 358 unit + 112 integration + 4 snapshot)
 - 次の候補: Theme をレンダリングに適用 (line.rs, bar.rs, heatmap.rs の Color::* をtheme参照に変更)
+
+---
+
+## Cycle 139 — 2026-07-12T12:36
+- 種別: 機能追加 (テーマ適用)
+- 改善: Theme struct の series_colors を Line/Scatter チャートに実適用。`--theme light` で異なる配色で描画されることを確認。
+- 影響: src/render/mod.rs (ChartConfig.series_colors追加), src/render/line.rs (color_at method), src/chart/data_builder.rs (vec![] default), src/oneshot/builders.rs (theme colors injection)
+- テスト: 既存474テスト全パス (新色がテストに影響しないことを確認)
+- 検証: PASS (474 tests: 358 unit + 112 integration + 4 snapshot)
+- 次の候補: bar chart にもテーマ適用 or 停止判定

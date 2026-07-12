@@ -274,6 +274,7 @@ pub fn build_chart_config(
         y_axis: Axis::from_data(&y_label, &all_y),
         series,
         x_labels,
+        series_colors: vec![],
     }
 }
 

@@ -29,6 +29,8 @@ pub fn build_line_scatter_config(
     let rendered = config.series.iter().map(|s| s.data.len()).sum::<usize>();
     let effective_rows = rows.len().min(data_builder::MAX_CHART_POINTS);
     super::warn_skipped_rows(effective_rows, rendered, recommendation, chart_type);
+    // Apply theme colors
+    config.series_colors = opts.theme.series_colors.clone();
     config
 }
 
