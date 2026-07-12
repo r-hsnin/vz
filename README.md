@@ -1,5 +1,9 @@
 # vz
 
+[![CI](https://github.com/r-hsnin/vz/actions/workflows/ci.yml/badge.svg)](https://github.com/r-hsnin/vz/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
+
 CLI BI tool with smart visualization and terminal presentation.
 
 **Convention over Configuration** — data types determine the visualization automatically.

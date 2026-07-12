@@ -6,6 +6,11 @@ rust-version = "1.85"
 description = "CLI BI tool with smart visualization and terminal presentation"
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/r-hsnin/vz"
+homepage = "https://r-hsnin.github.io/vz/"
+keywords = ["cli", "visualization", "csv", "chart", "terminal"]
+categories = ["command-line-utilities", "visualization"]
+exclude = ["fixtures/", "tests/", "docs/", ".github/", "demo/"]
 
 [dependencies]
 # CLI

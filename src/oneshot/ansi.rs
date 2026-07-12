@@ -8,7 +8,7 @@ use ratatui::{
 };
 
 /// Determine whether to output ANSI color codes (for stdout).
-/// Respects NO_COLOR env var (https://no-color.org/) and TTY detection.
+/// Respects NO_COLOR env var (<https://no-color.org/>) and TTY detection.
 pub fn should_colorize() -> bool {
     // NO_COLOR takes precedence (any non-empty value disables color)
     if std::env::var("NO_COLOR").is_ok_and(|v| !v.is_empty()) {
