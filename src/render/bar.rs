@@ -32,7 +32,8 @@ impl<'a> Widget for BarChart<'a> {
         let chart_area = if self.data.values.is_empty() {
             area
         } else {
-            super::render_y_axis_frame_tight(max_val, 5, &area, buf)
+            let color = self.data.axis_color.unwrap_or(Color::DarkGray);
+            super::render_y_axis_frame_colored(max_val, 5, &area, buf, true, color)
         };
 
         let bar_count = self.data.labels.len();
@@ -133,6 +134,7 @@ mod tests {
             y_label: "Revenue".to_string(),
             show_labels: false,
             series_colors: vec![],
+            axis_color: None,
         };
 
         let chart = BarChart::new(&data);
@@ -157,6 +159,7 @@ mod tests {
             y_label: "Y".to_string(),
             show_labels: false,
             series_colors: vec![],
+            axis_color: None,
         };
 
         let chart = BarChart::new(&data);
@@ -175,6 +178,7 @@ mod tests {
             y_label: "Count".to_string(),
             show_labels: false,
             series_colors: vec![],
+            axis_color: None,
         };
 
         let chart = BarChart::new(&data);
@@ -192,6 +196,7 @@ mod tests {
             y_label: "Rate".to_string(),
             show_labels: false,
             series_colors: vec![],
+            axis_color: None,
         };
 
         let chart = BarChart::new(&data);
@@ -222,6 +227,7 @@ mod tests {
             y_label: "Revenue".to_string(),
             show_labels: false,
             series_colors: vec![],
+            axis_color: None,
         };
 
         let chart = BarChart::new(&data);

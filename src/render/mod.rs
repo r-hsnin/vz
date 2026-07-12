@@ -122,6 +122,8 @@ pub struct BarChartData {
     pub show_labels: bool,
     /// Color palette for bars (from theme). Falls back to SERIES_COLORS if empty.
     pub series_colors: Vec<Color>,
+    /// Color for axis lines (from theme). Falls back to DarkGray if not set.
+    pub axis_color: Option<Color>,
 }
 
 /// Data for a histogram.
@@ -275,7 +277,7 @@ pub fn split_y_axis(area: Rect, y_ticks: &[String]) -> (Rect, Rect) {
 /// This encapsulates the shared pattern used by bar and histogram charts:
 /// nice_scale → format ticks → dedup → split → render → return chart_area.
 pub fn render_y_axis_frame(max_val: f64, tick_count: usize, area: &Rect, buf: &mut Buffer) -> Rect {
-    render_y_axis_frame_inner(max_val, tick_count, area, buf, false)
+    render_y_axis_frame_inner(max_val, tick_count, area, buf, false, Color::DarkGray)
 }
 
 /// Render Y-axis frame with tight scaling (max stays close to data max).
@@ -286,7 +288,19 @@ pub fn render_y_axis_frame_tight(
     area: &Rect,
     buf: &mut Buffer,
 ) -> Rect {
-    render_y_axis_frame_inner(max_val, tick_count, area, buf, true)
+    render_y_axis_frame_inner(max_val, tick_count, area, buf, true, Color::DarkGray)
+}
+
+/// Render Y-axis frame with a specific axis color.
+pub fn render_y_axis_frame_colored(
+    max_val: f64,
+    tick_count: usize,
+    area: &Rect,
+    buf: &mut Buffer,
+    tight: bool,
+    axis_color: Color,
+) -> Rect {
+    render_y_axis_frame_inner(max_val, tick_count, area, buf, tight, axis_color)
 }
 
 fn render_y_axis_frame_inner(
@@ -295,6 +309,7 @@ fn render_y_axis_frame_inner(
     area: &Rect,
     buf: &mut Buffer,
     tight: bool,
+    axis_color: Color,
 ) -> Rect {
     let scale = nice_numbers::nice_scale(0.0, max_val, tick_count);
 
@@ -326,7 +341,7 @@ fn render_y_axis_frame_inner(
     let y_ticks = dedup_tick_labels(&y_ticks);
 
     let (y_area, chart_area) = split_y_axis(*area, &y_ticks);
-    render_y_axis(&y_ticks, y_area, buf, Color::DarkGray);
+    render_y_axis(&y_ticks, y_area, buf, axis_color);
     chart_area
 }
 

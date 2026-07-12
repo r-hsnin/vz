@@ -182,6 +182,7 @@ fn render_chart_to_buffer(
             }
             data.show_labels = opts.labels;
             data.series_colors = opts.theme.series_colors.clone();
+            data.axis_color = Some(opts.theme.axis_color);
             builders::sort_bar_data(&mut data, opts.sort_order);
             builders::truncate_bar_data(&mut data, opts.limit);
             warn_skipped_rows(rows.len(), rows_used, recommendation, ChartType::Bar);

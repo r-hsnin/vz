@@ -112,6 +112,7 @@ fn build_chart_data_for_type(
                 AggFunction::Sum,
             );
             data.series_colors = theme.series_colors.clone();
+            data.axis_color = Some(theme.axis_color);
             Ok(ChartData::Bar(data))
         }
         ChartType::Histogram => {

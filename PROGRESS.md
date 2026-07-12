@@ -2699,3 +2699,18 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 1 unit (test_chart_type_change_shows_notification)
 - 検証: PASS (495 tests: 375 unit + 116 integration + 4 snapshot)
 - 次の候補: render_chart_to_buffer 分割 (RICE=45) or bar/histogram axis color (RICE=14.4)
+
+---
+
+## Cycle 158 — 2026-07-12T14:13
+- 種別: 設計整合 (theme 完全適用)
+- スコア: RICE = (4×2×9)/0.5 = 14.4
+- 改善: Bar/Histogram チャートの Y 軸にも theme.axis_color を適用。
+  - `BarChartData` に `axis_color: Option<Color>` 追加
+  - `render_y_axis_frame_colored` 公開関数追加
+  - Bar widget が `data.axis_color` を使用
+  - oneshot/present から theme.axis_color を注入
+- 影響: src/render/mod.rs, src/render/bar.rs, src/chart/data_builder.rs, src/oneshot/mod.rs, src/oneshot/builders.rs, src/present/chart_loader.rs
+- テスト: 既存495テスト全パス
+- 検証: PASS (495 tests: 375 unit + 116 integration + 4 snapshot)
+- 次の候補: render_chart_to_buffer 分割 or 停止条件チェック
