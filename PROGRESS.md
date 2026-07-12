@@ -2466,3 +2466,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 4 unit
 - 検証: PASS (482 tests: 365 unit + 113 integration + 4 snapshot)
 - 次の候補: oneshot/builders.rs テスト追加 or 他の UX 改善
+
+---
+
+## Cycle 144 — 2026-07-12T13:12
+- 種別: 品質改善 (テストカバレッジ)
+- スコア: RICE = (4×3×9)/2 = 5.4
+- 改善: `oneshot/builders.rs` に8つのユニットテスト追加（build_bar_data sum/mean, sort desc/asc, truncate, histogram, heatmap）
+- 影響: src/oneshot/builders.rs
+- テスト追加: 8 unit
+- 検証: PASS (489 tests: 372 unit + 113 integration + 4 snapshot)
+- 次の候補: auto_select テーブル駆動化 or 新機能検討

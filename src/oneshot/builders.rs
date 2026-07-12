@@ -191,3 +191,131 @@ fn apply_extra_y_columns(
         .collect();
     config.y_axis = Axis::from_data(&config.y_axis.label, &all_y);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::chart::selector::ChartRecommendation;
+
+    fn sales_headers() -> Vec<String> {
+        vec![
+            "city".to_string(),
+            "revenue".to_string(),
+            "profit".to_string(),
+        ]
+    }
+
+    fn sales_rows() -> Vec<Vec<String>> {
+        vec![
+            vec!["Tokyo".into(), "1000".into(), "200".into()],
+            vec!["Osaka".into(), "500".into(), "100".into()],
+            vec!["Tokyo".into(), "2000".into(), "400".into()],
+        ]
+    }
+
+    fn bar_recommendation() -> ChartRecommendation {
+        ChartRecommendation {
+            chart_type: ChartType::Bar,
+            x_column: "city".to_string(),
+            y_column: Some("revenue".to_string()),
+            color_column: None,
+        }
+    }
+
+    #[test]
+    fn test_build_bar_data_aggregates() {
+        let (data, rows_used) = build_bar_data(
+            &bar_recommendation(),
+            &sales_headers(),
+            &sales_rows(),
+            AggFunction::Sum,
+        );
+        assert_eq!(rows_used, 3);
+        assert!(data.labels.contains(&"Tokyo".to_string()));
+        assert!(data.labels.contains(&"Osaka".to_string()));
+        // Tokyo sum = 3000, Osaka sum = 500
+        let tokyo_idx = data.labels.iter().position(|l| l == "Tokyo").unwrap();
+        assert!((data.values[tokyo_idx] - 3000.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_build_bar_data_mean() {
+        let (data, _) = build_bar_data(
+            &bar_recommendation(),
+            &sales_headers(),
+            &sales_rows(),
+            AggFunction::Mean,
+        );
+        let tokyo_idx = data.labels.iter().position(|l| l == "Tokyo").unwrap();
+        assert!((data.values[tokyo_idx] - 1500.0).abs() < 0.01); // (1000+2000)/2
+    }
+
+    #[test]
+    fn test_sort_bar_data_desc() {
+        let (mut data, _) = build_bar_data(
+            &bar_recommendation(),
+            &sales_headers(),
+            &sales_rows(),
+            AggFunction::Sum,
+        );
+        sort_bar_data(&mut data, Some(SortOrder::Desc));
+        assert_eq!(data.labels[0], "Tokyo"); // 3000 > 500
+    }
+
+    #[test]
+    fn test_sort_bar_data_asc() {
+        let (mut data, _) = build_bar_data(
+            &bar_recommendation(),
+            &sales_headers(),
+            &sales_rows(),
+            AggFunction::Sum,
+        );
+        sort_bar_data(&mut data, Some(SortOrder::Asc));
+        assert_eq!(data.labels[0], "Osaka"); // 500 < 3000
+    }
+
+    #[test]
+    fn test_truncate_bar_data_limit() {
+        let (mut data, _) = build_bar_data(
+            &bar_recommendation(),
+            &sales_headers(),
+            &sales_rows(),
+            AggFunction::Sum,
+        );
+        truncate_bar_data(&mut data, Some(1));
+        assert_eq!(data.labels.len(), 1);
+        assert_eq!(data.values.len(), 1);
+    }
+
+    #[test]
+    fn test_build_histogram_data_numeric_column() {
+        let rec = ChartRecommendation {
+            chart_type: ChartType::Histogram,
+            x_column: "revenue".to_string(),
+            y_column: None,
+            color_column: None,
+        };
+        let data = build_histogram_data(&rec, &sales_headers(), &sales_rows());
+        assert!(!data.values.is_empty());
+        assert!(data.title.unwrap_or_default().contains("revenue"));
+    }
+
+    #[test]
+    fn test_build_heatmap_two_categoricals() {
+        let headers = vec!["city".to_string(), "product".to_string()];
+        let rows = vec![
+            vec!["Tokyo".into(), "A".into()],
+            vec!["Tokyo".into(), "B".into()],
+            vec!["Osaka".into(), "A".into()],
+        ];
+        let rec = ChartRecommendation {
+            chart_type: ChartType::Heatmap,
+            x_column: "city".to_string(),
+            y_column: Some("product".to_string()),
+            color_column: None,
+        };
+        let data = build_heatmap(&rec, &headers, &rows);
+        assert!(!data.row_labels.is_empty());
+        assert!(!data.col_labels.is_empty());
+    }
+}
