@@ -2976,3 +2976,13 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: src/main.rs, src/oneshot/mod.rs (builders public化), tests/integration_test.rs
 - テスト追加: 2 integration (test_output_json_chart_data_line, _bar_sorted)
 - 検証: PASS (517 tests: 394 unit + 119 integration + 4 snapshot)
+
+---
+
+## Cycle 177 — 2026-07-12T16:15
+- 種別: リファクタ
+- スコア: RICE = (3×2×8.5)/1 = 51
+- 改善: `compute_column_stats` (66行) を `quantitative_stats`/`categorical_stats`/`temporal_stats` に分割。メイン関数は20行、各ヘルパーは10-15行。
+- 影響: src/output/mod.rs
+- テスト: 既存517テスト全パス
+- 検証: PASS (517 tests: 394 unit + 119 integration + 4 snapshot)

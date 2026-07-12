@@ -145,51 +145,55 @@ pub fn compute_column_stats(
     }
 
     match data_type {
-        DataType::Quantitative => {
-            let nums: Vec<f64> = values.iter().filter_map(|v| v.parse().ok()).collect();
-            if nums.is_empty() {
-                return ColumnStats::Empty {};
-            }
-            let (min, max) = crate::util::min_max(&nums).unwrap_or((0.0, 0.0));
-            let mean = nums.iter().sum::<f64>() / nums.len() as f64;
-            // Sanitize: if any value is NaN/Infinity (shouldn't happen with
-            // the guards above, but defensively handle), return Empty.
-            if !min.is_finite() || !max.is_finite() || !mean.is_finite() {
-                return ColumnStats::Empty {};
-            }
-            ColumnStats::Quantitative { min, max, mean }
+        DataType::Quantitative => quantitative_stats(&values),
+        DataType::Categorical | DataType::Nominal => categorical_stats(&values),
+        DataType::Temporal => temporal_stats(&values),
+    }
+}
+
+fn quantitative_stats(values: &[&str]) -> ColumnStats {
+    let nums: Vec<f64> = values.iter().filter_map(|v| v.parse().ok()).collect();
+    if nums.is_empty() {
+        return ColumnStats::Empty {};
+    }
+    let (min, max) = crate::util::min_max(&nums).unwrap_or((0.0, 0.0));
+    let mean = nums.iter().sum::<f64>() / nums.len() as f64;
+    if !min.is_finite() || !max.is_finite() || !mean.is_finite() {
+        return ColumnStats::Empty {};
+    }
+    ColumnStats::Quantitative { min, max, mean }
+}
+
+fn categorical_stats(values: &[&str]) -> ColumnStats {
+    let mut unique_set = std::collections::HashSet::new();
+    let mut unique_ordered = Vec::new();
+    for &v in values {
+        if unique_set.insert(v) {
+            unique_ordered.push(v.to_string());
         }
-        DataType::Categorical | DataType::Nominal => {
-            let mut unique_set = std::collections::HashSet::new();
-            let mut unique_ordered = Vec::new();
-            for &v in &values {
-                if unique_set.insert(v) {
-                    unique_ordered.push(v.to_string());
-                }
-            }
-            ColumnStats::Categorical {
-                unique: unique_set.len(),
-                values: unique_ordered,
-            }
-        }
-        DataType::Temporal => {
-            let min_val = values
-                .iter()
-                .filter(|v| !v.is_empty())
-                .min()
-                .unwrap_or(&"")
-                .to_string();
-            let max_val = values
-                .iter()
-                .filter(|v| !v.is_empty())
-                .max()
-                .unwrap_or(&"")
-                .to_string();
-            ColumnStats::Temporal {
-                min: min_val,
-                max: max_val,
-            }
-        }
+    }
+    ColumnStats::Categorical {
+        unique: unique_set.len(),
+        values: unique_ordered,
+    }
+}
+
+fn temporal_stats(values: &[&str]) -> ColumnStats {
+    let min_val = values
+        .iter()
+        .filter(|v| !v.is_empty())
+        .min()
+        .unwrap_or(&"")
+        .to_string();
+    let max_val = values
+        .iter()
+        .filter(|v| !v.is_empty())
+        .max()
+        .unwrap_or(&"")
+        .to_string();
+    ColumnStats::Temporal {
+        min: min_val,
+        max: max_val,
     }
 }
 
