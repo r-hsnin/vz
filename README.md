@@ -142,13 +142,13 @@ Bar charts automatically aggregate (sum) values by category.
 |-----|--------|
 | `h`/`l` (←/→) | Change X axis column |
 | `j`/`k` (↑/↓) | Change Y axis column (chart) / Scroll rows (table) |
+| `c` | Cycle color/group-by column |
+| `y` | Show equivalent oneshot command |
 | `d` / `Tab` | Toggle between chart and data table view |
-| `1` | Force Line chart |
-| `2` | Force Bar chart |
-| `3` | Force Scatter plot |
-| `4` | Force Histogram |
-| `0` | Auto (reset) |
-| `q` | Quit |
+| `1`-`4` | Force chart type (Line/Bar/Scatter/Histogram) |
+| `0` | Auto chart type (reset) |
+| `?` | Show/hide help overlay |
+| `q` / `Esc` | Quit |
 
 ## Present Mode
 
