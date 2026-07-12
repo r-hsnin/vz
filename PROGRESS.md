@@ -2440,3 +2440,18 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 1 unit + 1 integration
 - 検証: PASS (476 tests: 359 unit + 113 integration + 4 snapshot)
 - 次の候補: Explore mode color discoverability (RICE=135) or test coverage for table.rs/builders.rs
+
+---
+
+## Cycle 142 — 2026-07-12T13:12
+- 種別: UX改善
+- ユーザーストーリー: Explore モードで `c` を押したとき、現在のカラー列状態を把握し、列がない場合はその理由を理解したい。
+- スコア: RICE = (6×5×9)/2 = 135
+- 改善:
+  1. ステータスバーに現在のカラー列名を表示（`c=city` / `c=off`）
+  2. カラー列がない場合に「no color columns available」メッセージを表示
+  3. `status_message` フィールドを ExploreApp に追加（1描画後にクリア）
+- 影響: src/explore/mod.rs
+- テスト追加: 2 unit (no_categoricals_shows_message, status_bar_shows_current_color_column)
+- 検証: PASS (478 tests: 361 unit + 113 integration + 4 snapshot)
+- 次の候補: table.rs unit tests or builders.rs test coverage

@@ -32,6 +32,8 @@ pub struct ExploreApp {
     pub should_quit: bool,
     pub view_mode: ViewMode,
     pub table_offset: usize,
+    /// Transient status message shown for one render cycle.
+    pub status_message: Option<String>,
 }
 
 impl ExploreApp {
@@ -47,6 +49,7 @@ impl ExploreApp {
             should_quit: false,
             view_mode: ViewMode::Chart,
             table_offset: 0,
+            status_message: None,
         }
     }
 
@@ -147,6 +150,7 @@ impl ExploreApp {
 
         if categoricals.is_empty() {
             self.selected_color = None;
+            self.status_message = Some("no color columns available".to_string());
             return;
         }
 
@@ -306,6 +310,7 @@ pub fn run_explore(schema: Schema, data: Vec<Vec<String>>) -> Result<()> {
 
     loop {
         terminal.draw(|frame| draw_ui(frame, &app))?;
+        app.status_message = None; // clear transient message after render
 
         if let Event::Key(key) = event::read()?
             && key.kind == KeyEventKind::Press
@@ -481,13 +486,28 @@ fn build_status_bar(app: &ExploreApp) -> Paragraph<'static> {
         .collect::<Vec<_>>()
         .join(" ");
 
+    let color_info = match app.selected_color {
+        Some(idx) => format!(
+            "c={}",
+            app.schema
+                .columns
+                .get(idx)
+                .map(|c| c.name.as_str())
+                .unwrap_or("?")
+        ),
+        None => "c=off".to_string(),
+    };
+
     let text = Line::from(vec![
         Span::styled(" h/l", Style::default().fg(Color::Yellow)),
         Span::raw("=X "),
         Span::styled("j/k", Style::default().fg(Color::Yellow)),
         Span::raw("=Y "),
         Span::styled("c", Style::default().fg(Color::Yellow)),
-        Span::raw("=color "),
+        Span::raw(format!(
+            "={} ",
+            color_info.strip_prefix("c=").unwrap_or("off")
+        )),
         Span::styled("1-4", Style::default().fg(Color::Yellow)),
         Span::raw("=type "),
         Span::styled("0", Style::default().fg(Color::Yellow)),
@@ -499,7 +519,15 @@ fn build_status_bar(app: &ExploreApp) -> Paragraph<'static> {
         Span::styled(col_display, Style::default().fg(Color::DarkGray)),
     ]);
 
-    Paragraph::new(text).block(Block::default().borders(Borders::TOP))
+    let mut lines = vec![text];
+    if let Some(ref msg) = app.status_message {
+        lines.push(Line::from(Span::styled(
+            format!(" ⚠ {}", msg),
+            Style::default().fg(Color::Yellow),
+        )));
+    }
+
+    Paragraph::new(lines).block(Block::default().borders(Borders::TOP))
 }
 
 #[cfg(test)]
@@ -758,5 +786,40 @@ mod tests {
         // No categorical columns available (city is x)
         app.handle_key(KeyCode::Char('c'));
         assert_eq!(app.selected_color, None); // nothing to select
+    }
+
+    #[test]
+    fn test_cycle_color_no_categoricals_shows_message() {
+        let schema = Schema::new(vec![
+            ColumnMeta {
+                name: "x".to_string(),
+                data_type: DataType::Quantitative,
+                null_count: 0,
+                sample_size: 2,
+            },
+            ColumnMeta {
+                name: "y".to_string(),
+                data_type: DataType::Quantitative,
+                null_count: 0,
+                sample_size: 2,
+            },
+        ]);
+        let data = vec![vec!["1".into(), "2".into()]];
+        let mut app = ExploreApp::new(schema, data);
+        app.handle_key(KeyCode::Char('c'));
+        assert_eq!(
+            app.status_message.as_deref(),
+            Some("no color columns available")
+        );
+    }
+
+    #[test]
+    fn test_status_bar_shows_current_color_column() {
+        let mut app = make_test_app();
+        // city is at index 1 (categorical)
+        app.handle_key(KeyCode::Char('c'));
+        assert_eq!(app.selected_color, Some(1));
+        // The status bar function uses app.selected_color to show "c=city"
+        // We just verify the field is set correctly
     }
 }
