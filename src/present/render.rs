@@ -21,7 +21,7 @@ pub fn draw_slide(frame: &mut Frame, app: &PresentApp) {
     .split(frame.area());
 
     if let Some(slide) = app.current_slide() {
-        render_slide_content(frame, slide, chunks[0], &app.base_dir);
+        render_slide_content(frame, slide, chunks[0], &app.base_dir, &app.theme);
     }
 
     // Footer with slide indicator
@@ -45,6 +45,7 @@ fn render_slide_content(
     slide: &Slide,
     content_area: ratatui::layout::Rect,
     base_dir: &Path,
+    theme: &crate::theme::Theme,
 ) {
     let inner_chunks = Layout::vertical([
         Constraint::Length(if slide.title.is_some() { 3 } else { 0 }),
@@ -71,7 +72,7 @@ fn render_slide_content(
         inner_chunks[0]
     };
 
-    render_slide_body(frame, &slide.content, body_area, base_dir);
+    render_slide_body(frame, &slide.content, body_area, base_dir, theme);
 }
 
 /// Render slide body elements with spacing.
@@ -80,6 +81,7 @@ fn render_slide_body(
     elements: &[SlideElement],
     area: ratatui::layout::Rect,
     base_dir: &Path,
+    theme: &crate::theme::Theme,
 ) {
     let constraints: Vec<Constraint> = elements.iter().map(element_constraint).collect();
 
@@ -93,7 +95,7 @@ fn render_slide_body(
         if i >= chunks.len() {
             break;
         }
-        render_element(frame, element, chunks[i], base_dir);
+        render_element(frame, element, chunks[i], base_dir, theme);
     }
 }
 
@@ -117,6 +119,7 @@ fn render_element(
     element: &SlideElement,
     area: ratatui::layout::Rect,
     base_dir: &Path,
+    theme: &crate::theme::Theme,
 ) {
     match element {
         SlideElement::Text(text) => {
@@ -137,7 +140,7 @@ fn render_element(
             frame.render_widget(Paragraph::new(lines), area);
         }
         SlideElement::Chart(chart_block) => {
-            render_chart_placeholder(frame, chart_block, area, base_dir);
+            render_chart_placeholder(frame, chart_block, area, base_dir, theme);
         }
         SlideElement::Code { language, content } => {
             render_code_block(frame, language.as_deref(), content, area);
@@ -204,10 +207,11 @@ fn render_chart_placeholder(
     block: &ChartBlock,
     area: ratatui::layout::Rect,
     base_dir: &Path,
+    theme: &crate::theme::Theme,
 ) {
     use crate::render::ChartWidget;
 
-    if let Ok(chart_data) = super::load_chart_data(block, base_dir) {
+    if let Ok(chart_data) = super::load_chart_data(block, base_dir, theme) {
         frame.render_widget(ChartWidget(&chart_data), area);
     } else {
         // Fallback: show chart block info

@@ -252,7 +252,7 @@ fn run(cli: &Cli) -> Result<()> {
             explore::run_explore(schema, data.rows, resolve_theme(cli))?;
         }
         Some(Command::Present { file }) => {
-            present::run_present(file)?;
+            present::run_present(file, resolve_theme(cli))?;
         }
         Some(Command::Completions { shell }) => {
             let mut cmd = Cli::command();

@@ -24,7 +24,11 @@ fn resolve_chart_source_path(source: &str, base_dir: &Path) -> PathBuf {
 }
 
 /// Load chart data from a chart block definition and base directory.
-pub fn load_chart_data(block: &ChartBlock, base_dir: &Path) -> Result<crate::render::ChartData> {
+pub fn load_chart_data(
+    block: &ChartBlock,
+    base_dir: &Path,
+    theme: &crate::theme::Theme,
+) -> Result<crate::render::ChartData> {
     let path = resolve_chart_source_path(&block.source, base_dir);
 
     let mut data = crate::loader::load_data(&path).with_context(|| {
@@ -57,7 +61,7 @@ pub fn load_chart_data(block: &ChartBlock, base_dir: &Path) -> Result<crate::ren
         block.color_col.as_deref(),
         headers,
     );
-    build_chart_data_for_type(chart_type, block, rows, &axes)
+    build_chart_data_for_type(chart_type, block, rows, &axes, theme)
 }
 
 /// Infer chart type from data when not explicitly specified in chart block.
@@ -85,6 +89,7 @@ fn build_chart_data_for_type(
     block: &ChartBlock,
     rows: &[Vec<String>],
     cols: &data_builder::ResolvedAxes,
+    theme: &crate::theme::Theme,
 ) -> Result<crate::render::ChartData> {
     use crate::render::ChartData;
 
@@ -98,7 +103,7 @@ fn build_chart_data_for_type(
             Ok(ChartData::Heatmap(data))
         }
         ChartType::Bar => {
-            let (data, _) = data_builder::aggregate_bar(
+            let (mut data, _) = data_builder::aggregate_bar(
                 rows,
                 cols.x_idx,
                 cols.y_idx,
@@ -106,6 +111,7 @@ fn build_chart_data_for_type(
                 cols.y_label.clone(),
                 AggFunction::Sum,
             );
+            data.series_colors = theme.series_colors.clone();
             Ok(ChartData::Bar(data))
         }
         ChartType::Histogram => {
@@ -118,7 +124,7 @@ fn build_chart_data_for_type(
             Ok(ChartData::Histogram(data))
         }
         ChartType::Line | ChartType::Scatter => {
-            let config = data_builder::build_chart_config(
+            let mut config = data_builder::build_chart_config(
                 rows,
                 cols.x_idx,
                 cols.y_idx,
@@ -127,6 +133,7 @@ fn build_chart_data_for_type(
                 cols.y_label.clone(),
                 block.title.clone(),
             );
+            config.series_colors = theme.series_colors.clone();
             if chart_type == ChartType::Scatter {
                 Ok(ChartData::Scatter(config))
             } else {

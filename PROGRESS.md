@@ -2548,3 +2548,20 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 3 unit (truncate_to_width: fits/truncates/min)
 - 検証: PASS (492 tests: 375 unit + 113 integration + 4 snapshot)
 - 次の候補: Present mode theme threading (RICE=22.8)
+
+---
+
+## Cycle 149 — 2026-07-12T13:45
+- 種別: 設計整合
+- ユーザーストーリー: プレゼンモードでプロジェクタ（白背景）を使うユーザーが、`--theme light` で見やすいカラーを適用したい。
+- スコア: RICE = (4×3×9.5)/0.5 = 22.8
+- 改善: Theme を Present モードに全面適用。
+  - `run_present` に theme 引数追加
+  - `PresentApp` に theme フィールド追加
+  - `chart_loader` で series_colors をテーマから適用（Line/Scatter/Bar）
+  - render チェーン全体に theme を伝播
+- 影響: src/present/mod.rs, src/present/chart_loader.rs, src/present/render.rs, src/main.rs
+- テスト: 既存492テスト全パス
+- 検証: PASS (492 tests: 375 unit + 113 integration + 4 snapshot)
+- 設計一貫性: 3モード全てで `--theme` が有効に（oneshot/explore/present）
+- 次の候補: oneshot/mod.rs テスト移動 or Explore filter/search

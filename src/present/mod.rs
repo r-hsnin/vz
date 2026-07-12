@@ -62,16 +62,23 @@ pub struct PresentApp {
     pub base_dir: std::path::PathBuf,
     /// Buffer for digit input (jump-to-slide).
     pub input_buffer: String,
+    /// Color theme for chart rendering.
+    pub theme: crate::theme::Theme,
 }
 
 impl PresentApp {
-    pub fn new(presentation: Presentation, base_dir: std::path::PathBuf) -> Self {
+    pub fn new(
+        presentation: Presentation,
+        base_dir: std::path::PathBuf,
+        theme: crate::theme::Theme,
+    ) -> Self {
         Self {
             presentation,
             current_slide: 0,
             should_quit: false,
             base_dir,
             input_buffer: String::new(),
+            theme,
         }
     }
 
@@ -211,7 +218,7 @@ pub fn parse_inline_spans(text: &str) -> Vec<Span<'static>> {
 }
 
 /// Run the Present mode TUI.
-pub fn run_present(path: &Path) -> Result<()> {
+pub fn run_present(path: &Path, theme: crate::theme::Theme) -> Result<()> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read presentation file: {:?}", path))?;
     let presentation = parse_presentation(&content);
@@ -229,7 +236,7 @@ pub fn run_present(path: &Path) -> Result<()> {
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
     let mut terminal = ratatui::init();
-    let mut app = PresentApp::new(presentation, base_dir);
+    let mut app = PresentApp::new(presentation, base_dir, theme);
 
     loop {
         terminal.draw(|frame| render::draw_slide(frame, &app))?;
@@ -256,8 +263,9 @@ mod render;
 pub(crate) fn load_chart_data(
     block: &ChartBlock,
     base_dir: &Path,
+    theme: &crate::theme::Theme,
 ) -> Result<crate::render::ChartData> {
-    chart_loader::load_chart_data(block, base_dir)
+    chart_loader::load_chart_data(block, base_dir, theme)
 }
 
 #[cfg(test)]
@@ -385,7 +393,7 @@ where: revenue>500
                 },
             ],
         };
-        let mut app = PresentApp::new(pres, std::path::PathBuf::new());
+        let mut app = PresentApp::new(pres, std::path::PathBuf::new(), crate::theme::Theme::dark());
         assert_eq!(app.current_slide, 0);
 
         app.handle_key(KeyCode::Right);
@@ -418,7 +426,7 @@ where: revenue>500
                 content: vec![],
             }],
         };
-        let mut app = PresentApp::new(pres, std::path::PathBuf::new());
+        let mut app = PresentApp::new(pres, std::path::PathBuf::new(), crate::theme::Theme::dark());
         assert!(!app.should_quit);
         app.handle_key(KeyCode::Char('q'));
         assert!(app.should_quit);
@@ -442,7 +450,7 @@ where: revenue>500
                 },
             ],
         };
-        let mut app = PresentApp::new(pres, std::path::PathBuf::new());
+        let mut app = PresentApp::new(pres, std::path::PathBuf::new(), crate::theme::Theme::dark());
         assert_eq!(app.slide_indicator(), "1/3");
         app.handle_key(KeyCode::Right);
         assert_eq!(app.slide_indicator(), "2/3");
@@ -495,7 +503,7 @@ More text after chart.
 
         // Use the fixtures directory as base_dir (where demo.md lives)
         let base_dir = std::path::Path::new("fixtures");
-        let result = super::load_chart_data(&block, base_dir);
+        let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
         assert!(
             result.is_ok(),
             "load_chart_data should resolve sales.csv relative to fixtures/: {:?}",
@@ -516,7 +524,7 @@ More text after chart.
         };
 
         let base_dir = std::path::Path::new("fixtures");
-        let result = super::load_chart_data(&block, base_dir);
+        let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
         assert!(
             result.is_ok(),
             "load_chart_data with where filter should succeed: {:?}",
@@ -537,7 +545,7 @@ More text after chart.
         };
 
         let base_dir = std::path::Path::new("fixtures");
-        let result = super::load_chart_data(&block, base_dir);
+        let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
         assert!(result.is_err());
     }
 
@@ -554,7 +562,7 @@ More text after chart.
         };
 
         let base_dir = std::path::Path::new("fixtures");
-        let result = super::load_chart_data(&block, base_dir);
+        let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
         assert!(
             result.is_ok(),
             "multi-series should work: {:?}",
@@ -605,7 +613,7 @@ More text after chart.
         };
 
         let base_dir = std::path::Path::new("fixtures");
-        let result = super::load_chart_data(&block, base_dir);
+        let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
         assert!(
             result.is_ok(),
             "JSON source should work via loader: {:?}",
@@ -634,7 +642,7 @@ More text after chart.
         };
 
         let base_dir = std::path::Path::new("fixtures");
-        let result = super::load_chart_data(&block, base_dir);
+        let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
         assert!(result.is_ok(), "Should load: {:?}", result.err());
         assert!(
             matches!(result.unwrap(), crate::render::ChartData::Heatmap(_)),
@@ -656,7 +664,7 @@ More text after chart.
         };
 
         let base_dir = std::path::Path::new("fixtures");
-        let result = super::load_chart_data(&block, base_dir);
+        let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
         assert!(result.is_ok(), "Should load: {:?}", result.err());
         assert!(
             matches!(result.unwrap(), crate::render::ChartData::Line(_)),
@@ -674,7 +682,7 @@ More text after chart.
                 })
                 .collect(),
         };
-        let mut app = PresentApp::new(pres, std::path::PathBuf::new());
+        let mut app = PresentApp::new(pres, std::path::PathBuf::new(), crate::theme::Theme::dark());
         assert_eq!(app.current_slide, 0);
 
         // Type "5" then Enter → jump to slide 5 (index 4)
@@ -696,7 +704,7 @@ More text after chart.
                 })
                 .collect(),
         };
-        let mut app = PresentApp::new(pres, std::path::PathBuf::new());
+        let mut app = PresentApp::new(pres, std::path::PathBuf::new(), crate::theme::Theme::dark());
 
         // Type "99" then Enter → clamped to last slide (index 2)
         app.handle_key(KeyCode::Char('9'));
@@ -715,7 +723,7 @@ More text after chart.
                 })
                 .collect(),
         };
-        let mut app = PresentApp::new(pres, std::path::PathBuf::new());
+        let mut app = PresentApp::new(pres, std::path::PathBuf::new(), crate::theme::Theme::dark());
         app.current_slide = 3;
 
         // Type "0" then Enter → clamped to 0 (first slide)
@@ -734,7 +742,7 @@ More text after chart.
                 })
                 .collect(),
         };
-        let mut app = PresentApp::new(pres, std::path::PathBuf::new());
+        let mut app = PresentApp::new(pres, std::path::PathBuf::new(), crate::theme::Theme::dark());
         app.current_slide = 2;
 
         // Type "7" then Escape → should NOT jump, stay at 2
