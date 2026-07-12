@@ -2289,3 +2289,18 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 0 (リファクタリングのみ、既存テスト全パスで振る舞い保持確認)
 - 検証: PASS (460 tests: 349 unit + 107 integration + 4 snapshot)
 - 次の候補: oneshot/mod.rs 分割 or render_oneshot短縮
+
+---
+
+## Cycle 133 — 2026-07-12T12:03
+- 種別: 品質改善 (安全性 + UX)
+- 選定: 2つの高RICE小修正を1サイクルで実施
+  1. `values.last().unwrap()` → `values.last()?` (RICE=400: R10×I4×C10/E1)
+  2. explore ステータスバーに `c=color` ヒント追加 (RICE=180: R5×I4×C9/E1)
+- 改善:
+  1. `trend_annotation()` の `.unwrap()` を `?` に置換。guard と距離が離れたunwrapの脆弱性を排除。
+  2. explore TUI のステータスバーに `c=color` を追加。ユーザーがカラーカラム切替機能を発見可能に。
+- 影響: src/oneshot/summary.rs (1行変更), src/explore/mod.rs (2行追加)
+- テスト追加: 0 (既存テストで振る舞い保持確認)
+- 検証: PASS (460 tests: 349 unit + 107 integration + 4 snapshot)
+- 次の候補: oneshot/mod.rs 1068行分割 or render_oneshot 61行短縮

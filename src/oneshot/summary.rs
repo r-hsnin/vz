@@ -130,7 +130,7 @@ fn trend_annotation(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
         return None;
     }
     let first = values[0];
-    let last = *values.last().unwrap();
+    let last = *values.last()?;
     if first.abs() < f64::EPSILON {
         return None;
     }

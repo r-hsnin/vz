@@ -486,6 +486,8 @@ fn build_status_bar(app: &ExploreApp) -> Paragraph<'static> {
         Span::raw("=X "),
         Span::styled("j/k", Style::default().fg(Color::Yellow)),
         Span::raw("=Y "),
+        Span::styled("c", Style::default().fg(Color::Yellow)),
+        Span::raw("=color "),
         Span::styled("1-4", Style::default().fg(Color::Yellow)),
         Span::raw("=type "),
         Span::styled("0", Style::default().fg(Color::Yellow)),
