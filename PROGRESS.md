@@ -2455,3 +2455,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 2 unit (no_categoricals_shows_message, status_bar_shows_current_color_column)
 - 検証: PASS (478 tests: 361 unit + 113 integration + 4 snapshot)
 - 次の候補: table.rs unit tests or builders.rs test coverage
+
+---
+
+## Cycle 143 — 2026-07-12T13:12
+- 種別: 品質改善 (テストカバレッジ)
+- スコア: RICE = (4×3×9)/2 = 5.4
+- 改善: `table.rs` に4つのユニットテスト追加（col_width: max_data_length, respects_minimum, empty_rows, missing_index）
+- 影響: src/table.rs, tests/integration_test.rs (重複テスト除去)
+- テスト追加: 4 unit
+- 検証: PASS (482 tests: 365 unit + 113 integration + 4 snapshot)
+- 次の候補: oneshot/builders.rs テスト追加 or 他の UX 改善

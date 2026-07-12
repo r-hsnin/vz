@@ -121,3 +121,36 @@ fn col_width(rows: &[Vec<String>], idx: usize, min: usize) -> usize {
         .unwrap_or(min)
         .max(min)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_col_width_uses_max_data_length() {
+        let rows = vec![
+            vec!["ab".to_string(), "12345".to_string()],
+            vec!["abc".to_string(), "1".to_string()],
+        ];
+        assert_eq!(col_width(&rows, 0, 2), 3); // "abc" is longest
+        assert_eq!(col_width(&rows, 1, 2), 5); // "12345" is longest
+    }
+
+    #[test]
+    fn test_col_width_respects_minimum() {
+        let rows = vec![vec!["a".to_string()]];
+        assert_eq!(col_width(&rows, 0, 10), 10);
+    }
+
+    #[test]
+    fn test_col_width_empty_rows() {
+        let rows: Vec<Vec<String>> = vec![];
+        assert_eq!(col_width(&rows, 0, 5), 5);
+    }
+
+    #[test]
+    fn test_col_width_missing_index() {
+        let rows = vec![vec!["a".to_string()]];
+        assert_eq!(col_width(&rows, 5, 3), 3);
+    }
+}
