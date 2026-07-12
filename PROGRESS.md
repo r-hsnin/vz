@@ -2675,3 +2675,15 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存493テスト全パス
 - 検証: PASS (493 tests: 373 unit + 116 integration + 4 snapshot)
 - 次の候補: fit_labels_to_width 修正 for small datasets (RICE=144)
+
+---
+
+## Cycle 156 — 2026-07-12T14:13
+- 種別: UX改善
+- ユーザーストーリー: 小規模データ（≤10行）のユーザーが、X軸ラベル全てを確認したい（勝手に省略されて混乱しない）。
+- スコア: RICE = (8×6×9)/3 = 144
+- 改善: `fit_labels_to_width` に ≤10 データポイントバイパス追加。小規模データは全ラベル表示。
+- 影響: src/oneshot/mod.rs, tests/snapshots/snapshot_test__snapshot_line_chart_default.snap
+- テスト追加: 1 unit (test_fit_labels_large_dataset_reduces)
+- 検証: PASS (494 tests: 374 unit + 116 integration + 4 snapshot)
+- 次の候補: Explore chart-type-change notification (RICE=120)

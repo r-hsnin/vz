@@ -253,6 +253,10 @@ pub(crate) fn fit_labels_to_width(labels: &[String], available_width: usize) -> 
     if labels.is_empty() {
         return vec![];
     }
+    // Small datasets: always show all labels (avoids confusing elision)
+    if labels.len() <= 10 {
+        return labels.to_vec();
+    }
     let max_label_width = labels.iter().map(|l| l.len()).max().unwrap_or(1);
     let labels_that_fit = (available_width / (max_label_width + 2)).max(2);
     if labels.len() <= labels_that_fit {
@@ -734,11 +738,11 @@ mod tests {
             "2024-05-01".to_string(),
             "2024-06-01".to_string(),
         ];
-        // At width 28, each 11-char label needs 11+1=12 chars, so max 2 labels
+        // Small datasets (≤10) always show all labels regardless of width
         let result = fit_labels_to_width(&labels, 28);
-        assert_eq!(result.len(), 2);
+        assert_eq!(result.len(), 6);
         assert_eq!(result[0], "2024-01-01");
-        assert_eq!(result[1], "2024-06-01");
+        assert_eq!(result[5], "2024-06-01");
     }
 
     #[test]
@@ -753,6 +757,20 @@ mod tests {
         // At width 80, each 4-char label needs 4 chars, so max 20 — all fit
         let result = fit_labels_to_width(&labels, 80);
         assert_eq!(result.len(), 5);
+    }
+
+    #[test]
+    fn test_fit_labels_large_dataset_reduces() {
+        let labels: Vec<String> = (1..=20).map(|i| format!("2024-{:02}-01", i)).collect();
+        // 20 labels > 10, so width-based reduction kicks in
+        let result = fit_labels_to_width(&labels, 40);
+        assert!(
+            result.len() < 20,
+            "Expected labels to be reduced for large dataset"
+        );
+        assert!(result.len() >= 2, "Should keep at least 2 labels");
+        assert_eq!(result[0], "2024-01-01");
+        assert_eq!(*result.last().unwrap(), "2024-20-01");
     }
 
     #[test]
