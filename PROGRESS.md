@@ -2536,3 +2536,15 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存489テスト全パス
 - 検証: PASS (489 tests: 372 unit + 113 integration + 4 snapshot)
 - 次の候補: Summary truncation fix — hints cut first on narrow terminals (RICE=120)
+
+---
+
+## Cycle 148 — 2026-07-12T13:45
+- 種別: UX改善
+- ユーザーストーリー: 狭いターミナルでも、ユーザーは「他に可視化できるカラム」のヒントを見たい（切り捨てられたくない）。
+- スコア: RICE = (8×5×9)/3 = 120
+- 改善: `format_and_print_parts` を改修。ヒントが幅超過する場合は2行に分割して表示。非カラーモードにも同じロジックを適用。
+- 影響: src/oneshot/summary.rs
+- テスト追加: 3 unit (truncate_to_width: fits/truncates/min)
+- 検証: PASS (492 tests: 375 unit + 113 integration + 4 snapshot)
+- 次の候補: Present mode theme threading (RICE=22.8)

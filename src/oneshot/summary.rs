@@ -169,8 +169,15 @@ fn format_and_print_parts(parts: &[String]) {
                     .collect::<Vec<_>>()
                     .join(" │ ");
                 let full = format!("{} │ {}", main_line, hint);
-                let truncated = truncate_to_width(&full, max_width);
-                eprintln!("\x1b[90m{}\x1b[0m", truncated);
+                if full.chars().count() <= max_width {
+                    eprintln!("\x1b[90m{}\x1b[0m", full);
+                } else {
+                    // Hint would be truncated: show on separate line
+                    let truncated_main = truncate_to_width(&main_line, max_width);
+                    let truncated_hint = truncate_to_width(hint, max_width);
+                    eprintln!("\x1b[90m{}\x1b[0m", truncated_main);
+                    eprintln!("\x1b[90m  {}\x1b[0m", truncated_hint);
+                }
             } else {
                 let full = parts.join(" │ ");
                 let truncated = truncate_to_width(&full, max_width);
@@ -182,9 +189,34 @@ fn format_and_print_parts(parts: &[String]) {
             eprintln!("\x1b[90m{}\x1b[0m", truncated);
         }
     } else {
-        let full = parts.join(" │ ");
-        let truncated = truncate_to_width(&full, max_width);
-        eprintln!("{}", truncated);
+        // Non-colorized: same logic for hint preservation
+        let main_parts: Vec<&String> = parts.iter().take(parts.len().saturating_sub(1)).collect();
+        if let Some(hint) = parts.last() {
+            if hint.starts_with('+') || hint.contains("try ") {
+                let main_line = main_parts
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" | ");
+                let full = format!("{} | {}", main_line, hint);
+                if full.chars().count() <= max_width {
+                    eprintln!("{}", full);
+                } else {
+                    let truncated_main = truncate_to_width(&main_line, max_width);
+                    let truncated_hint = truncate_to_width(hint, max_width);
+                    eprintln!("{}", truncated_main);
+                    eprintln!("  {}", truncated_hint);
+                }
+            } else {
+                let full = parts.join(" | ");
+                let truncated = truncate_to_width(&full, max_width);
+                eprintln!("{}", truncated);
+            }
+        } else {
+            let full = parts.join(" | ");
+            let truncated = truncate_to_width(&full, max_width);
+            eprintln!("{}", truncated);
+        }
     }
 }
 
@@ -728,4 +760,20 @@ fn test_build_summary_parts_shows_skipped_rows() {
         "Expected '3 rows (1 skipped)' in parts: {:?}",
         parts
     );
+}
+
+#[test]
+fn test_truncate_to_width_fits() {
+    assert_eq!(truncate_to_width("hello", 10), "hello");
+}
+
+#[test]
+fn test_truncate_to_width_truncates() {
+    let result = truncate_to_width("hello world", 6);
+    assert_eq!(result, "hello…");
+}
+
+#[test]
+fn test_truncate_to_width_min() {
+    assert_eq!(truncate_to_width("abc", 1), "…");
 }
