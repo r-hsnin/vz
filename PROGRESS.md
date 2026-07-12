@@ -3065,3 +3065,42 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: src/chart/data_builder.rs
 - テスト追加: 2 unit (test_collect_groups_sum, _count)
 - 検証: PASS (525 tests: 400 unit + 121 integration + 4 snapshot)
+
+---
+
+## STOP — 2026-07-12T16:15 (Session — 13 cycles: 173-185)
+
+**停止条件:**
+1. ✅ cargo test 全パス: 525 tests (400 unit + 121 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ 13 cycles recorded this session (173-185)
+4. 残改善候補:
+   - computed columns `--calc` (大型, RICE=33.6)
+   - render_element refactor (60行→分割)
+   - 孤立テストの再整理 (data_builder.rs の mod tests 構造修正)
+   - Parquet入力 (中型)
+   - Explore SVGエクスポート (中型)
+
+**このセッション (Cycles 173-185) のサマリー:**
+
+| Cycle | Type | Key Change |
+|-------|------|-----------| 
+| 173 | UX | Explore 起動時キーバインドヒント表示 |
+| 174 | DRY | `min_max()` ユーティリティ新設、5箇所統一 |
+| 175 | DRY | ExploreApp `x_label()`/`y_label()` で6箇所統一 |
+| 176 | feat | `--output json` に chart_data 追加（集計済み） |
+| 177 | refactor | `compute_column_stats` を型別に分割 |
+| 178 | feat | **`--output svg` / `--svg` 実装** (全チャート対応) |
+| 179 | feat | Explore `y` キーでコマンドヤンク |
+| 180 | UX | ヘルプオーバーレイに `y` 追加 |
+| 181 | docs | README Explore キーバインド表更新 |
+| 182 | refactor | `aggregate_bar` を `collect_groups` に分割 |
+| 183 | feat | SVG 背景色がテーマに連動 |
+| 184 | test | SVG + light テーマ統合テスト |
+| 185 | test | `collect_groups` ユニットテスト追加 |
+
+**テスト数推移:** 510→525 (+15 this session)
+**新機能:**
+- SVG出力（全チャート×全テーマ）
+- JSON出力にchart_data（集計・ソート済み）
+- Explore `y` キーで等価コマンド表示
