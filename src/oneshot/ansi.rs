@@ -165,6 +165,10 @@ mod tests {
 
     #[test]
     fn test_print_buffer_with_color() {
+        // Force color output even without TTY (e.g., CI environment)
+        // SAFETY: Test runs sequentially (cargo test default), no concurrent env access.
+        unsafe { std::env::set_var("FORCE_COLOR", "1") };
+
         let area = Rect::new(0, 0, 5, 1);
         let mut buf = Buffer::empty(area);
 
@@ -178,6 +182,8 @@ mod tests {
         assert!(text.contains("\x1b[31m"));
         assert!(text.contains("R"));
         assert!(text.contains("\x1b[0m"));
+
+        unsafe { std::env::remove_var("FORCE_COLOR") };
     }
 
     #[test]

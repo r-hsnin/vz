@@ -123,14 +123,14 @@ structures before passing them to `render_chart_data()`:
 - `present/chart_loader.rs` — Markdown chart block → ChartData
 ```
 
-**変更影響マップ:**
-- `loader/` を変更 → 全モードに影響。統合テスト全実行必須。
-- `filter.rs` を変更 → oneshot + explore モードに影響（present は chart block 内 where: フィールドで適用）。
-- `infer/` を変更 → chart selection + 全モードに影響。
-- `chart/selector.rs` を変更 → 全モードに影響。
-- `chart/data_builder.rs` を変更 → oneshot, explore, present すべてに影響。
-- `render/` を変更 → 対応チャート種別のみ影響。
-- `oneshot/`, `explore/`, `present/` → そのモードのみ影響。
+**Change Impact Map:**
+- `loader/` change → affects all modes. Run full integration tests.
+- `filter.rs` change → affects oneshot + explore (present applies via chart block `where:` field).
+- `infer/` change → affects chart selection + all modes.
+- `chart/selector.rs` change → affects all modes.
+- `chart/data_builder.rs` change → affects oneshot, explore, present.
+- `render/` change → affects only the corresponding chart type.
+- `oneshot/`, `explore/`, `present/` → affects only that mode.
 
 ## Type Inference Rules
 
@@ -199,39 +199,22 @@ vz present slides.md
 
 ## Scope
 
-### Implemented (v1)
-- [x] CSV / TSV input (stdin + file)
-- [x] JSON / NDJSON input (array-of-objects, newline-delimited)
-- [x] Format auto-detection (extension + content sniffing)
-- [x] Type inference (temporal, quantitative, categorical, nominal)
-- [x] Auto chart selection (line, bar, scatter, histogram, heatmap)
-- [x] Terminal rendering via ratatui
-- [x] One-shot mode: Buffer → ANSI stdout with summary stats
-- [x] Explore mode: interactive chart switching, column selection, data table view
-- [x] Present mode: markdown with ```chart blocks
-- [x] Legend from column names, label override with `:`
-- [x] Nice-numbers axis tick algorithm
-- [x] Multi-series: color grouping (`-c`) and multi-Y (`-y a,b,c`)
-- [x] Row filtering (`--where col=val`, `--where col>val`)
-- [x] Bar chart sorting (`--sort desc/asc`)
-- [x] Bar chart limiting (`--top N`, `--tail N`)
-- [x] Stdin auto-detect (pipe without `-` argument)
-- [x] Column metadata (`--info`)
-- [x] Heatmap (categorical × categorical, count-based)
-- [x] File watch mode (`--watch`)
-- [x] Machine-readable output (`--output json`, `--output table`, `--output spark`, `--output svg`, `--output markdown`)
-- [x] Aggregation functions (`--agg sum/mean/count/max/min`)
-- [x] Custom chart title (`--title`)
-- [x] Value labels on bar charts (`--labels`)
-- [x] Shell completions (`vz completions <shell>`)
-- [x] Sampling for large datasets (`--sample N`)
-- [x] All-Y overlay (`-Y` / `--all-y`)
+### In Scope (v0.1)
+- File-based batch visualization (CSV/TSV/JSON/NDJSON)
+- Auto-inference of column types and chart selection
+- Three output modes: oneshot (stdout), explore (TUI), present (slides)
+- Machine-readable exports: JSON, SVG, Markdown, sparkline, table
+- Row filtering, aggregation, sampling
+- Color themes (dark, light, high-contrast)
+- File watch mode for iterative exploration
+- Shell completions
 
-### Out (future)
-- Parquet / SQLite / DB connections
-- Export (PNG) — SVG は `--svg` で実装済み、Markdown テーブルは `--output markdown` で実装済み
-- ~~Custom themes / color configuration~~ → **実装済み** (`--theme dark|light|high-contrast`)
-- Streaming / live data (部分的に `--watch` で実現)
+### Non-goals (for now)
+- Database connections (Parquet, SQLite, PostgreSQL)
+- PNG raster export
+- Streaming / real-time data beyond `--watch`
+- Data transformation / ETL operations
+- Custom color palettes (beyond the 3 built-in themes)
 
 ## Key Design Decisions
 
