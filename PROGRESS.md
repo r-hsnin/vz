@@ -2856,3 +2856,16 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: src/explore/mod.rs
 - テスト: 既存501テスト全パス
 - 検証: PASS (501 tests: 380 unit + 117 integration + 4 snapshot)
+
+---
+
+## Cycle 169 — 2026-07-12T15:26
+- 種別: 機能追加 + テスト
+- ユーザーストーリー: Present モードでバッククォート(\`)を使ったインラインコードをハイライト表示したい。
+- 改善:
+  1. `parse_inline_spans` にバッククォートコード解析追加（黄色ハイライト）
+  2. テスト4件追加: plain_text, bold, italic, code
+- 影響: src/present/mod.rs
+- テスト追加: 4 unit (test_parse_inline_spans_*)
+- 検証: PASS (505 tests: 384 unit + 117 integration + 4 snapshot)
+- 次の候補: 新評価サイクル (10サイクル完了, 5+5)

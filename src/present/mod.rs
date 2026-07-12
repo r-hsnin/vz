@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::Span,
 };
 use std::path::Path;
@@ -202,6 +202,21 @@ pub fn parse_inline_spans(text: &str) -> Vec<Span<'static>> {
             spans.push(Span::styled(
                 italic_text.to_string(),
                 Style::default().add_modifier(Modifier::ITALIC),
+            ));
+            remaining = &remaining[start + 1 + end + 1..];
+            continue;
+        }
+        // Try code (`)
+        if let Some(start) = remaining.find('`')
+            && let Some(end) = remaining[start + 1..].find('`')
+        {
+            if start > 0 {
+                spans.push(Span::raw(remaining[..start].to_string()));
+            }
+            let code_text = &remaining[start + 1..start + 1 + end];
+            spans.push(Span::styled(
+                code_text.to_string(),
+                Style::default().fg(Color::Yellow),
             ));
             remaining = &remaining[start + 1 + end + 1..];
             continue;
@@ -755,5 +770,39 @@ More text after chart.
             !app.should_quit,
             "Escape with pending input should not quit"
         );
+    }
+
+    #[test]
+    fn test_parse_inline_spans_plain_text() {
+        let spans = parse_inline_spans("hello world");
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].content, "hello world");
+    }
+
+    #[test]
+    fn test_parse_inline_spans_bold() {
+        let spans = parse_inline_spans("before **bold** after");
+        assert_eq!(spans.len(), 3);
+        assert_eq!(spans[0].content, "before ");
+        assert_eq!(spans[1].content, "bold");
+        assert!(spans[1].style.add_modifier.contains(Modifier::BOLD));
+        assert_eq!(spans[2].content, " after");
+    }
+
+    #[test]
+    fn test_parse_inline_spans_italic() {
+        let spans = parse_inline_spans("some *italic* text");
+        assert_eq!(spans.len(), 3);
+        assert_eq!(spans[1].content, "italic");
+        assert!(spans[1].style.add_modifier.contains(Modifier::ITALIC));
+    }
+
+    #[test]
+    fn test_parse_inline_spans_code() {
+        use ratatui::style::Color;
+        let spans = parse_inline_spans("use `code` here");
+        assert_eq!(spans.len(), 3);
+        assert_eq!(spans[1].content, "code");
+        assert_eq!(spans[1].style.fg, Some(Color::Yellow));
     }
 }
