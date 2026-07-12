@@ -275,3 +275,92 @@ fn build_status_bar(app: &ExploreApp) -> Paragraph<'static> {
 
     Paragraph::new(lines).block(Block::default().borders(Borders::TOP))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infer::types::{ColumnMeta, DataType, Schema};
+
+    fn make_test_app() -> ExploreApp {
+        let schema = Schema {
+            columns: vec![
+                ColumnMeta {
+                    name: "date".to_string(),
+                    data_type: DataType::Temporal,
+                    null_count: 0,
+                    sample_size: 2,
+                },
+                ColumnMeta {
+                    name: "city".to_string(),
+                    data_type: DataType::Categorical,
+                    null_count: 0,
+                    sample_size: 2,
+                },
+                ColumnMeta {
+                    name: "revenue".to_string(),
+                    data_type: DataType::Quantitative,
+                    null_count: 0,
+                    sample_size: 2,
+                },
+            ],
+        };
+        let data = vec![
+            vec!["2024-01".into(), "Tokyo".into(), "1000".into()],
+            vec!["2024-02".into(), "Osaka".into(), "1500".into()],
+        ];
+        ExploreApp::new(schema, data, crate::theme::Theme::dark())
+    }
+
+    #[test]
+    fn test_build_column_display_shows_markers() {
+        let app = make_test_app();
+        let display = build_column_display(&app);
+        // selected_x = 0 (date), selected_y = 2 (revenue)
+        assert!(
+            display.contains("[x]date"),
+            "Should show x marker: {display}"
+        );
+        assert!(
+            display.contains("[y]revenue"),
+            "Should show y marker: {display}"
+        );
+        assert!(
+            display.contains("[ ]city"),
+            "Unselected should have space: {display}"
+        );
+    }
+
+    #[test]
+    fn test_build_binding_spans_contains_keys() {
+        let app = make_test_app();
+        let spans = build_binding_spans(&app);
+        let text: String = spans.iter().map(|s| s.content.to_string()).collect();
+        assert!(text.contains("h/l"), "Should contain h/l key: {text}");
+        assert!(text.contains("j/k"), "Should contain j/k key: {text}");
+        assert!(text.contains("q"), "Should contain quit key: {text}");
+        assert!(text.contains("?"), "Should contain help key: {text}");
+    }
+
+    #[test]
+    fn test_build_binding_spans_shows_color_off() {
+        let app = make_test_app();
+        let spans = build_binding_spans(&app);
+        let text: String = spans.iter().map(|s| s.content.to_string()).collect();
+        assert!(
+            text.contains("off"),
+            "No color selected should show 'off': {text}"
+        );
+    }
+
+    #[test]
+    fn test_build_binding_spans_shows_color_name() {
+        let mut app = make_test_app();
+        app.selected_color = Some(1); // city
+        let spans = build_binding_spans(&app);
+        let text: String = spans.iter().map(|s| s.content.to_string()).collect();
+        assert!(
+            text.contains("city"),
+            "Color column name should appear: {text}"
+        );
+    }
+}

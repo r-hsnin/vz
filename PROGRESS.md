@@ -2813,3 +2813,15 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存497テスト全パス
 - 検証: PASS (497 tests: 376 unit + 117 integration + 4 snapshot)
 - 次の候補: explore/present render.rs テスト追加 (RICE=65)
+
+---
+
+## Cycle 165 — 2026-07-12T15:26
+- 種別: テスト追加
+- スコア: RICE = (6×6×9)/5 = 65
+- 改善: `explore/render.rs` に初のユニットテスト4件追加: column_display, binding_spans, color_off/name 表示。
+- 影響: src/explore/render.rs
+- テスト追加: 4 unit (build_column_display_shows_markers, build_binding_spans_contains_keys, _shows_color_off, _shows_color_name)
+- 検証: PASS (501 tests: 380 unit + 117 integration + 4 snapshot)
+- テスト数累計推移: 493→501 (+8 this session)
+- 次の候補: auto_select 57行リファクタ (RICE=60) or DESIGN.md 更新
