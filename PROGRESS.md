@@ -2869,3 +2869,13 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 4 unit (test_parse_inline_spans_*)
 - 検証: PASS (505 tests: 384 unit + 117 integration + 4 snapshot)
 - 次の候補: 新評価サイクル (10サイクル完了, 5+5)
+
+---
+
+## Cycle 170 — 2026-07-12T15:26
+- 種別: ドキュメント修正
+- スコア: RICE = (5×1×10)/0.5 = 100 (実装済みフラグを README に反映)
+- 改善: README CLI Options テーブルに未記載だった14フラグ + completions サブコマンドを追加。
+- 影響: README.md
+- テスト: 既存505テスト全パス (ドキュメント変更のみ)
+- 検証: PASS

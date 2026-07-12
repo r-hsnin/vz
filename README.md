@@ -86,8 +86,21 @@ vz present slides.md
 | `-W` | `--width` | Chart width in columns (default: terminal width) |
 | `-H` | `--height` | Chart height in rows (default: 24) |
 | `-I` | `--info` | Show column metadata without rendering a chart |
+| `-w` | `--where` | Filter rows: `col=value`, `col>value`, `col<value` (repeatable) |
+| `-o` | `--output` | Output format: `text`, `json`, `table`, `spark` |
+| `-Y` | `--all-y` | Plot all quantitative columns as multi-series overlay |
 | | `--no-header` | Treat first row as data (auto-detected if all-numeric) |
 | | `--sort` | Sort bar chart values: `desc`, `asc`, `none` |
+| | `--top` | Show only the top N categories (implies `--sort desc`) |
+| | `--tail` | Show only the bottom N categories (implies `--sort asc`) |
+| | `--agg` | Aggregation: `sum` (default), `mean`, `count`, `max`, `min` |
+| | `--title` | Custom chart title |
+| | `--labels` | Show value + percentage labels on bar chart bars |
+| | `--sample` | Sample at most N rows (systematic sampling) |
+| | `--watch` | Watch file for changes and auto-redraw |
+| | `--theme` | Color theme: `dark` (default), `light`, `high-contrast` |
+| | `--json` | Shorthand for `--output json` |
+| | `--spark` | Shorthand for `--output spark` |
 | `-h` | `--help` | Print help |
 | `-V` | `--version` | Print version |
 
@@ -97,6 +110,7 @@ vz present slides.md
 |---------|-------------|
 | `vz explore <FILE>` | Interactive TUI exploration mode |
 | `vz present <FILE>` | Slide presentation with embedded charts |
+| `vz completions <SHELL>` | Generate shell completion scripts |
 
 <!-- /AUTO-GENERATED -->
 
