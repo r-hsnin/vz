@@ -146,3 +146,50 @@ title: Monthly Revenue
 ````
 
 Run: `vz present slides.md`
+
+## SVG Export
+
+```bash
+$ vz sales.csv -x city -y revenue -t bar --svg > chart.svg
+```
+
+Generates a monospace-text SVG image matching the terminal rendering. Supports `--theme light` for white-background documents.
+
+## Markdown Output
+
+```bash
+$ vz sales.csv -x city -y revenue -t bar --markdown
+```
+
+```markdown
+| city | revenue |
+|---|---|
+| Tokyo | 4200 |
+| Osaka | 3300 |
+| Nagoya | 800 |
+```
+
+Useful for embedding aggregated results in README files and GitHub issues.
+
+## Labels & Percentages
+
+```bash
+$ vz sales.csv -x city -y revenue -t bar --labels
+```
+
+Shows value and percentage on each bar: `████ 4.2k (51%)`. Great for presentations and quick data sharing.
+
+## Aggregation Functions
+
+```bash
+# Default: sum
+$ vz data.csv -x product -y revenue --agg sum
+
+# Average per category
+$ vz data.csv -x product -y revenue --agg mean
+
+# Count rows per category
+$ vz data.csv -x region -y id --agg count
+```
+
+Summary line reflects the function: `y=mean(revenue)` instead of `y=revenue`.

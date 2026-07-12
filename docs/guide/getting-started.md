@@ -79,6 +79,32 @@ vz sales.csv --where "city=Tokyo"
 vz sales.csv --where "revenue>1500"
 ```
 
+## Customization
+
+```bash
+# Color theme (dark/light/high-contrast)
+vz data.csv --theme light
+
+# Histogram bin count
+vz scores.csv --bins 20
+
+# Bar chart value labels with percentages
+vz data.csv -x city -y revenue -t bar --labels
+
+# Aggregation function (sum/mean/count/max/min)
+vz data.csv -x city -y revenue --agg mean
+
+# Plot all numeric columns at once
+vz data.csv -Y
+```
+
+## Live Reload
+
+```bash
+# Auto-redraw on file change
+vz data.csv --watch
+```
+
 ## Shell Completions
 
 ```bash

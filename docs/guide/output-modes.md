@@ -57,10 +57,57 @@ Output includes:
 
 ## JSON
 
-Machine-readable metadata output.
+Machine-readable metadata output. Includes column stats, chart recommendation, and data sample.
 
 ```bash
+vz data.csv -o json
+```
+
+Use with `--info` for metadata only, or without for chart data + metadata:
+```bash
+# Metadata only
 vz data.csv --info -o json
+
+# Full: metadata + chart_data (aggregated values, series)
+vz data.csv -o json
+```
+
+## SVG
+
+Export charts as SVG images. The output is a monospace-text SVG that matches the terminal rendering.
+
+```bash
+# Save chart as SVG
+vz data.csv --svg > chart.svg
+
+# With specific dimensions
+vz data.csv -W 100 -H 30 --svg > wide-chart.svg
+
+# Light theme for white backgrounds (documents/wikis)
+vz data.csv --svg --theme light > chart-light.svg
+```
+
+SVG output respects the `--theme` flag — dark produces a dark background, light produces white.
+
+## Markdown
+
+Export aggregated data as GitHub Flavored Markdown (GFM) tables. Perfect for README files, issues, and documentation.
+
+```bash
+# Markdown table of bar chart aggregation
+vz sales.csv -x city -y revenue -t bar --markdown
+
+# With sorting
+vz data.csv -x category -y value --sort desc --markdown
+```
+
+Output example:
+```markdown
+| city | revenue |
+|---|---|
+| Tokyo | 4200 |
+| Osaka | 3300 |
+| Nagoya | 800 |
 ```
 
 ## Three Interactive Modes
@@ -111,3 +158,32 @@ title: Monthly Revenue
 ````
 
 Navigate: `←`/`→` or `h`/`l`, jump: `g`/`G`, quit: `q`
+
+## Watch Mode
+
+Auto-redraw when the input file changes. Useful during data exploration or ETL development.
+
+```bash
+vz data.csv --watch
+```
+
+- Debounced at 200ms (no flicker on rapid saves)
+- Works with atomic writes (editor save)
+- Press `Ctrl+C` to stop
+
+## Themes
+
+Control color palette for different terminal backgrounds.
+
+```bash
+# Dark terminal (default)
+vz data.csv --theme dark
+
+# Light/white terminal background
+vz data.csv --theme light
+
+# Maximum contrast, colorblind-friendly
+vz data.csv --theme high-contrast
+```
+
+Themes affect all charts, summary lines, and SVG export background color.
