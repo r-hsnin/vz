@@ -4,6 +4,8 @@ CLI BI tool with smart visualization and terminal presentation.
 
 **Convention over Configuration** — data types determine the visualization automatically.
 
+📖 [Documentation](https://r-hsnin.github.io/vz/) · 🤝 [Contributing](CONTRIBUTING.md)
+
 ## Features
 
 - **Auto-inference** — Detects temporal, quantitative, categorical columns from data
@@ -17,10 +19,16 @@ CLI BI tool with smart visualization and terminal presentation.
 ## Install
 
 ```bash
+cargo install --git https://github.com/r-hsnin/vz
+```
+
+Or from a local clone:
+
+```bash
 cargo install --path .
 ```
 
-Requires Rust 1.70+.
+Requires Rust 1.85+.
 
 ## Usage
 
@@ -164,8 +172,6 @@ y: revenue
 type: line
 ```
 ````
-
-Navigate: `←`/`→` or `h`/`l`, jump: `g`/`G`, quit: `q`
 
 Navigate: `←`/`→` or `h`/`l`, jump: `g`/`G`, quit: `q`
 

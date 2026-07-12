@@ -48,10 +48,52 @@ vz data.csv --info
 ## JSON
 
 ```bash
-vz data.csv --info -o json
+vz data.csv -o json
 ```
 
-メタデータを JSON で出力する。プログラムから利用する場合に。
+メタデータを JSON で出力する。`--info` と組み合わせるとメタデータのみ、なしだとチャートデータ + メタデータ。
+
+```bash
+# メタデータのみ
+vz data.csv --info -o json
+
+# チャートデータ含む
+vz data.csv -o json
+```
+
+## SVG
+
+チャートを SVG 画像としてエクスポートする。ターミナル出力と同じモノスペーステキスト形式。
+
+```bash
+# SVG に保存
+vz data.csv --svg > chart.svg
+
+# サイズ指定
+vz data.csv -W 100 -H 30 --svg > wide-chart.svg
+
+# 白背景（ドキュメント・Wiki 向け）
+vz data.csv --svg --theme light > chart-light.svg
+```
+
+`--theme` に連動し、dark は暗い背景、light は白背景の SVG になる。
+
+## Markdown
+
+集計結果を GitHub Flavored Markdown テーブルで出力する。README や Issue に埋め込むのに便利。
+
+```bash
+vz sales.csv -x city -y revenue -t bar --markdown
+```
+
+出力例:
+```markdown
+| city | revenue |
+|---|---|
+| Tokyo | 4200 |
+| Osaka | 3300 |
+| Nagoya | 800 |
+```
 
 ## 3 つのモード
 
@@ -103,3 +145,32 @@ title: 月次売上推移
 ````
 
 操作: `←` / `→` でページ送り、`g` / `G` で先頭/末尾、`q` で終了。
+
+## ウォッチモード
+
+ファイル変更を監視し、自動的に再描画する。データ探索や ETL 開発時に便利。
+
+```bash
+vz data.csv --watch
+```
+
+- 200ms のデバウンス（高速保存でもちらつかない）
+- エディタのアトミック保存に対応
+- `Ctrl+C` で停止
+
+## テーマ
+
+ターミナル背景に合わせてカラーパレットを切り替える。
+
+```bash
+# ダークターミナル（デフォルト）
+vz data.csv --theme dark
+
+# ライト / 白背景ターミナル
+vz data.csv --theme light
+
+# 最大コントラスト（色覚多様性対応）
+vz data.csv --theme high-contrast
+```
+
+テーマはすべてのチャート、サマリーライン、SVG エクスポートの背景色に反映される。

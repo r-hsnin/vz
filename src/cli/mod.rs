@@ -8,7 +8,7 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
 
-    /// Input file (CSV, JSON, NDJSON). Use "-" for stdin.
+    /// Input file (CSV, TSV, JSON, NDJSON). Use "-" for stdin.
     #[arg(value_name = "FILE")]
     pub file: Option<PathBuf>,
 

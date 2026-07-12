@@ -15,7 +15,7 @@ cd vz && cargo install --path .
 
 :::
 
-Rust 1.70 以上が必要。
+Rust 1.85 以上が必要。
 
 ## 最初の一歩
 
@@ -77,6 +77,32 @@ vz present slides.md
 ```bash
 vz sales.csv --where "city=Tokyo"
 vz sales.csv --where "revenue>1500"
+```
+
+## カスタマイズ
+
+```bash
+# カラーテーマ (dark/light/high-contrast)
+vz data.csv --theme light
+
+# ヒストグラムのビン数
+vz scores.csv --bins 20
+
+# 棒グラフに値とパーセンテージを表示
+vz data.csv -x city -y revenue -t bar --labels
+
+# 集計関数 (sum/mean/count/max/min)
+vz data.csv -x city -y revenue --agg mean
+
+# 全数値列をまとめてプロット
+vz data.csv -Y
+```
+
+## ライブリロード
+
+```bash
+# ファイル変更を監視して自動再描画
+vz data.csv --watch
 ```
 
 ## シェル補完

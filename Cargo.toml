@@ -2,6 +2,7 @@
 name = "vz"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 description = "CLI BI tool with smart visualization and terminal presentation"
 license = "MIT"
 readme = "README.md"

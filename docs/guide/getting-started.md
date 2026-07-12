@@ -15,7 +15,7 @@ cd vz && cargo install --path .
 
 :::
 
-Requires Rust 1.70+.
+Requires Rust 1.85+.
 
 ## Your First Chart
 
