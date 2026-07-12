@@ -2687,3 +2687,15 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト追加: 1 unit (test_fit_labels_large_dataset_reduces)
 - 検証: PASS (494 tests: 374 unit + 116 integration + 4 snapshot)
 - 次の候補: Explore chart-type-change notification (RICE=120)
+
+---
+
+## Cycle 157 — 2026-07-12T14:13
+- 種別: UX改善
+- ユーザーストーリー: Explore モードでカラムを切り替えたとき、チャート種別が自動変更された理由を即座に理解したい。
+- スコア: RICE = (6×5×8)/2 = 120
+- 改善: `handle_key` で before/after のチャート種別を比較し、自動変更時に `"auto: Line → Bar"` 通知を表示。
+- 影響: src/explore/mod.rs
+- テスト追加: 1 unit (test_chart_type_change_shows_notification)
+- 検証: PASS (495 tests: 375 unit + 116 integration + 4 snapshot)
+- 次の候補: render_chart_to_buffer 分割 (RICE=45) or bar/histogram axis color (RICE=14.4)

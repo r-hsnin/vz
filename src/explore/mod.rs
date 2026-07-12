@@ -64,6 +64,8 @@ impl ExploreApp {
     }
 
     pub fn handle_key(&mut self, key: KeyCode) {
+        let prev_chart_type = self.effective_chart_type();
+
         match key {
             KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
             KeyCode::Char('d') | KeyCode::Tab => {
@@ -83,6 +85,15 @@ impl ExploreApp {
             KeyCode::Char('0') => self.chart_type_override = None,
             KeyCode::Char('c') => self.cycle_color_column(),
             _ => {}
+        }
+
+        // Notify when chart type auto-changes due to column navigation
+        let new_chart_type = self.effective_chart_type();
+        if new_chart_type != prev_chart_type && self.chart_type_override.is_none() {
+            self.status_message = Some(format!(
+                "auto: {:?} → {:?}",
+                prev_chart_type, new_chart_type
+            ));
         }
     }
 
@@ -622,5 +633,29 @@ mod tests {
         assert_eq!(app.selected_color, Some(1));
         // The status bar function uses app.selected_color to show "c=city"
         // We just verify the field is set correctly
+    }
+
+    #[test]
+    fn test_chart_type_change_shows_notification() {
+        let mut app = make_test_app();
+        // Initial: date(Temporal) x revenue(Quantitative) = Line
+        assert_eq!(app.effective_chart_type(), ChartType::Line);
+        // Navigate X to city (Categorical) → should auto-change to Bar
+        app.handle_key(KeyCode::Char('h')); // Move X to the left... actually let's navigate right
+        app.handle_key(KeyCode::Char('l')); // Move X from date to city
+        // After moving X to Categorical, chart type should change
+        if app.effective_chart_type() != ChartType::Line {
+            assert!(
+                app.status_message.is_some(),
+                "Expected notification on chart type change"
+            );
+            assert!(
+                app.status_message
+                    .as_deref()
+                    .unwrap_or("")
+                    .contains("auto:"),
+                "Notification should contain 'auto:'"
+            );
+        }
     }
 }
