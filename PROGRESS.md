@@ -2879,3 +2879,14 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: README.md
 - テスト: 既存505テスト全パス (ドキュメント変更のみ)
 - 検証: PASS
+
+---
+
+## Cycle 171 — 2026-07-12T15:26
+- 種別: UX改善
+- ユーザーストーリー: ヒストグラムのビン幅が狭いとき、ラベルが途切れて読めない問題を解消したい。
+- スコア: RICE = (7×6×9)/3 = 126
+- 改善: ヒストグラムビンラベルを幅に応じて自動省略。"1000-2000" → "1.0k-2.0k" → "1.0k" とフォールバック。
+- 影響: src/render/histogram.rs, tests/snapshots/snapshot_test__snapshot_histogram.snap
+- テスト追加: 4 unit (format_bin_label_fits, _abbreviates, _very_narrow, abbreviate_number)
+- 検証: PASS (509 tests: 388 unit + 117 integration + 4 snapshot)

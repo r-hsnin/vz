@@ -84,7 +84,7 @@ fn render_histogram_bars(
     let bars: Vec<Bar> = bins
         .iter()
         .map(|(start, end, count)| {
-            let label = format!("{:.0}-{:.0}", start, end);
+            let label = format_bin_label(*start, *end, bar_width as usize);
             Bar::default()
                 .label(Line::from(label))
                 .value(*count as u64)
@@ -105,6 +105,34 @@ fn render_histogram_bars(
         .data(group);
 
     chart.render(chart_area, buf);
+}
+
+/// Format a bin label to fit within the given max width.
+/// Uses abbreviated form (e.g., "1.2k") when full label would overflow.
+fn format_bin_label(start: f64, end: f64, max_width: usize) -> String {
+    let full = format!("{:.0}-{:.0}", start, end);
+    if full.len() <= max_width {
+        return full;
+    }
+    // Try abbreviated format
+    let abbrev = format!("{}-{}", abbreviate_number(start), abbreviate_number(end));
+    if abbrev.len() <= max_width {
+        return abbrev;
+    }
+    // Fallback: just show start value abbreviated
+    abbreviate_number(start)
+}
+
+/// Abbreviate a number: 1200 → "1.2k", 1500000 → "1.5M"
+fn abbreviate_number(n: f64) -> String {
+    let abs = n.abs();
+    if abs >= 1_000_000.0 {
+        format!("{:.1}M", n / 1_000_000.0)
+    } else if abs >= 1_000.0 {
+        format!("{:.1}k", n / 1_000.0)
+    } else {
+        format!("{:.0}", n)
+    }
 }
 
 #[cfg(test)]
@@ -185,5 +213,36 @@ mod tests {
         assert_eq!(ticks.last().unwrap(), "0");
         let first: usize = ticks[0].parse().unwrap();
         assert!(first >= 1);
+    }
+
+    #[test]
+    fn test_format_bin_label_fits() {
+        assert_eq!(format_bin_label(10.0, 20.0, 10), "10-20");
+        assert_eq!(format_bin_label(100.0, 200.0, 10), "100-200");
+    }
+
+    #[test]
+    fn test_format_bin_label_abbreviates() {
+        // "1000-2000" = 9 chars, max_width=10 → fits as-is
+        assert_eq!(format_bin_label(1000.0, 2000.0, 10), "1000-2000");
+        // max_width=8 → "1000-2000" (9) too long → "1.0k-2.0k" (9) too long → "1.0k"
+        assert_eq!(format_bin_label(1000.0, 2000.0, 8), "1.0k");
+        // "10000-20000" = 11 chars, max_width=10 → try "10.0k-20.0k" (11) → "10.0k"
+        assert_eq!(format_bin_label(10000.0, 20000.0, 10), "10.0k");
+        // max_width=12 → "10000-20000" (11) fits
+        assert_eq!(format_bin_label(10000.0, 20000.0, 12), "10000-20000");
+    }
+
+    #[test]
+    fn test_format_bin_label_very_narrow() {
+        // Very narrow: just show start
+        assert_eq!(format_bin_label(1000.0, 2000.0, 3), "1.0k");
+    }
+
+    #[test]
+    fn test_abbreviate_number() {
+        assert_eq!(abbreviate_number(500.0), "500");
+        assert_eq!(abbreviate_number(1500.0), "1.5k");
+        assert_eq!(abbreviate_number(2_500_000.0), "2.5M");
     }
 }
