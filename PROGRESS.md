@@ -2334,3 +2334,16 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: .github/workflows/ci.yml (新規), TODO.md (完了項目マーク)
 - テスト追加: 0 (インフラ変更)
 - 検証: PASS (460 tests: 349 unit + 107 integration + 4 snapshot)
+
+---
+
+## Cycle 136 — 2026-07-12T12:36
+- 種別: UX改善
+- 選定: --labels非bar警告 (RICE=160) + summary行の幅制限 (RICE=200)
+- 改善:
+  1. `--labels` が非barチャートで使用された時に stderr warning を表示（--sort/--agg と同じパターン）
+  2. `truncate_to_width()` + `summary_max_width()` 追加。summary行がターミナル幅を超えた場合に「…」で切り詰め。マルチバイト文字安全。
+- 影響: src/oneshot/mod.rs (+5行), src/oneshot/summary.rs (+35行), tests/integration_test.rs (+1)
+- テスト追加: 4 unit (truncate_to_width: short/exact/overflow/one) + 1 integration (test_labels_on_non_bar_chart_warns)
+- 検証: PASS (465 tests: 353 unit + 108 integration + 4 snapshot)
+- 次の候補: DESIGN.md更新 or render_oneshot分割

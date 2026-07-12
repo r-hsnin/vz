@@ -2373,3 +2373,19 @@ fn test_watch_flag_on_stdin_errors() {
         stderr
     );
 }
+
+#[test]
+fn test_labels_on_non_bar_chart_warns() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--labels"])
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--labels has no effect"),
+        "Expected --labels warning, got: {}",
+        stderr
+    );
+}

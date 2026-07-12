@@ -86,6 +86,13 @@ pub fn render_oneshot(
         );
     }
 
+    if opts.labels && !matches!(chart_type, ChartType::Bar) {
+        eprintln!(
+            "warning: --labels has no effect on {:?} charts (only applies to bar charts)",
+            chart_type
+        );
+    }
+
     let area = Rect::new(0, 0, width, height);
     let mut buf = Buffer::empty(area);
     render_chart_to_buffer(

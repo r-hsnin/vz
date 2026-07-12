@@ -161,6 +161,8 @@ fn sparkline(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
 
 /// Format and print parts with optional ANSI coloring.
 fn format_and_print_parts(parts: &[String]) {
+    let max_width = summary_max_width();
+
     if ansi::should_colorize() {
         let main_parts: Vec<&String> = parts.iter().take(parts.len().saturating_sub(1)).collect();
         if let Some(hint) = parts.last() {
@@ -170,16 +172,48 @@ fn format_and_print_parts(parts: &[String]) {
                     .map(|s| s.as_str())
                     .collect::<Vec<_>>()
                     .join(" │ ");
-                eprintln!("\x1b[90m{} │ \x1b[33m{}\x1b[0m", main_line, hint);
+                let full = format!("{} │ {}", main_line, hint);
+                let truncated = truncate_to_width(&full, max_width);
+                eprintln!("\x1b[90m{}\x1b[0m", truncated);
             } else {
-                eprintln!("\x1b[90m{}\x1b[0m", parts.join(" │ "));
+                let full = parts.join(" │ ");
+                let truncated = truncate_to_width(&full, max_width);
+                eprintln!("\x1b[90m{}\x1b[0m", truncated);
             }
         } else {
-            eprintln!("\x1b[90m{}\x1b[0m", parts.join(" │ "));
+            let full = parts.join(" │ ");
+            let truncated = truncate_to_width(&full, max_width);
+            eprintln!("\x1b[90m{}\x1b[0m", truncated);
         }
     } else {
-        eprintln!("{}", parts.join(" │ "));
+        let full = parts.join(" │ ");
+        let truncated = truncate_to_width(&full, max_width);
+        eprintln!("{}", truncated);
     }
+}
+
+/// Get maximum width for summary line (matches chart width).
+fn summary_max_width() -> usize {
+    if !std::io::IsTerminal::is_terminal(&std::io::stderr()) {
+        return 120; // generous width for piped stderr
+    }
+    crossterm::terminal::size()
+        .map(|(w, _)| w as usize)
+        .unwrap_or(80)
+}
+
+/// Truncate a string to fit within max_width characters, adding "…" if truncated.
+fn truncate_to_width(s: &str, max_width: usize) -> String {
+    // Count display characters (simplified: treat each char as width 1)
+    let char_count = s.chars().count();
+    if char_count <= max_width {
+        return s.to_string();
+    }
+    if max_width <= 1 {
+        return "…".to_string();
+    }
+    let truncated: String = s.chars().take(max_width - 1).collect();
+    format!("{}…", truncated)
 }
 
 /// Color name for ANSI display corresponding to SERIES_COLORS palette.
@@ -641,4 +675,26 @@ fn test_trend_annotation_stable() {
 fn test_trend_annotation_single_row_returns_none() {
     let rows = vec![vec!["a".to_string(), "100".to_string()]];
     assert!(trend_annotation(&rows, 1).is_none());
+}
+
+#[test]
+fn test_truncate_to_width_short_string() {
+    assert_eq!(truncate_to_width("hello", 80), "hello");
+}
+
+#[test]
+fn test_truncate_to_width_exact() {
+    assert_eq!(truncate_to_width("12345", 5), "12345");
+}
+
+#[test]
+fn test_truncate_to_width_overflow() {
+    let result = truncate_to_width("abcdefghij", 6);
+    assert_eq!(result, "abcde…");
+    assert_eq!(result.chars().count(), 6);
+}
+
+#[test]
+fn test_truncate_to_width_one() {
+    assert_eq!(truncate_to_width("hello", 1), "…");
 }
