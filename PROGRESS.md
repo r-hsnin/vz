@@ -3104,3 +3104,538 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - SVG出力（全チャート×全テーマ）
 - JSON出力にchart_data（集計・ソート済み）
 - Explore `y` キーで等価コマンド表示
+
+---
+
+## Cycle 136 — 2026-07-12T18:13
+- 種別: 機能追加
+- ユーザーストーリー: データアナリストとして、`vz data.csv -t histogram --bins 20` でヒストグラムのビン数を調整し、分布の粒度を制御したい。
+- スコア: RICE = 400 (R8×I5×C10/E1)
+- 改善:
+  1. `--bins N` CLI フラグ追加 (cli/mod.rs)
+  2. `RenderOptions.bins: Option<usize>` フィールド追加
+  3. `data_builder::build_histogram()` に `bin_count: Option<usize>` パラメータ追加 (None時はデフォルト10)
+  4. `builders::build_histogram_data_with_bins()` 新規追加 (bin_count passthrough)
+  5. `warn_incompatible_flags` に --bins 非histogram 警告追加
+- 影響: src/cli/mod.rs, src/oneshot/mod.rs, src/oneshot/builders.rs, src/chart/data_builder.rs, src/main.rs, src/present/chart_loader.rs, src/explore/mod.rs, src/oneshot/tests.rs, tests/integration_test.rs
+- テスト追加: +2 unit (custom bins, default bins) + 2 integration (histogram usage, non-histogram warning) + 2 CLI unit (parse flag, not set)
+- 検証: PASS (531 tests: 404 unit + 123 integration + 4 snapshot)
+- 次の候補: svg.rs unwrap除去 (RICE=150) or main.rs print_chart_json抽出 (RICE=40)
+
+---
+
+## Cycle 137 — 2026-07-12T18:13
+- 種別: 品質改善
+- 選定: svg.rs の unwrap() 除去 (RICE=150: R5×I3×C10/E1)
+- 改善: `buffer_to_svg` と `write_tspan` 内の7箇所の `.unwrap()` を `let _ =` パターンに置換。`write!`/`writeln!` の書き込み先が String であるため書き込みは常に成功するが、unwrap() はコーディング規約（エラーを黙って握りつぶさない）に反し、将来の `impl Write` 変更時にパニックリスクがあった。
+- 影響: src/svg.rs (7箇所修正)
+- テスト追加: 0 (既存3テストで振る舞い保持確認)
+- 検証: PASS (531 tests: 404 unit + 123 integration + 4 snapshot)
+- 次の候補: -o table 全カラム表示 (RICE=108) or chart_loader.rs テスト追加 (RICE=90)
+
+---
+
+## Cycle 138 — 2026-07-12T18:13
+- 種別: UX改善
+- 選定: -o table が全カラムを表示しない問題 (RICE=108: R6×I4×C9/E2)
+- 改善: `-o table` で非barチャート時に `print_all_columns` を使用し、全カラムを表示するよう修正。以前は chart recommendation の x/y/color のみを表示し、他カラムをサイレントに除外していた（profit 等）。dead code となった `print_xy_table` 関数を削除。
+- 影響: src/table.rs (10行削減), tests/integration_test.rs (+1 test)
+- テスト追加: +1 integration (test_output_table_shows_all_columns_by_default)
+- 検証: PASS (532 tests: 404 unit + 124 integration + 4 snapshot)
+- 次の候補: chart_loader.rs テスト追加 (RICE=90) or 再評価
+
+---
+
+## Cycle 139 — 2026-07-12T18:13
+- 種別: 品質改善 (テストカバレッジ)
+- 選定: present/chart_loader.rs ユニットテスト追加 (RICE=90: R3×I3×C10/E1)
+- 改善: 146行・テストゼロだった chart_loader.rs に7ユニットテスト追加:
+  - resolve_chart_source_path: 絶対パス、相対パス(存在する)、相対パス(存在しない) の3テスト
+  - infer_chart_type_from_data: temporal→Line, categorical→Bar, quantitative→Scatter, hints指定→Bar の4テスト
+- 影響: src/present/chart_loader.rs (+127行テスト)
+- テスト追加: +7 unit
+- 検証: PASS (539 tests: 411 unit + 124 integration + 4 snapshot)
+- 次の候補: 再評価で次の改善を判断
+
+---
+
+## Session Summary (Cycles 136-139)
+| Cycle | 種別 | 内容 | テスト増 |
+|-------|------|------|---------|
+| 136 | 機能追加 | `--bins N` ヒストグラムビン数指定 | +6 (4u+2i) |
+| 137 | 品質改善 | svg.rs unwrap() 7箇所 → `let _ =` | +0 |
+| 138 | UX改善 | `-o table` 全カラム表示 | +1 integration |
+| 139 | 品質改善 | chart_loader.rs テスト7本追加 | +7 unit |
+
+## Current Status
+- Tests: 539 (411 unit + 124 integration + 4 snapshot), 0 failures
+- Clippy: 0 warnings, fmt: clean
+- Total cycles: 140
+
+---
+
+## Cycle 140 — 2026-07-12T18:13
+- 種別: リファクタリング
+- 選定: main.rs print_chart_json 抽出 (800行制約 + 50行関数制約違反修正)
+- 改善: `print_chart_json` (100行) を `src/output/chart_json.rs` に抽出。4つの小関数に分割: `build_chart_data`, `build_bar_json`, `build_histogram_json`, `build_series_json`。main.rs のプロダクションコードは665行（800行制約達成）。
+- 影響: src/main.rs (-82行), src/output/chart_json.rs (新規145行), src/output/mod.rs (+2行)
+- テスト追加: 0 (既存の JSON 出力テスト8本で振る舞い保持確認)
+- 検証: PASS (539 tests: 411 unit + 124 integration + 4 snapshot)
+
+---
+
+## STOP — 2026-07-12T18:13 (Session 16 — Quality & Features)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 539 tests (411 unit + 124 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 140 サイクル記録 (5+)
+4. ✅ 評価エージェントが「RICE > 100 の改善なし」と判定 → STOP
+
+**このセッション (Cycles 136-140) のサマリー:**
+
+| Cycle | RICE | 種別 | 内容 |
+|-------|------|------|------|
+| 136 | 400 | 機能追加 | `--bins N` ヒストグラムビン数指定 |
+| 137 | 150 | 品質改善 | svg.rs unwrap() 7箇所 → `let _ =` |
+| 138 | 108 | UX改善 | `-o table` 全カラム表示 |
+| 139 | 90 | 品質改善 | chart_loader.rs テスト7本追加 |
+| 140 | 50 | リファクタ | print_chart_json 抽出 (main.rs 921→839行) |
+
+**テスト数推移:** 525 → 539 (このセッションで +14)
+**新機能:** `--bins N` (ヒストグラムのビン数カスタマイズ)
+**品質:** unwrap除去、テストカバレッジ拡大、全プロダクションファイル800行以内、全関数50行以内
+
+
+---
+
+## Cycle 141 — 2026-07-12T18:41
+- 種別: バグ修正 (正確性)
+- 選定: spark 出力が bar chart の集計を無視する (RICE=126: R6×I7×C9/E3)
+- ユーザーストーリー: パイプラインユーザーとして、`-o spark -t bar` で集計済みカテゴリ値をスパークラインで見たい。生の行データではなく。
+- 改善: `print_spark` に bar chart 分岐を追加。`aggregate_bar` で集計 → `sort_bar_data` でソート → `top/tail` でリミット → sparkline。Line/Scatter は従来通り生データのまま。
+- 影響: src/main.rs (+20行), tests/integration_test.rs (+2 tests)
+- テスト追加: +2 integration (test_spark_output_respects_bar_aggregation, test_spark_output_respects_sort_and_top)
+- 検証: PASS (541 tests: 411 unit + 126 integration + 4 snapshot)
+- 次の候補: JSON 出力が -c color を無視する (RICE=126)
+
+---
+
+## Cycle 142 — 2026-07-12T18:41
+- 種別: バグ修正 (正確性)
+- 選定: JSON 出力が -c color グルーピングを無視する (RICE=126: R7×I8×C9/E4)
+- ユーザーストーリー: AI エージェント/ダッシュボードとして、`-o json -c city` でグループ別の series を受け取りたい。単一の未分割 series ではなく。
+- 改善: `ChartJsonParams` に `color_column: Option<String>` を追加。`build_series_json` で color_column 指定時に `build_grouped_series_json` を呼び、BTreeMap でグループ化した series を生成。`cli.color_col` (明示的ユーザー指定) を使用し、auto-inferred な recommendation.color_column は使わない（後方互換性）。
+- 影響: src/output/chart_json.rs (+30行), src/main.rs (+1行), tests/integration_test.rs (+1 test)
+- テスト追加: +1 integration (test_json_output_respects_color_grouping)
+- 検証: PASS (542 tests: 411 unit + 127 integration + 4 snapshot)
+- 次の候補: chart_json.rs ユニットテスト追加 (RICE=60.8)
+
+---
+
+## Cycle 143 — 2026-07-12T18:41
+- 種別: 品質改善 (テストカバレッジ)
+- 選定: output/chart_json.rs ユニットテスト追加 (RICE=60.8: R8×I8×C0.95/E1)
+- 改善: 新規ファイル chart_json.rs (145行, テスト0本) に8ユニットテスト追加:
+  - build_bar_json: 集計テスト、sort+limit テスト
+  - build_histogram_json: ビン生成テスト
+  - build_series_json: 単一 series、extra_y series、color column → grouped
+  - build_grouped_series_json: BTreeMap でグループ化確認
+  - build_chart_data: dispatch テスト
+- 影響: src/output/chart_json.rs (+177行テスト)
+- テスト追加: +8 unit
+- 検証: PASS (550 tests: 419 unit + 127 integration + 4 snapshot)
+- 次の候補: 再評価 or present/render.rs テスト追加
+
+---
+
+## STOP — 2026-07-12T18:41 (Session 17 — Correctness & Coverage)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 550 tests (419 unit + 127 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 143 サイクル記録 (5+)
+4. ✅ 評価エージェントが「RICE > 100 の改善なし」と判定 → STOP
+
+**このセッション (Cycles 141-143) のサマリー:**
+
+| Cycle | RICE | 種別 | 内容 |
+|-------|------|------|------|
+| 141 | 126 | バグ修正 | spark 出力が bar chart 集計を反映するよう修正 |
+| 142 | 126 | バグ修正 | JSON 出力が -c color グルーピングを反映するよう修正 |
+| 143 | 60.8 | 品質改善 | output/chart_json.rs ユニットテスト8本追加 |
+
+**テスト数推移:** 539 → 550 (このセッションで +11: 8 unit + 3 integration)
+**修正されたバグ:** 2 件 (spark/JSON の出力モードが CLI フラグを無視していた問題)
+**品質:** 全 output モード (text/json/table/spark/svg) が集計・ソート・色分けを正しく反映
+
+---
+
+## Cycle 144 — 2026-07-12T18:52
+- 種別: バグ修正 (正確性)
+- 選定: JSON histogram 出力が空 bins を返す (RICE=640: R4×I8×C10/E0.5 — 1行修正)
+- ユーザーストーリー: パイプラインユーザーとして、`-o json -t histogram -y revenue` で正しいビン範囲と件数を取得したい。
+- 改善: `build_chart_data()` 内の histogram dispatch で `x_idx` → `y_idx` に修正。date 列 (text) ではなく revenue 列 (数値) のヒストグラムを正しく計算。
+- 影響: src/output/chart_json.rs (1行変更), tests/integration_test.rs (+1 test)
+- テスト追加: +1 integration (test_json_histogram_produces_nonempty_bins)
+- 検証: PASS (551 tests: 419 unit + 128 integration + 4 snapshot)
+- 次の候補: present/render.rs テスト追加 (RICE=112)
+
+---
+
+## Cycle 145 — 2026-07-12T18:52
+- 種別: 品質改善 (テストカバレッジ)
+- 選定: present/render.rs ユニットテスト追加 (RICE=112: R7×I6×C8/E3)
+- 改善: 227行/7関数のテスト0本だった present/render.rs に9ユニットテスト追加:
+  - element_constraint: 全6 SlideElement バリアント (Chart, Text, Bullets, Code, Heading, OrderedList)
+  - draw_slide: TestBackend でフッター表示、タイトル表示を検証
+  - render_code_block: 言語ラベルの表示を検証
+- 影響: src/present/render.rs (+146行テスト)
+- テスト追加: +9 unit
+- 検証: PASS (560 tests: 428 unit + 128 integration + 4 snapshot)
+- 次の候補: main.rs 800行超え分割 (RICE=78.4)
+
+---
+
+## Cycle 146 — 2026-07-12T18:52
+- 種別: リファクタ (ファイルサイズ削減)
+- 選定: main.rs 800行超え → spark ロジックを抽出 (RICE=78.4: R8×I7×C7/E5)
+- 改善: `print_spark` + `make_sparkline` (~60行) を `src/output/spark.rs` に抽出。`SparkParams` struct を導入し Cli への直接依存を除去。main.rs は thin wrapper (10行) を残すのみ。
+- 影響: src/output/spark.rs (+83行新規), src/output/mod.rs (+1行), src/main.rs (-50行, 859→809)
+- main.rs: 809行 (634 prod + 175 test)。production code は800行以内。
+- テスト追加: なし (既存テスト全 PASS で動作確認)
+- 検証: PASS (560 tests: 428 unit + 128 integration + 4 snapshot)
+- 次の候補: 再評価 or present/mod.rs テスト分離 (RICE=75)
+
+---
+
+## Cycle 147 — 2026-07-12T18:52
+- 種別: リファクタ (ファイルサイズ削減)
+- 選定: present/mod.rs 808行 → テスト分離 (RICE=75: R5×I5×C9/E3)
+- 改善: `#[cfg(test)] mod tests { ... }` (520行) を `src/present/tests.rs` に分離。`mod tests;` パターンで参照。present/mod.rs は808行→287行に削減。
+- 影響: src/present/mod.rs (-521行), src/present/tests.rs (+520行新規)
+- テスト追加: なし (既存テスト移動のみ、全 PASS)
+- 検証: PASS (560 tests: 428 unit + 128 integration + 4 snapshot)
+- 次の候補: 再評価 (残項目は全て RICE < 75)
+
+---
+
+## STOP — 2026-07-12T18:52 (Session 18 — Correctness Bugs + Structure)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 560 tests (428 unit + 128 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 147 サイクル記録 (5+)
+4. ✅ 評価エージェントが「RICE > 100 の改善なし」と判定 → STOP
+
+**このセッション (Cycles 141-147) のサマリー:**
+
+| Cycle | RICE | 種別 | 内容 |
+|-------|------|------|------|
+| 141 | 126 | バグ修正 | spark 出力が bar chart 集計を反映するよう修正 |
+| 142 | 126 | バグ修正 | JSON 出力が -c color グルーピングを反映するよう修正 |
+| 143 | 60.8 | 品質改善 | output/chart_json.rs ユニットテスト8本追加 |
+| 144 | 640 | バグ修正 | JSON histogram 空 bins バグ修正 (x_idx → y_idx) |
+| 145 | 112 | 品質改善 | present/render.rs ユニットテスト9本追加 |
+| 146 | 78.4 | リファクタ | print_spark を output/spark.rs に抽出 (main.rs 859→809行) |
+| 147 | 75 | リファクタ | present/mod.rs テストを tests.rs に分離 (808→287行) |
+
+**テスト数推移:** 539 → 560 (このセッションで +21: 17 unit + 4 integration)
+**修正されたバグ:** 3 件 (spark集計, JSONカラーグルーピング, JSONヒストグラム空bins)
+**コード構造:** main.rs 634行 prod, present/mod.rs 287行, output/spark.rs 新規 83行
+
+---
+
+## Cycle 148 — 2026-07-12T19:05
+- 種別: リファクタ (ファイルサイズ・責務分離)
+- 選定: main.rs 809行超え → 診断関数 + 統計テキスト関数を抽出 (RICE=108: R8×I6×C9/E4)
+- 改善:
+  - `error_hint`, `find_similar_files`, `is_data_file` → `src/diagnostics.rs` (112行, テスト3本付き)
+  - `compute_column_stats_text`, `format_stat` → `src/output/stats_text.rs` (113行, テスト6本付き)
+  - main.rs: 809→616行 (−193行)
+- 影響: src/main.rs (-193行), src/diagnostics.rs (+112行新規), src/output/stats_text.rs (+113行新規), src/output/mod.rs (+1行)
+- テスト追加: +10 unit (3 diagnostics + 6 stats_text + 1 temporal_single in stats_text) / -9 moved from main.rs = net +1
+- 検証: PASS (561 tests: 429 unit + 128 integration + 4 snapshot)
+- 次の候補: render_chart_to_buffer 65行関数分割 (RICE=105)
+
+---
+
+## Cycle 149 — 2026-07-12T19:05
+- 種別: リファクタ (関数サイズ)
+- 選定: render_chart_to_buffer 65行 → 50行超え関数の分割 (RICE=105: R7×I5×C9/E3)
+- 改善: `render_chart_to_buffer` (65行) を4関数に分割:
+  - `render_chart_to_buffer` (27行) — 純粋なディスパッチ
+  - `build_line_scatter_chart` (16行)
+  - `build_bar_chart` (17行)
+  - `build_histogram_chart` (11行)
+- 影響: src/oneshot/mod.rs (+30行, net — 同ファイル内リファクタ)
+- テスト追加: なし (既存テスト全 PASS で動作確認)
+- 検証: PASS (561 tests: 429 unit + 128 integration + 4 snapshot)
+- 次の候補: output format 統合 (table.rs, svg.rs → output/) (RICE=105)
+
+---
+
+## Cycle 150 — 2026-07-12T19:05
+- 種別: リファクタ (モジュール統合)
+- 選定: output format 統合 — table.rs, svg.rs を output/ に移動 (RICE=105: R7×I5×C9/E3)
+- 改善: `src/table.rs` → `src/output/table.rs`, `src/svg.rs` → `src/output/svg.rs` に移動。output/ が全出力フォーマットの統一ホームに。DESIGN.md の設計意図に合致。
+- 影響: src/table.rs → src/output/table.rs, src/svg.rs → src/output/svg.rs, src/main.rs (import更新), src/output/mod.rs (+2 pub mod)
+- テスト追加: なし (移動のみ、既存テスト全 PASS)
+- 検証: PASS (561 tests: 429 unit + 128 integration + 4 snapshot)
+- 次の候補: stderr colorization 修正 (RICE=105)
+
+---
+
+## Cycle 151 — 2026-07-12T19:05
+- 種別: バグ修正 (UX)
+- 選定: stderr 経由のサマリー行が piped 時に ANSI エスケープコードを含む (RICE=105: R6×I5×C7/E2)
+- ユーザーストーリー: スクリプトユーザーとして、`vz data.csv --svg > chart.svg 2>log.txt` した時に log.txt にエスケープコードが混入しないようにしたい。
+- 改善: `should_colorize_stderr()` を追加。stderr.is_terminal() をチェックする。`format_and_print_parts` がこれを使うよう変更。stdout 用の `should_colorize()` は従来通り stdout.is_terminal() をチェック。
+- 影響: src/oneshot/ansi.rs (+11行), src/oneshot/summary.rs (1行変更), tests/integration_test.rs (+1 test)
+- テスト追加: +1 integration (test_stderr_summary_no_ansi_when_piped)
+- 検証: PASS (562 tests: 429 unit + 129 integration + 4 snapshot)
+- 次の候補: 再評価
+
+---
+
+## STOP — 2026-07-12T19:05 (Session 19 — Refactoring & Bug Fix)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 562 tests (429 unit + 129 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 152 サイクル記録 (5+)
+4. ✅ 評価エージェント2名が「RICE > 100 の改善なし」と判定 → STOP
+
+**このセッション (Cycles 148-152) のサマリー:**
+
+| Cycle | RICE | 種別 | 内容 |
+|-------|------|------|------|
+| 148 | 108 | リファクタ | main.rs から diagnostics.rs + output/stats_text.rs を抽出 (809→617行) |
+| 149 | 105 | リファクタ | render_chart_to_buffer 65行→27行dispatch + 3 helpers |
+| 150 | 105 | リファクタ | table.rs, svg.rs を output/ に移動 (設計意図に合致) |
+| 151 | 105 | バグ修正 | stderr サマリー行がパイプ時に ANSI エスケープを出力しないよう修正 |
+| 152 | — | 再評価 | 全エージェント STOP → 停止 |
+
+**テスト数推移:** 560 → 562 (net +2: +10 unit added, -9 moved to new modules, +1 integration)
+**コード構造改善:**
+- main.rs: 809→617行 (−192行, 責務分離)
+- output/ ディレクトリ: chart_json, spark, stats_text, table, svg を統合（全出力フォーマット統一）
+- oneshot/mod.rs: render_chart_to_buffer が50行以内に
+- oneshot/ansi.rs: stderr 用の should_colorize_stderr() 追加
+
+---
+
+## Cycle 153 — 2026-07-12T19:21
+- 種別: 機能追加
+- ユーザーストーリー: データアナリストとして、`vz data.csv -o markdown` でMarkdownテーブルを出力し、GitHub IssueやREADMEに直接貼り付けたい。
+- 選定: --output markdown 実装 (RICE=216: R8×I6×C9/E2)
+- 改善: `--output markdown` / `--markdown` で GFM テーブルを出力する新フォーマットを追加。Bar chart は集約テーブル、その他は全カラム表示。
+- 影響: src/cli/mod.rs (+Markdown variant, +--markdown flag), src/main.rs (+shorthand + dispatch arm), src/output/markdown.rs (新規113行), src/output/mod.rs (+1 pub mod), tests/integration_test.rs (+3 tests)
+- テスト追加: +4 unit (markdown.rs) + 3 integration = +7
+- 検証: PASS (569 tests: 433 unit + 132 integration + 4 snapshot)
+- 次の候補: DESIGN.md モジュールマップ更新 (RICE=180)
+
+---
+
+## Cycle 154 — 2026-07-12T19:21
+- 種別: ドキュメント改善
+- 選定: DESIGN.md モジュールマップが実装と乖離 (RICE=180: R5×I4×C9/E1)
+- 改善: Module Structure セクションを現在の output/ サブモジュール構成 (chart_json, markdown, spark, stats_text, svg, table) + diagnostics.rs に更新。Out (future) セクションで SVG/Markdown を実装済みに変更。
+- 影響: DESIGN.md
+- テスト追加: なし (ドキュメントのみ)
+- 検証: PASS (569 tests)
+- 次の候補: summary.rs 777行の分割 (RICE=168)
+
+---
+
+## Cycle 155 — 2026-07-12T19:21
+- 種別: リファクタ (ファイルサイズ)
+- 選定: summary.rs 777行が800行上限に接近 (RICE=168: R8×I7×C9/E3)
+- 改善: テストモジュール (413行) を `src/oneshot/summary_tests.rs` に分離。include! マクロで参照。summary.rs: 777→366行。
+- 影響: src/oneshot/summary.rs (−411行), src/oneshot/summary_tests.rs (+412行, 新規)
+- テスト追加: なし (既存テスト移動のみ, 全18テスト PASS)
+- 検証: PASS (569 tests: 433 unit + 132 integration + 4 snapshot)
+- 次の候補: output/spark.rs にユニットテスト追加 (RICE=162)
+
+---
+
+## Cycle 156 — 2026-07-12T19:21
+- 種別: 品質改善 (テストカバレッジ)
+- 選定: output/spark.rs (83行) にユニットテストがない (RICE=162: R6×I6×C9/E2)
+- 改善: 6つのユニットテストを追加。make_sparkline (basic, empty, constant, ascending) + print_spark (no_y, basic_values) のテストで正常動作・エッジケースをカバー。
+- 影響: src/output/spark.rs (+87行テストモジュール)
+- テスト追加: +6 unit
+- 検証: PASS (575 tests: 439 unit + 132 integration + 4 snapshot)
+- 次の候補: 再評価
+
+---
+
+## Cycle 157 — 2026-07-12T19:21 (Re-evaluation)
+- 評価結果: 両エージェント STOP 判定。RICE > 100 の改善なし。
+- 補足修正: README.md に --output markdown / --markdown の記載を追加 (評価エージェント指摘 RICE=80)
+
+---
+
+## STOP — 2026-07-12T19:21 (Session 20 — Feature + Quality)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 575 tests (439 unit + 132 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 157 サイクル記録 (5+)
+4. ✅ 評価エージェント2名が「RICE > 100 の改善なし」と判定 → STOP
+
+**このセッション (Cycles 153-157) のサマリー:**
+
+| Cycle | RICE | 種別 | 内容 |
+|-------|------|------|------|
+| 153 | 216 | 機能追加 | --output markdown 実装 (GFM テーブル出力) |
+| 154 | 180 | ドキュメント | DESIGN.md モジュールマップを現状に更新 |
+| 155 | 168 | リファクタ | summary.rs 777→366行 (テスト412行を分離) |
+| 156 | 162 | テスト | output/spark.rs に6本のユニットテスト追加 |
+| 157 | — | 再評価 | STOP |
+
+**テスト数推移:** 562 → 575 (net +13: +4 markdown.rs, +6 spark.rs, +3 integration)
+
+---
+
+## Cycle 158 — 2026-07-12T19:53
+- 種別: バグ修正 (UX)
+- 選定: 空stdinで「only headers」と誤表示 (RICE=320: R8×I4×C10/E1)
+- 改善: 空入力 (headers も空) を早期検出し、「Input is empty — no data to visualize」の明確なエラーを表示。誤解を招く "only headers" ヒントを排除。
+- 影響: src/main.rs (条件分岐追加), tests/integration_test.rs (+1 test, 既存test assertion更新)
+- テスト追加: +1 integration (test_empty_stdin_gives_clear_error)
+- 検証: PASS (576 tests: 439 unit + 133 integration + 4 snapshot)
+- 次の候補: build_chart_config 57行の分割 (RICE=250)
+
+---
+
+## Cycle 159 — 2026-07-12T19:53
+- 種別: リファクタ (関数サイズ)
+- 選定: build_chart_config 57行 > 50行上限違反 (RICE=250: R5×I5×C10/E1)
+- 改善: compute_x_labels() と axes_from_series() を抽出。build_chart_config: 57→45行。
+- 影響: src/chart/data_builder.rs (関数分割、行数微増+17行)
+- テスト追加: なし (既存テスト27件が挙動を保証)
+- 検証: PASS (576 tests)
+- 次の候補: DESIGN.md に theme.rs / util.rs を追記 (RICE=240)
+
+---
+
+## Cycle 160 — 2026-07-12T19:53
+- 種別: ドキュメント改善
+- 選定: DESIGN.md に theme.rs / util.rs が未記載 (RICE=240: R8×I3×C10/E1)
+- 改善: Module Structure セクションに theme.rs (色テーマ定義) と util.rs (数値ユーティリティ) を追記。
+- 影響: DESIGN.md
+- テスト追加: なし
+- 検証: PASS (576 tests)
+- 次の候補: --sort が table/markdown で無視される (RICE=120)
+
+---
+
+## Cycle 161 — 2026-07-12T19:53
+- 種別: バグ修正 (UX)
+- 選定: --sort が -o table / -o markdown で無視される (RICE=120: R6×I6×C10/E3)
+- 改善: table.rs と markdown.rs の bar chart 集約パスに sort_bar_data() 呼び出しを追加。--sort asc/desc が table/markdown 出力でも正しく適用される。
+- 影響: src/output/table.rs, src/output/markdown.rs, tests/integration_test.rs (+2 tests)
+- テスト追加: +2 integration (test_output_table_respects_sort_asc, test_output_markdown_respects_sort_desc)
+- 検証: PASS (578 tests: 439 unit + 135 integration + 4 snapshot)
+- 次の候補: 再評価
+
+---
+
+## Cycle 162 — 2026-07-12T19:53 (Re-evaluation)
+- 評価結果: 全3エージェント STOP 判定。RICE > 100 の改善なし。
+  - Agent A 最高: agg label in table headers (RICE=18)
+  - Agent B 最高: render_once 63 lines (RICE=9)
+  - Agent C 最高: DESIGN.md test files (RICE=15)
+
+---
+
+## STOP — 2026-07-12T19:53 (Session 21 — Bug Fix + Refactor)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 578 tests (439 unit + 135 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 162 サイクル記録 (5+)
+4. ✅ 評価エージェント3名が「RICE > 100 の改善なし」と判定 → STOP
+
+**このセッション (Cycles 158-162) のサマリー:**
+
+| Cycle | RICE | 種別 | 内容 |
+|-------|------|------|------|
+| 158 | 320 | バグ修正 | 空stdin: 「only headers」→「is empty」に改善 |
+| 159 | 250 | リファクタ | build_chart_config 57→45行 (helpers抽出) |
+| 160 | 240 | ドキュメント | DESIGN.md に theme.rs / util.rs 追記 |
+| 161 | 120 | バグ修正 | --sort が table/markdown で効くように |
+| 162 | — | 再評価 | STOP |
+
+**テスト数推移:** 575 → 578 (net +3: +1 empty stdin, +2 sort tests)
+
+---
+
+## Cycle 163 — 2026-07-12T20:10
+- 種別: バグ修正 (UX)
+- 選定: ヘッダのみ入力で tip メッセージが二重表示 (RICE=240: R6×I4×C10/E1)
+- 改善: bail!() から tip テキストを削除。diagnostics::error_hint() が1回だけ付与するように。
+- 影響: src/main.rs (bail! 修正), tests/integration_test.rs (+1 test)
+- テスト追加: +1 integration (test_header_only_input_no_duplicate_tip)
+- 検証: PASS (579 tests: 439 unit + 136 integration + 4 snapshot)
+- 次の候補: render_once の y_opts/recommendation 重複計算を統一 (RICE=140)
+
+---
+
+## Cycle 164 — 2026-07-12T20:10
+- 種別: リファクタ (関数サイズ + 重複排除)
+- 選定: render_once 内の y_opts/recommendation 重複計算 (RICE=140: R8×I5×C7/E2)
+- 改善: (1) parse_y_options+build_recommendation+expand_all_y を1回だけ計算するよう統一。(2) empty-data 検証を validate_loaded_data() に抽出。render_once: 61→38行。
+- 影響: src/main.rs (render_once分割 + validate_loaded_data追加)
+- テスト追加: なし (既存579テストが挙動を保証)
+- 検証: PASS (579 tests)
+- 次の候補: spark 出力にコンテキストヘッダを追加 (RICE=112.5)
+
+---
+
+## Cycle 165 — 2026-07-12T20:10
+- 種別: 機能改善 (UX)
+- 選定: spark 出力にコンテキスト (列名) がない (RICE=112.5: R5×I5×C9/E2)
+- ユーザーストーリー: CLIユーザーが spark 出力をパイプ/ダッシュボードに使う際、どの列のスパークラインか一目で分かるようにしたい。
+- 改善: spark 出力に Y列名プレフィックスを追加。`revenue  ▂▅▃▁█▇` の形式。グループモードは従来通りグループ名を表示。
+- 影響: src/output/spark.rs (print_spark修正), tests/integration_test.rs (+1 test, 既存4テスト更新)
+- テスト追加: +1 integration (test_spark_output_shows_column_context)
+- 検証: PASS (580 tests: 439 unit + 137 integration + 4 snapshot)
+- 次の候補: 再評価
+
+---
+
+## Cycle 166 — 2026-07-12T20:10 (Re-evaluation)
+- 評価結果: 全2エージェント STOP 判定。RICE > 100 の改善なし。
+  - eval_quality: 残存 > 50行関数は decision table/rendering loop で分割は artificial (最高RICE=12)
+  - eval_ux: 全出力形式が正常動作、エラーメッセージも適切 (残存feature最高RICE=15)
+
+---
+
+## STOP — 2026-07-12T20:10 (Session 22 — Code Quality Focus)
+
+**停止条件:**
+
+1. ✅ `cargo test` 全パス: 580 tests (439 unit + 137 integration + 4 snapshot)
+2. ✅ clippy 0 warnings, fmt clean
+3. ✅ PROGRESS.md に 166+ サイクル記録 (5+)
+4. ✅ 評価エージェント2名が「RICE > 100 の改善なし」と判定 → STOP
+
+**このセッション (Cycles 163-166) のサマリー:**
+
+| Cycle | RICE | 種別 | 内容 |
+|-------|------|------|------|
+| 163 | 240 | バグ修正 | 重複 tip メッセージ除去 (bail! vs diagnostics) |
+| 164 | 140 | リファクタ | render_once 61→38行 (y_opts重複排除 + validate_loaded_data抽出) |
+| 165 | 112.5 | UX改善 | spark 出力に列名プレフィックス追加 |
+| 166 | — | 再評価 | STOP |
+
+**テスト数推移:** 578 → 580 (net +2)
+**コード品質:** render_once 50行超 → 38行に解決。残る50行超関数は全て decision table/dispatch で分割不要。

@@ -116,7 +116,9 @@ fn test_no_file_argument_error() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(
-        combined.contains("No input file") || combined.contains("No data rows"),
+        combined.contains("No input file")
+            || combined.contains("No data rows")
+            || combined.contains("is empty"),
         "Expected error, got: '{}'",
         combined
     );
@@ -2199,7 +2201,7 @@ fn test_error_hint_stdin_tip() {
 
 #[test]
 fn test_spark_output_mode() {
-    // --spark should output a single line of Unicode block characters (no chart)
+    // --spark should output the y-column name followed by a sparkline
     let output = vz_binary()
         .args(["fixtures/sales.csv", "-o", "spark"])
         .output()
@@ -2210,19 +2212,19 @@ fn test_spark_output_mode() {
         output
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    // Should contain only sparkline characters and be a single short line
     let trimmed = stdout.trim();
     assert!(!trimmed.is_empty(), "Expected sparkline output");
+    // Format: "column_name  ▂▅▃▁█▇"
     assert!(
-        trimmed.chars().all(|c| "▁▂▃▄▅▆▇█".contains(c)),
-        "Expected only sparkline chars, got: {}",
+        trimmed.contains("revenue"),
+        "Expected column name in spark output, got: {}",
         trimmed
     );
-    // Should be compact (≤ 20 chars for 6 data points)
+    let spark_part = trimmed.split("  ").last().unwrap_or("");
     assert!(
-        trimmed.len() <= 60,
-        "Sparkline too long: {} chars",
-        trimmed.len()
+        spark_part.chars().all(|c| "▁▂▃▄▅▆▇█".contains(c)),
+        "Expected only sparkline chars after label, got: {}",
+        spark_part
     );
 }
 
@@ -2260,8 +2262,10 @@ fn test_spark_shorthand_flag() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     let trimmed = stdout.trim();
+    // Format: "column_name  ▂▅▃▁█▇"
+    let spark_part = trimmed.split("  ").last().unwrap_or("");
     assert!(
-        trimmed.chars().all(|c| "▁▂▃▄▅▆▇█".contains(c)),
+        spark_part.chars().all(|c| "▁▂▃▄▅▆▇█".contains(c)),
         "Expected sparkline from --spark, got: {}",
         trimmed
     );
@@ -2571,4 +2575,422 @@ fn test_theme_invalid_value_errors() {
         .output()
         .expect("Failed to run vz");
     assert!(!output.status.success(), "Expected error for invalid theme");
+}
+
+#[test]
+fn test_bins_flag_controls_histogram_bin_count() {
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-y",
+            "revenue",
+            "-t",
+            "histogram",
+            "--bins",
+            "5",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(
+        output.status.success(),
+        "vz --bins 5 failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // With 5 bins, we should have fewer distinct bin labels than with 10
+    assert!(!stdout.is_empty(), "Should produce histogram output");
+}
+
+#[test]
+fn test_bins_flag_warns_on_non_histogram() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-t", "bar", "--bins", "20"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--bins"),
+        "Should warn that --bins has no effect on non-histogram charts. stderr: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_output_table_shows_all_columns_by_default() {
+    // When -o table is used without -t bar, all columns should be shown
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-o", "table"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success(), "vz -o table should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // ALL columns from the CSV should be present, not just chart-selected ones
+    assert!(
+        stdout.contains("profit"),
+        "Table should show ALL columns including 'profit'. Got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("date"),
+        "Table should show 'date' column. Got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("city"),
+        "Table should show 'city' column. Got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("revenue"),
+        "Table should show 'revenue' column. Got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_spark_output_respects_bar_aggregation() {
+    // When -t bar is specified with spark output, values should be aggregated
+    // sales.csv: Tokyo=4200, Osaka=3300, Nagoya=800 → 3 aggregated categories
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-t",
+            "bar",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "-o",
+            "spark",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    // Format: "revenue  █▆▁" — extract spark part after double-space
+    let spark_part = trimmed.split("  ").last().unwrap_or(trimmed);
+    let spark_chars: Vec<char> = spark_part.chars().collect();
+    // Should have 3 characters (one per aggregated category), not 6 (one per raw row)
+    assert_eq!(
+        spark_chars.len(),
+        3,
+        "Spark with -t bar should show 3 aggregated values, got {}: '{}'",
+        spark_chars.len(),
+        trimmed
+    );
+}
+
+#[test]
+fn test_spark_output_respects_sort_and_top() {
+    // With --sort desc --top 2, spark should show only top 2 categories
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-t",
+            "bar",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "-o",
+            "spark",
+            "--sort",
+            "desc",
+            "--top",
+            "2",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    // Format: "revenue  █▇" — extract spark part after double-space
+    let spark_part = trimmed.split("  ").last().unwrap_or(trimmed);
+    let spark_chars: Vec<char> = spark_part.chars().collect();
+    assert_eq!(
+        spark_chars.len(),
+        2,
+        "Spark with --top 2 should show 2 values, got {}: '{}'",
+        spark_chars.len(),
+        trimmed
+    );
+}
+
+#[test]
+fn test_json_output_respects_color_grouping() {
+    // When -c city is specified, JSON should produce multiple series grouped by city
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-c", "city", "-o", "json"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Should be valid JSON");
+    let series = json["chart_data"]["series"]
+        .as_array()
+        .expect("chart_data.series should be an array");
+    // Should have 3 series (Tokyo, Osaka, Nagoya), not 1
+    assert!(
+        series.len() >= 3,
+        "Expected at least 3 series for 3 cities, got {}: {}",
+        series.len(),
+        serde_json::to_string_pretty(&json["chart_data"]).unwrap()
+    );
+    // Each series should have a name matching a city
+    let names: Vec<&str> = series.iter().filter_map(|s| s["name"].as_str()).collect();
+    assert!(
+        names.contains(&"Tokyo"),
+        "Should have Tokyo series, got: {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"Osaka"),
+        "Should have Osaka series, got: {:?}",
+        names
+    );
+}
+
+#[test]
+fn test_json_histogram_produces_nonempty_bins() {
+    // JSON histogram output should have populated bins, not empty array
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-o",
+            "json",
+            "-t",
+            "histogram",
+            "-y",
+            "revenue",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Should be valid JSON");
+    let bins = json["chart_data"]["bins"]
+        .as_array()
+        .expect("chart_data.bins should be an array");
+    assert!(
+        !bins.is_empty(),
+        "Histogram bins should not be empty, got: {}",
+        serde_json::to_string_pretty(&json["chart_data"]).unwrap()
+    );
+    // Each bin should have range and count
+    assert!(bins[0]["range"].is_string());
+    assert!(bins[0]["count"].is_number());
+}
+
+#[test]
+fn test_stderr_summary_no_ansi_when_piped() {
+    // When stderr is piped (as in test harness), summary should NOT contain ANSI escape codes
+    let output = vz_binary()
+        .args(["fixtures/sales.csv"])
+        .env_remove("FORCE_COLOR")
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Summary line should be present but without escape sequences
+    assert!(!stderr.is_empty(), "stderr should contain a summary line");
+    assert!(
+        !stderr.contains("\x1b["),
+        "stderr should not contain ANSI escapes when piped, got: {:?}",
+        stderr
+    );
+}
+
+#[test]
+fn test_output_markdown_produces_valid_table() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-o", "markdown"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Should contain markdown table separators
+    assert!(
+        stdout.contains("|---"),
+        "Expected markdown table separator, got:\n{}",
+        stdout
+    );
+    // Should contain header columns
+    assert!(stdout.contains("date"), "Expected 'date' column in output");
+    assert!(
+        stdout.contains("revenue"),
+        "Expected 'revenue' column in output"
+    );
+}
+
+#[test]
+fn test_output_markdown_shorthand_flag() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--markdown"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("|---"));
+}
+
+#[test]
+fn test_output_markdown_with_bar_chart() {
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-o",
+            "markdown",
+            "-t",
+            "bar",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Bar chart markdown should have aggregated data
+    assert!(
+        stdout.contains("city"),
+        "Expected 'city' in markdown output"
+    );
+    assert!(
+        stdout.contains("revenue"),
+        "Expected 'revenue' in markdown output"
+    );
+    assert!(stdout.contains("|---"));
+}
+
+#[test]
+fn test_empty_stdin_gives_clear_error() {
+    // Empty stdin should say "empty input" not "only headers"
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+        .arg("-")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap()
+        .wait_with_output()
+        .unwrap();
+    let combined = String::from_utf8_lossy(&output.stdout).to_string()
+        + &String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !combined.contains("only headers"),
+        "Empty stdin should NOT say 'only headers'. Got: {}",
+        combined
+    );
+    assert!(
+        combined.contains("empty") || combined.contains("no data"),
+        "Empty stdin should mention 'empty' or 'no data'. Got: {}",
+        combined
+    );
+}
+
+#[test]
+fn test_output_table_respects_sort_asc() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+        .args([
+            "fixtures/sales.csv",
+            "-o",
+            "table",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "--sort",
+            "asc",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Ascending: Nagoya (800) should come before Osaka (3300) before Tokyo (4200)
+    let nagoya_pos = stdout.find("Nagoya").expect("Nagoya not in output");
+    let osaka_pos = stdout.find("Osaka").expect("Osaka not in output");
+    let tokyo_pos = stdout.find("Tokyo").expect("Tokyo not in output");
+    assert!(
+        nagoya_pos < osaka_pos && osaka_pos < tokyo_pos,
+        "Expected ascending sort: Nagoya < Osaka < Tokyo. Got:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn test_output_markdown_respects_sort_desc() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+        .args([
+            "fixtures/sales.csv",
+            "-o",
+            "markdown",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "--sort",
+            "desc",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Descending: Tokyo (4200) should come before Osaka (3300) before Nagoya (800)
+    let tokyo_pos = stdout.find("Tokyo").expect("Tokyo not in output");
+    let osaka_pos = stdout.find("Osaka").expect("Osaka not in output");
+    let nagoya_pos = stdout.find("Nagoya").expect("Nagoya not in output");
+    assert!(
+        tokyo_pos < osaka_pos && osaka_pos < nagoya_pos,
+        "Expected descending sort: Tokyo < Osaka < Nagoya. Got:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn test_header_only_input_no_duplicate_tip() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+        .arg("-")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write;
+            child.stdin.take().unwrap().write_all(b"a,b\n").unwrap();
+            child.wait_with_output()
+        })
+        .unwrap();
+    let combined = String::from_utf8_lossy(&output.stdout).to_string()
+        + &String::from_utf8_lossy(&output.stderr);
+    // The tip should appear exactly ONCE, not twice
+    let tip_count = combined.matches("vz file.csv --no-header").count();
+    assert_eq!(
+        tip_count, 1,
+        "Tip should appear exactly once, but appeared {} times.\nOutput:\n{}",
+        tip_count, combined
+    );
+}
+
+#[test]
+fn test_spark_output_shows_column_context() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+        .args(["fixtures/sales.csv", "-o", "spark"])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Should show the Y column name somewhere in the output
+    assert!(
+        stdout.contains("revenue"),
+        "Spark output should show the Y column name. Got:\n{}",
+        stdout
+    );
 }

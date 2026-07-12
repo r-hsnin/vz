@@ -121,6 +121,7 @@ fn build_chart_data_for_type(
                 cols.x_idx,
                 block.title.clone(),
                 cols.x_label.clone(),
+                None,
             );
             data.axis_color = Some(theme.axis_color);
             Ok(ChartData::Histogram(data))
@@ -142,5 +143,132 @@ fn build_chart_data_for_type(
                 Ok(ChartData::Line(config))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_resolve_chart_source_path_absolute() {
+        let base_dir = Path::new("/some/dir");
+        let result = resolve_chart_source_path("/absolute/path/data.csv", base_dir);
+        assert_eq!(result, PathBuf::from("/absolute/path/data.csv"));
+    }
+
+    #[test]
+    fn test_resolve_chart_source_path_relative_existing() {
+        let tmp = TempDir::new().unwrap();
+        let csv_path = tmp.path().join("data.csv");
+        fs::write(&csv_path, "a,b\n1,2\n").unwrap();
+
+        let result = resolve_chart_source_path("data.csv", tmp.path());
+        assert_eq!(result, csv_path);
+    }
+
+    #[test]
+    fn test_resolve_chart_source_path_relative_nonexistent() {
+        let tmp = TempDir::new().unwrap();
+        // File does not exist in base_dir — falls back to raw relative path
+        let result = resolve_chart_source_path("missing.csv", tmp.path());
+        assert_eq!(result, PathBuf::from("missing.csv"));
+    }
+
+    #[test]
+    fn test_infer_chart_type_temporal_x() {
+        let headers = vec!["date".to_string(), "value".to_string()];
+        let rows = vec![
+            vec!["2024-01-01".to_string(), "100".to_string()],
+            vec!["2024-02-01".to_string(), "200".to_string()],
+            vec!["2024-03-01".to_string(), "150".to_string()],
+        ];
+        let block = ChartBlock {
+            source: String::new(),
+            chart_type: None,
+            x_col: None,
+            y_col: None,
+            color_col: None,
+            title: None,
+            filter: vec![],
+        };
+        let ct = infer_chart_type_from_data(&headers, &rows, &block);
+        assert_eq!(ct, ChartType::Line);
+    }
+
+    #[test]
+    fn test_infer_chart_type_categorical_x() {
+        let headers = vec!["city".to_string(), "revenue".to_string()];
+        let rows = vec![
+            vec!["Tokyo".to_string(), "1000".to_string()],
+            vec!["Osaka".to_string(), "1500".to_string()],
+            vec!["Nagoya".to_string(), "800".to_string()],
+        ];
+        let block = ChartBlock {
+            source: String::new(),
+            chart_type: None,
+            x_col: None,
+            y_col: None,
+            color_col: None,
+            title: None,
+            filter: vec![],
+        };
+        let ct = infer_chart_type_from_data(&headers, &rows, &block);
+        assert_eq!(ct, ChartType::Bar);
+    }
+
+    #[test]
+    fn test_infer_chart_type_quantitative_both() {
+        let headers = vec!["height".to_string(), "weight".to_string()];
+        let rows = vec![
+            vec!["170".to_string(), "65".to_string()],
+            vec!["180".to_string(), "75".to_string()],
+            vec!["165".to_string(), "58".to_string()],
+        ];
+        let block = ChartBlock {
+            source: String::new(),
+            chart_type: None,
+            x_col: None,
+            y_col: None,
+            color_col: None,
+            title: None,
+            filter: vec![],
+        };
+        let ct = infer_chart_type_from_data(&headers, &rows, &block);
+        assert_eq!(ct, ChartType::Scatter);
+    }
+
+    #[test]
+    fn test_infer_chart_type_with_x_hint() {
+        let headers = vec![
+            "date".to_string(),
+            "city".to_string(),
+            "revenue".to_string(),
+        ];
+        let rows = vec![
+            vec![
+                "2024-01-01".to_string(),
+                "Tokyo".to_string(),
+                "1000".to_string(),
+            ],
+            vec![
+                "2024-02-01".to_string(),
+                "Osaka".to_string(),
+                "1500".to_string(),
+            ],
+        ];
+        let block = ChartBlock {
+            source: String::new(),
+            chart_type: None,
+            x_col: Some("city".to_string()),
+            y_col: Some("revenue".to_string()),
+            color_col: None,
+            title: None,
+            filter: vec![],
+        };
+        let ct = infer_chart_type_from_data(&headers, &rows, &block);
+        assert_eq!(ct, ChartType::Bar);
     }
 }

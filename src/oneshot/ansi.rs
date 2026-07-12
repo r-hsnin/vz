@@ -7,7 +7,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
 };
 
-/// Determine whether to output ANSI color codes.
+/// Determine whether to output ANSI color codes (for stdout).
 /// Respects NO_COLOR env var (https://no-color.org/) and TTY detection.
 pub fn should_colorize() -> bool {
     // NO_COLOR takes precedence (any non-empty value disables color)
@@ -20,6 +20,18 @@ pub fn should_colorize() -> bool {
     }
     // Default: color only if stdout is a TTY
     std::io::stdout().is_terminal()
+}
+
+/// Determine whether to output ANSI color codes to stderr.
+/// Used by the summary line which is always printed to stderr.
+pub fn should_colorize_stderr() -> bool {
+    if std::env::var("NO_COLOR").is_ok_and(|v| !v.is_empty()) {
+        return false;
+    }
+    if std::env::var("FORCE_COLOR").is_ok_and(|v| !v.is_empty()) {
+        return true;
+    }
+    std::io::stderr().is_terminal()
 }
 
 /// Convert a ratatui Buffer to ANSI-colored text and write to the given writer.

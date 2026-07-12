@@ -85,8 +85,12 @@ pub struct Cli {
     pub spark: bool,
 
     /// Shorthand for --output svg (SVG image export).
-    #[arg(long = "svg", conflicts_with_all = ["output", "json", "spark"])]
+    #[arg(long = "svg", conflicts_with_all = ["output", "json", "spark", "markdown"])]
     pub svg: bool,
+
+    /// Shorthand for --output markdown (Markdown table export).
+    #[arg(long = "markdown", conflicts_with_all = ["output", "json", "spark", "svg"])]
+    pub markdown: bool,
 
     /// Sample at most N rows from the data (systematic sampling for large datasets).
     #[arg(long = "sample", value_name = "N")]
@@ -107,6 +111,10 @@ pub struct Cli {
     /// Color theme: dark (default), light, or high-contrast.
     #[arg(long = "theme", value_enum)]
     pub theme: Option<ThemeArg>,
+
+    /// Number of bins for histogram charts (default: 10).
+    #[arg(long = "bins", value_name = "N")]
+    pub bins: Option<usize>,
 }
 
 #[derive(Subcommand, Debug, PartialEq, Clone)]
@@ -215,6 +223,8 @@ pub enum OutputFormat {
     Spark,
     /// SVG image output (monospace text rendering).
     Svg,
+    /// Markdown table for documentation embedding.
+    Markdown,
 }
 
 /// Color theme preset.
@@ -389,5 +399,17 @@ mod tests {
     fn test_cli_parse_format_long() {
         let cli = Cli::try_parse_from(["vz", "-", "--format", "ndjson"]).unwrap();
         assert_eq!(cli.format, Some(InputFormatArg::Ndjson));
+    }
+
+    #[test]
+    fn test_cli_parse_bins_flag() {
+        let cli = Cli::try_parse_from(["vz", "data.csv", "--bins", "20"]).unwrap();
+        assert_eq!(cli.bins, Some(20));
+    }
+
+    #[test]
+    fn test_cli_parse_bins_flag_not_set() {
+        let cli = Cli::try_parse_from(["vz", "data.csv"]).unwrap();
+        assert_eq!(cli.bins, None);
     }
 }

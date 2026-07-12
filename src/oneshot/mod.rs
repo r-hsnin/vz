@@ -39,6 +39,8 @@ pub struct RenderOptions<'a> {
     pub labels: bool,
     /// Color theme for rendering.
     pub theme: crate::theme::Theme,
+    /// Number of bins for histogram charts (None = default 10).
+    pub bins: Option<usize>,
 }
 
 pub fn render_oneshot(
@@ -117,6 +119,13 @@ fn warn_incompatible_flags(chart_type: ChartType, opts: &RenderOptions<'_>) {
             chart_type
         );
     }
+
+    if opts.bins.is_some() && !matches!(chart_type, ChartType::Histogram) {
+        eprintln!(
+            "warning: --bins has no effect on {:?} charts (only applies to histogram charts)",
+            chart_type
+        );
+    }
 }
 
 /// Compute min/max of aggregated bar chart values (post-sum/mean/etc).
@@ -151,53 +160,74 @@ pub fn render_chart_to_buffer(
 
     let mut chart_data = match chart_type {
         ChartType::Line | ChartType::Scatter => {
-            let config = builders::build_line_scatter_config(
-                recommendation,
-                headers,
-                rows,
-                opts,
-                area,
-                chart_type,
-            );
-            if chart_type == ChartType::Scatter {
-                ChartData::Scatter(config)
-            } else {
-                ChartData::Line(config)
-            }
+            build_line_scatter_chart(chart_type, recommendation, headers, rows, opts, area)
         }
         ChartType::Heatmap => {
             let data = builders::build_heatmap(recommendation, headers, rows);
             ChartData::Heatmap(data)
         }
-        ChartType::Bar => {
-            let (mut data, rows_used) =
-                builders::build_bar_data(recommendation, headers, rows, opts.agg);
-            if let Some(label) = opts.y_label_override {
-                data.y_label = label.to_string();
-            }
-            data.show_labels = opts.labels;
-            data.series_colors = opts.theme.series_colors.clone();
-            data.axis_color = Some(opts.theme.axis_color);
-            builders::sort_bar_data(&mut data, opts.sort_order);
-            builders::truncate_bar_data(&mut data, opts.limit);
-            warn_skipped_rows(rows.len(), rows_used, recommendation, ChartType::Bar);
-            ChartData::Bar(data)
-        }
-        ChartType::Histogram => {
-            let mut data = builders::build_histogram_data(recommendation, headers, rows);
-            data.axis_color = Some(opts.theme.axis_color);
-            let rendered = data.values.len();
-            warn_skipped_rows(rows.len(), rendered, recommendation, ChartType::Histogram);
-            ChartData::Histogram(data)
-        }
+        ChartType::Bar => build_bar_chart(recommendation, headers, rows, opts),
+        ChartType::Histogram => build_histogram_chart(recommendation, headers, rows, opts),
     };
 
-    // Apply title override once for all chart types
     if let Some(ref title) = opts.title {
         chart_data.set_title(title.clone());
     }
 
     render_chart_data(&chart_data, area, buf);
+}
+
+fn build_line_scatter_chart(
+    chart_type: ChartType,
+    recommendation: &ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &RenderOptions<'_>,
+    area: Rect,
+) -> crate::render::ChartData {
+    use crate::render::ChartData;
+    let config =
+        builders::build_line_scatter_config(recommendation, headers, rows, opts, area, chart_type);
+    if chart_type == ChartType::Scatter {
+        ChartData::Scatter(config)
+    } else {
+        ChartData::Line(config)
+    }
+}
+
+fn build_bar_chart(
+    recommendation: &ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &RenderOptions<'_>,
+) -> crate::render::ChartData {
+    use crate::render::ChartData;
+    let (mut data, rows_used) = builders::build_bar_data(recommendation, headers, rows, opts.agg);
+    if let Some(label) = opts.y_label_override {
+        data.y_label = label.to_string();
+    }
+    data.show_labels = opts.labels;
+    data.series_colors = opts.theme.series_colors.clone();
+    data.axis_color = Some(opts.theme.axis_color);
+    builders::sort_bar_data(&mut data, opts.sort_order);
+    builders::truncate_bar_data(&mut data, opts.limit);
+    warn_skipped_rows(rows.len(), rows_used, recommendation, ChartType::Bar);
+    ChartData::Bar(data)
+}
+
+fn build_histogram_chart(
+    recommendation: &ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &RenderOptions<'_>,
+) -> crate::render::ChartData {
+    use crate::render::ChartData;
+    let mut data =
+        builders::build_histogram_data_with_bins(recommendation, headers, rows, opts.bins);
+    data.axis_color = Some(opts.theme.axis_color);
+    let rendered = data.values.len();
+    warn_skipped_rows(rows.len(), rendered, recommendation, ChartType::Histogram);
+    ChartData::Histogram(data)
 }
 
 /// Get terminal width, falling back to 80 columns.
@@ -337,7 +367,7 @@ fn count_skipped_y_rows(
 #[cfg(test)]
 use crate::render::ChartConfig;
 #[cfg(test)]
-use builders::{build_bar_data, build_histogram_data};
+use builders::{build_bar_data, build_histogram_data, build_histogram_data_with_bins};
 
 /// Build ChartConfig for line/scatter charts (used by tests).
 #[cfg(test)]

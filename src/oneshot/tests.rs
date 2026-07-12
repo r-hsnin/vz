@@ -503,3 +503,38 @@ fn test_adaptive_height_line_large_dataset_uses_default() {
     let height = adaptive_height(ChartType::Line, &rec, &headers, &rows);
     assert_eq!(height, DEFAULT_HEIGHT);
 }
+
+#[test]
+fn test_build_histogram_data_custom_bins() {
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Histogram,
+        x_column: "score".to_string(),
+        y_column: None,
+        color_column: None,
+    };
+    let headers = vec!["score".to_string()];
+    let rows = vec![
+        vec!["85".to_string()],
+        vec!["90".to_string()],
+        vec!["78".to_string()],
+        vec!["92".to_string()],
+    ];
+
+    let data = build_histogram_data_with_bins(&rec, &headers, &rows, Some(5));
+    assert_eq!(data.bin_count, 5);
+}
+
+#[test]
+fn test_build_histogram_data_default_bins_when_none() {
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Histogram,
+        x_column: "score".to_string(),
+        y_column: None,
+        color_column: None,
+    };
+    let headers = vec!["score".to_string()];
+    let rows = vec![vec!["85".to_string()], vec!["90".to_string()]];
+
+    let data = build_histogram_data_with_bins(&rec, &headers, &rows, None);
+    assert_eq!(data.bin_count, 10);
+}

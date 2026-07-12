@@ -1,5 +1,12 @@
 //! Machine-readable output formats for AI agent integration.
 
+pub mod chart_json;
+pub mod markdown;
+pub mod spark;
+pub mod stats_text;
+pub mod svg;
+pub mod table;
+
 use serde::Serialize;
 
 use crate::chart::selector::ChartRecommendation;

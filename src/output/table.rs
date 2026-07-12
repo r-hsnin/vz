@@ -28,8 +28,9 @@ pub fn print_table(
     {
         let agg = cli.agg.unwrap_or(cli::AggFunction::Sum);
         let y_label = recommendation.y_column.as_deref().unwrap_or("value");
-        let (bar_data, _) =
+        let (mut bar_data, _) =
             data_builder::aggregate_bar(rows, xi, yi, None, y_label.to_string(), agg);
+        crate::oneshot::builders::sort_bar_data(&mut bar_data, cli.sort);
         print_two_col_values(
             &recommendation.x_column,
             y_label,
@@ -39,21 +40,8 @@ pub fn print_table(
         return Ok(());
     }
 
-    // For other chart types: show raw x, y, and color column data
-    let color_idx = recommendation
-        .color_column
-        .as_ref()
-        .and_then(|c| data_builder::column_index(headers, c));
-
-    match (x_idx, y_idx) {
-        (Some(xi), Some(yi)) => {
-            let x_label = &recommendation.x_column;
-            let y_label = recommendation.y_column.as_deref().unwrap_or("value");
-            let color_label = recommendation.color_column.as_deref();
-            print_xy_table(x_label, y_label, color_label, rows, xi, yi, color_idx);
-        }
-        _ => print_all_columns(headers, rows),
-    }
+    // For other chart types: show all columns (users expect full data view)
+    print_all_columns(headers, rows);
     Ok(())
 }
 
@@ -70,46 +58,6 @@ fn print_two_col_values(x_label: &str, y_label: &str, labels: &[String], values:
     println!("{:-<col_w$}  {:-<val_w$}", "", "");
     for (label, value) in labels.iter().zip(values.iter()) {
         println!("{:<col_w$}  {:>val_w$.2}", label, value);
-    }
-}
-
-/// Print a table from raw row data with x, y, and optional color columns.
-fn print_xy_table(
-    x_label: &str,
-    y_label: &str,
-    color_label: Option<&str>,
-    rows: &[Vec<String>],
-    xi: usize,
-    yi: usize,
-    color_idx: Option<usize>,
-) {
-    let col_w = col_width(rows, xi, x_label.len());
-    let val_w = col_width(rows, yi, y_label.len());
-
-    match (color_label, color_idx) {
-        (Some(c_label), Some(ci)) => {
-            let c_w = col_width(rows, ci, c_label.len());
-            println!(
-                "{:<col_w$}  {:<c_w$}  {:>val_w$}",
-                x_label, c_label, y_label
-            );
-            println!("{:-<col_w$}  {:-<c_w$}  {:-<val_w$}", "", "", "");
-            for row in rows {
-                let x_val = row.get(xi).map_or("", |v| v.as_str());
-                let c_val = row.get(ci).map_or("", |v| v.as_str());
-                let y_val = row.get(yi).map_or("", |v| v.as_str());
-                println!("{:<col_w$}  {:<c_w$}  {:>val_w$}", x_val, c_val, y_val);
-            }
-        }
-        _ => {
-            println!("{:<col_w$}  {:>val_w$}", x_label, y_label);
-            println!("{:-<col_w$}  {:-<val_w$}", "", "");
-            for row in rows {
-                let x_val = row.get(xi).map_or("", |v| v.as_str());
-                let y_val = row.get(yi).map_or("", |v| v.as_str());
-                println!("{:<col_w$}  {:>val_w$}", x_val, y_val);
-            }
-        }
     }
 }
 

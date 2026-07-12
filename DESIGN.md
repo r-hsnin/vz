@@ -80,9 +80,18 @@ src/
 │   ├── render.rs        — Slide rendering (draw_slide, element rendering)
 │   └── chart_loader.rs  — Chart data loading for embedded chart blocks
 ├── watch.rs             — File watching mode (--watch, auto-redraw on changes)
-├── output/mod.rs        — Machine-readable output (JSON metadata, column stats)
+├── output/              — Output format renderers (machine-readable & export)
+│   ├── mod.rs           — Column stats computation, JSON metadata output
+│   ├── chart_json.rs    — Chart data as JSON (series, labels, bins)
+│   ├── markdown.rs      — Markdown table output (--output markdown)
+│   ├── spark.rs         — Sparkline output mode (--output spark)
+│   ├── stats_text.rs    — Text formatting for column statistics (--info)
+│   ├── svg.rs           — SVG image export (Buffer → SVG document)
+│   └── table.rs         — Text table output (--output table)
+├── diagnostics.rs       — Error hints & file suggestions for common errors
+├── theme.rs             — Color theme definitions (dark, light, high-contrast)
+├── util.rs              — Shared numeric utilities (min_max)
 ├── sparkline.rs         — Shared sparkline generation (Unicode block chars)
-└── table.rs             — Text table output (--output table)
 ```
 
 ## Data Flow & Dependencies
@@ -210,7 +219,7 @@ vz present slides.md
 - [x] Column metadata (`--info`)
 - [x] Heatmap (categorical × categorical, count-based)
 - [x] File watch mode (`--watch`)
-- [x] Machine-readable output (`--output json`, `--output table`, `--output spark`)
+- [x] Machine-readable output (`--output json`, `--output table`, `--output spark`, `--output svg`, `--output markdown`)
 - [x] Aggregation functions (`--agg sum/mean/count/max/min`)
 - [x] Custom chart title (`--title`)
 - [x] Value labels on bar charts (`--labels`)
@@ -220,7 +229,7 @@ vz present slides.md
 
 ### Out (future)
 - Parquet / SQLite / DB connections
-- Export (PNG, SVG)
+- Export (PNG) — SVG は `--svg` で実装済み、Markdown テーブルは `--output markdown` で実装済み
 - ~~Custom themes / color configuration~~ → **実装済み** (`--theme dark|light|high-contrast`)
 - Streaming / live data (部分的に `--watch` で実現)
 

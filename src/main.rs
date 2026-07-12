@@ -1,5 +1,6 @@
 pub mod chart;
 pub mod cli;
+pub mod diagnostics;
 pub mod explore;
 pub mod filter;
 pub mod infer;
@@ -9,8 +10,6 @@ pub mod output;
 pub mod present;
 pub mod render;
 pub mod sparkline;
-pub mod svg;
-pub mod table;
 pub mod theme;
 pub mod util;
 pub mod watch;
@@ -44,7 +43,7 @@ fn print_info(file: &Path, data: &LoadedData, schema: &infer::types::Schema) {
     println!("{:<20} {:<15} {:>6}  Stats", "Name", "Type", "Nulls");
     println!("{}", "-".repeat(70));
     for (i, col) in schema.columns.iter().enumerate() {
-        let stats = compute_column_stats_text(i, &col.data_type, data);
+        let stats = output::stats_text::compute_column_stats_text(i, &col.data_type, data);
         println!(
             "{:<20} {:<15} {:>6}  {}",
             col.name,
@@ -70,107 +69,35 @@ fn print_info_json(file: &Path, data: &LoadedData, schema: &Schema) -> anyhow::R
     Ok(())
 }
 
-/// Print chart data as JSON (includes metadata for backward compat + chart_data field).
-#[allow(clippy::too_many_arguments)]
+/// Print chart data as JSON — delegates to output::chart_json module.
 fn print_chart_json(
     file: &Path,
     data: &loader::LoadedData,
     schema: &infer::types::Schema,
     recommendation: &chart::ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
     cli: &Cli,
     y_opts: &YOptions,
 ) -> anyhow::Result<()> {
-    use chart::data_builder;
-    use chart::selector::ChartType;
-    use serde_json::json;
-
-    // Build base info output (backward compatible)
-    let output = output::build_info_output(
-        &file.display().to_string(),
+    let params = output::chart_json::ChartJsonParams {
+        chart_type: cli
+            .chart_type
+            .map(|ct| ct.to_chart_type())
+            .unwrap_or(recommendation.chart_type),
+        sort: effective_sort(cli),
+        agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
+        limit: cli.top.or(cli.tail),
+        extra_y_columns: y_opts.extra_columns.clone(),
+        color_column: cli.color_col.clone(),
+    };
+    output::chart_json::print_chart_json(
+        file,
         data,
         schema,
-        Some(recommendation),
-    );
-
-    // Compute chart_data from aggregation/sort
-    let chart_type = cli
-        .chart_type
-        .map(|ct| ct.to_chart_type())
-        .unwrap_or(recommendation.chart_type);
-    let sort = effective_sort(cli);
-    let agg = cli.agg.unwrap_or(cli::AggFunction::Sum);
-    let limit = cli.top.or(cli.tail);
-
-    let x_idx = data_builder::column_index(headers, &recommendation.x_column).unwrap_or(0);
-    let y_idx = recommendation
-        .y_column
-        .as_ref()
-        .and_then(|y| data_builder::column_index(headers, y))
-        .unwrap_or(x_idx);
-
-    let chart_data = match chart_type {
-        ChartType::Bar => {
-            let (mut bar_data, _) =
-                data_builder::aggregate_bar(rows, x_idx, y_idx, None, String::new(), agg);
-            oneshot::builders::sort_bar_data(&mut bar_data, sort);
-            if let Some(n) = limit {
-                bar_data.labels.truncate(n);
-                bar_data.values.truncate(n);
-            }
-            json!({ "type": "bar", "categories": bar_data.labels, "values": bar_data.values })
-        }
-        ChartType::Histogram => {
-            let hist_data = data_builder::build_histogram(rows, x_idx, None, String::new());
-            let bins = render::compute_bins(&hist_data.values, hist_data.bin_count);
-            let bin_data: Vec<serde_json::Value> = bins
-                .iter()
-                .map(|(s, e, c)| json!({"range": format!("{:.0}-{:.0}", s, e), "count": c}))
-                .collect();
-            json!({ "type": "histogram", "bins": bin_data })
-        }
-        _ => {
-            let extra_y: Vec<usize> = y_opts
-                .extra_columns
-                .iter()
-                .filter_map(|(name, _)| headers.iter().position(|h| h == name))
-                .collect();
-            let mut series: Vec<serde_json::Value> = Vec::new();
-            let y_name = headers.get(y_idx).cloned().unwrap_or_default();
-            let points: Vec<serde_json::Value> = rows
-                .iter()
-                .filter_map(|r| {
-                    let x = r.get(x_idx)?.clone();
-                    let y: f64 = r.get(y_idx)?.replace(',', "").parse().ok()?;
-                    Some(json!({"x": x, "y": y}))
-                })
-                .collect();
-            series.push(json!({"name": y_name, "data": points}));
-            for &ey in &extra_y {
-                let name = headers.get(ey).cloned().unwrap_or_default();
-                let pts: Vec<serde_json::Value> = rows
-                    .iter()
-                    .filter_map(|r| {
-                        let x = r.get(x_idx)?.clone();
-                        let y: f64 = r.get(ey)?.replace(',', "").parse().ok()?;
-                        Some(json!({"x": x, "y": y}))
-                    })
-                    .collect();
-                series.push(json!({"name": name, "data": pts}));
-            }
-            json!({ "type": format!("{chart_type:?}").to_lowercase(), "series": series })
-        }
-    };
-
-    // Merge chart_data into the output
-    let mut output_value = serde_json::to_value(&output)?;
-    if let serde_json::Value::Object(ref mut map) = output_value {
-        map.insert("chart_data".to_string(), chart_data);
-    }
-
-    println!("{}", serde_json::to_string_pretty(&output_value)?);
-    Ok(())
+        recommendation,
+        &data.headers,
+        &data.rows,
+        &params,
+    )
 }
 
 /// Print the auto-detected chart recommendation for the data.
@@ -199,44 +126,6 @@ fn print_recommendation(schema: &Schema) {
 }
 
 /// Compute summary statistics for a column and format as human-readable text.
-fn compute_column_stats_text(
-    col_idx: usize,
-    data_type: &infer::types::DataType,
-    data: &LoadedData,
-) -> String {
-    use output::ColumnStats;
-    match output::compute_column_stats(col_idx, data_type, data) {
-        ColumnStats::Quantitative { min, max, mean } => {
-            format!(
-                "Min={}  Max={}  Mean={}",
-                format_stat(min),
-                format_stat(max),
-                format_stat(mean)
-            )
-        }
-        ColumnStats::Categorical { unique, .. } => format!("{} unique", unique),
-        ColumnStats::Temporal { min, max } => {
-            if min == max {
-                min
-            } else {
-                format!("{}..{}", min, max)
-            }
-        }
-        ColumnStats::Empty {} => String::new(),
-    }
-}
-
-/// Format a numeric stat value concisely.
-fn format_stat(val: f64) -> String {
-    if val == val.trunc() && val.abs() < 1_000_000.0 {
-        format!("{:.0}", val)
-    } else if val.abs() >= 1_000_000.0 {
-        format!("{:.2e}", val)
-    } else {
-        format!("{:.2}", val)
-    }
-}
-
 fn main() {
     let mut cli = Cli::parse();
     // --json is a shorthand for -o json
@@ -250,6 +139,10 @@ fn main() {
     // --svg is a shorthand for -o svg
     if cli.svg {
         cli.output = Some(cli::OutputFormat::Svg);
+    }
+    // --markdown is a shorthand for -o markdown
+    if cli.markdown {
+        cli.output = Some(cli::OutputFormat::Markdown);
     }
     let json_output = cli.output == Some(cli::OutputFormat::Json);
 
@@ -267,89 +160,12 @@ fn main() {
             std::process::exit(1);
         } else {
             eprintln!("Error: {:#}", e);
-            if let Some(hint) = error_hint(&e, &cli) {
+            if let Some(hint) = diagnostics::error_hint(&e, &cli) {
                 eprintln!("\n{}", hint);
             }
             std::process::exit(1);
         }
     }
-}
-
-/// Generate contextual hints for common errors.
-fn error_hint(err: &anyhow::Error, cli: &Cli) -> Option<String> {
-    let msg = format!("{:#}", err);
-    // File not found: suggest similar files in the same directory
-    if msg.contains("No such file")
-        && let Some(ref file) = cli.file
-    {
-        let parent = file.parent().unwrap_or(std::path::Path::new("."));
-        let stem = file.file_name()?.to_str()?;
-        let suggestions = find_similar_files(parent, stem);
-        if !suggestions.is_empty() {
-            let list = suggestions
-                .iter()
-                .map(|s| format!("    • {}", s))
-                .collect::<Vec<_>>()
-                .join("\n");
-            return Some(format!("  Did you mean?\n{}", list));
-        }
-        return Some("  Tip: use vz - to read from stdin".to_string());
-    }
-    // Empty data
-    if msg.contains("No data rows") {
-        return Some(
-            "  Tip: check that the file contains data rows below the header.\n  \
-             For headerless data, try: vz file.csv --no-header"
-                .to_string(),
-        );
-    }
-    None
-}
-
-/// Find files in `dir` with names similar to `target`.
-/// Supported data file extensions for discovery.
-const DATA_EXTENSIONS: &[&str] = &["csv", "tsv", "json", "ndjson", "jsonl", "tab"];
-
-/// Check if a filename has a recognized data extension.
-fn is_data_file(name: &str) -> bool {
-    name.rsplit('.')
-        .next()
-        .is_some_and(|ext| DATA_EXTENSIONS.contains(&ext))
-}
-
-fn find_similar_files(dir: &std::path::Path, target: &str) -> Vec<String> {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return vec![];
-    };
-    let target_lower = target.to_lowercase();
-    let all_data_files: Vec<String> = entries
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().ok().is_some_and(|t| t.is_file()))
-        .filter_map(|e| e.file_name().into_string().ok())
-        .filter(|name| is_data_file(name))
-        .collect();
-
-    // First: find files similar to the target name
-    let similar: Vec<String> = all_data_files
-        .iter()
-        .filter(|name| {
-            let name_lower = name.to_lowercase();
-            let shared = target_lower
-                .chars()
-                .zip(name_lower.chars())
-                .take_while(|(a, b)| a == b)
-                .count();
-            shared >= 3 || name_lower.contains(&target_lower[..target_lower.len().min(4)])
-        })
-        .take(3)
-        .cloned()
-        .collect();
-
-    if !similar.is_empty() {
-        return similar;
-    }
-    // Fallback: show any data files in the directory
-    all_data_files.into_iter().take(3).collect()
 }
 
 fn run(cli: &Cli) -> Result<()> {
@@ -374,52 +190,21 @@ fn run(cli: &Cli) -> Result<()> {
 }
 
 /// Print data as a formatted text table (used by `--output table`).
-/// Generate a sparkline string from values, mapping to 8 Unicode block characters.
-fn make_sparkline(values: &[f64]) -> String {
-    sparkline::sparkline_from_values(values)
-}
-
-/// Print sparkline output: single-line or grouped by color column.
+/// Print sparkline output (delegates to output::spark module).
 fn print_spark(
     recommendation: &chart::selector::ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
     cli: &Cli,
 ) {
-    let y_idx = recommendation
-        .y_column
-        .as_ref()
-        .and_then(|y| chart::data_builder::column_index(headers, y));
-    let Some(yi) = y_idx else {
-        println!("▄");
-        return;
+    let params = output::spark::SparkParams {
+        chart_type_override: cli.chart_type,
+        agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
+        sort: effective_sort(cli),
+        limit: cli.top.or(cli.tail),
+        color_col: cli.color_col.clone(),
     };
-
-    // If color column specified, output one sparkline per group
-    if let Some(ref color) = cli.color_col
-        && let Some(ci) = chart::data_builder::column_index(headers, color)
-    {
-        let mut groups: std::collections::BTreeMap<&str, Vec<f64>> =
-            std::collections::BTreeMap::new();
-        for row in rows {
-            let group = row.get(ci).map_or("", |v| v.as_str());
-            let val = row.get(yi).and_then(|v| v.parse::<f64>().ok());
-            if let Some(v) = val {
-                groups.entry(group).or_default().push(v);
-            }
-        }
-        for (name, values) in &groups {
-            println!("{}  {}", name, make_sparkline(values));
-        }
-        return;
-    }
-
-    // Single sparkline from all Y values in row order
-    let values: Vec<f64> = rows
-        .iter()
-        .filter_map(|r| r.get(yi)?.parse::<f64>().ok())
-        .collect();
-    println!("{}", make_sparkline(&values));
+    output::spark::print_spark(recommendation, headers, rows, &params);
 }
 
 /// Expand `--all-y`: add all remaining quantitative columns to extra_y.
@@ -465,18 +250,7 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
         data
     };
 
-    if data.rows.is_empty() {
-        if !cli.filter.is_empty() && pre_filter_count > 0 {
-            anyhow::bail!(
-                "No rows remain after filtering. All {} rows were excluded by --where predicates.",
-                pre_filter_count,
-            );
-        }
-        anyhow::bail!(
-            "No data rows found in '{}'. The file appears to contain only headers.",
-            file.display(),
-        );
-    }
+    validate_loaded_data(&data, file, &cli.filter, pre_filter_count)?;
 
     let schema = infer_from_data(&data);
 
@@ -489,35 +263,46 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
         return Ok(());
     }
 
-    // JSON output without --info: output metadata + chart data
-    if cli.output == Some(cli::OutputFormat::Json) {
-        let mut y_opts = parse_y_options(cli);
-        let recommendation = build_recommendation(cli, &schema, &y_opts)?;
-        if cli.all_y {
-            expand_all_y(&recommendation, &schema, &mut y_opts);
-        }
-        print_chart_json(
-            file,
-            &data,
-            &schema,
-            &recommendation,
-            &data.headers,
-            &data.rows,
-            cli,
-            &y_opts,
-        )?;
-        return Ok(());
-    }
-
     let mut y_opts = parse_y_options(cli);
     let recommendation = build_recommendation(cli, &schema, &y_opts)?;
-
-    // --all-y: overlay all quantitative columns as multi-series
     if cli.all_y {
         expand_all_y(&recommendation, &schema, &mut y_opts);
     }
 
+    if cli.output == Some(cli::OutputFormat::Json) {
+        print_chart_json(file, &data, &schema, &recommendation, cli, &y_opts)?;
+        return Ok(());
+    }
+
     dispatch_output(cli, &recommendation, &data.headers, &data.rows, &y_opts)
+}
+
+/// Validate that loaded data is non-empty and produce clear error messages.
+fn validate_loaded_data(
+    data: &LoadedData,
+    file: &Path,
+    filters: &[String],
+    pre_filter_count: usize,
+) -> Result<()> {
+    if data.rows.is_empty() {
+        if !filters.is_empty() && pre_filter_count > 0 {
+            anyhow::bail!(
+                "No rows remain after filtering. All {} rows were excluded by --where predicates.",
+                pre_filter_count,
+            );
+        }
+        if data.headers.is_empty() || data.headers.iter().all(|h| h.is_empty()) {
+            anyhow::bail!(
+                "Input '{}' is empty — no data to visualize.\n\n  Tip: ensure the command or file produces output before piping to vz.",
+                file.display(),
+            );
+        }
+        anyhow::bail!(
+            "No data rows found in '{}'. The file appears to contain only headers.",
+            file.display(),
+        );
+    }
+    Ok(())
 }
 
 /// Dispatch to the appropriate output renderer based on CLI flags.
@@ -530,7 +315,7 @@ fn dispatch_output(
 ) -> Result<()> {
     match cli.output {
         Some(cli::OutputFormat::Table) => {
-            table::print_table(recommendation, headers, rows, cli)?;
+            output::table::print_table(recommendation, headers, rows, cli)?;
         }
         Some(cli::OutputFormat::Spark) => {
             print_spark(recommendation, headers, rows, cli);
@@ -538,6 +323,9 @@ fn dispatch_output(
         Some(cli::OutputFormat::Svg) => {
             let opts = build_render_options(cli, y_opts);
             print_svg(recommendation, headers, rows, &opts)?;
+        }
+        Some(cli::OutputFormat::Markdown) => {
+            output::markdown::print_markdown(recommendation, headers, rows, cli)?;
         }
         _ => {
             let opts = build_render_options(cli, y_opts);
@@ -572,7 +360,10 @@ fn print_svg(
         &mut buf,
     );
 
-    println!("{}", svg::buffer_to_svg(&buf, opts.theme.svg_background()));
+    println!(
+        "{}",
+        output::svg::buffer_to_svg(&buf, opts.theme.svg_background())
+    );
     Ok(())
 }
 
@@ -590,6 +381,7 @@ fn build_render_options<'a>(cli: &'a Cli, y_opts: &'a YOptions) -> oneshot::Rend
         title: cli.title.clone(),
         labels: cli.labels,
         theme: resolve_theme(cli),
+        bins: cli.bins,
     }
 }
 
@@ -747,85 +539,6 @@ fn adjust_bar_recommendation(
 mod tests {
     use super::*;
     use infer::types::DataType;
-
-    fn make_data(headers: Vec<&str>, rows: Vec<Vec<&str>>) -> LoadedData {
-        LoadedData {
-            headers: headers.into_iter().map(|s| s.to_string()).collect(),
-            rows: rows
-                .into_iter()
-                .map(|r| r.into_iter().map(|s| s.to_string()).collect())
-                .collect(),
-        }
-    }
-
-    #[test]
-    fn test_compute_column_stats_quantitative() {
-        let data = make_data(vec!["val"], vec![vec!["10"], vec!["20"], vec!["30"]]);
-        let result = compute_column_stats_text(0, &DataType::Quantitative, &data);
-        assert!(result.contains("Min=10"));
-        assert!(result.contains("Max=30"));
-        assert!(result.contains("Mean=20"));
-    }
-
-    #[test]
-    fn test_compute_column_stats_empty() {
-        let data = make_data(vec!["val"], vec![vec![""], vec![""]]);
-        let result = compute_column_stats_text(0, &DataType::Quantitative, &data);
-        assert_eq!(result, "");
-    }
-
-    #[test]
-    fn test_compute_column_stats_categorical() {
-        let data = make_data(
-            vec!["city"],
-            vec![vec!["Tokyo"], vec!["Osaka"], vec!["Tokyo"]],
-        );
-        let result = compute_column_stats_text(0, &DataType::Categorical, &data);
-        assert_eq!(result, "2 unique");
-    }
-
-    #[test]
-    fn test_compute_column_stats_temporal() {
-        let data = make_data(
-            vec!["date"],
-            vec![vec!["2024-01"], vec!["2024-02"], vec!["2024-03"]],
-        );
-        let result = compute_column_stats_text(0, &DataType::Temporal, &data);
-        assert_eq!(result, "2024-01..2024-03");
-    }
-
-    #[test]
-    fn test_compute_column_stats_temporal_single() {
-        let data = make_data(vec!["date"], vec![vec!["2024-01"]]);
-        let result = compute_column_stats_text(0, &DataType::Temporal, &data);
-        assert_eq!(result, "2024-01");
-    }
-
-    #[test]
-    fn test_compute_column_stats_non_numeric_quantitative() {
-        let data = make_data(vec!["val"], vec![vec!["abc"], vec!["def"]]);
-        let result = compute_column_stats_text(0, &DataType::Quantitative, &data);
-        assert_eq!(result, "");
-    }
-
-    #[test]
-    fn test_format_stat_integer() {
-        assert_eq!(format_stat(42.0), "42");
-        assert_eq!(format_stat(0.0), "0");
-        assert_eq!(format_stat(-5.0), "-5");
-    }
-
-    #[test]
-    fn test_format_stat_decimal() {
-        assert_eq!(format_stat(3.75), "3.75");
-        assert_eq!(format_stat(0.5), "0.50");
-    }
-
-    #[test]
-    fn test_format_stat_large() {
-        let result = format_stat(1_500_000.0);
-        assert!(result.contains("e") || result.contains("E"));
-    }
 
     fn make_schema(cols: &[(&str, DataType)]) -> infer::types::Schema {
         infer::types::Schema::new(

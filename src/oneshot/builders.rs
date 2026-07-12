@@ -110,6 +110,16 @@ pub fn build_histogram_data(
     headers: &[String],
     rows: &[Vec<String>],
 ) -> HistogramData {
+    build_histogram_data_with_bins(recommendation, headers, rows, None)
+}
+
+/// Build histogram data with an explicit bin count override.
+pub fn build_histogram_data_with_bins(
+    recommendation: &ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    bins: Option<usize>,
+) -> HistogramData {
     let axes = ResolvedAxes::from_recommendation(
         &recommendation.x_column,
         recommendation.y_column.as_deref(),
@@ -133,7 +143,7 @@ pub fn build_histogram_data(
     let label = headers.get(use_idx).cloned().unwrap_or_default();
     let title = format!("Distribution of {}", label);
 
-    data_builder::build_histogram(rows, use_idx, Some(title), label)
+    data_builder::build_histogram(rows, use_idx, Some(title), label, bins)
 }
 
 /// Build heatmap data for two categorical columns.

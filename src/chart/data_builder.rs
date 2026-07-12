@@ -259,6 +259,33 @@ pub fn build_chart_config(
         )]
     };
 
+    let x_labels = compute_x_labels(x_is_non_numeric, &raw_x_strings);
+    let (x_axis, y_axis) = axes_from_series(&series, &x_label, &y_label);
+
+    ChartConfig {
+        title,
+        x_axis,
+        y_axis,
+        series,
+        x_labels,
+        series_colors: vec![],
+        axis_color: None,
+        label_color: None,
+    }
+}
+
+/// Compute categorical X labels from raw strings (evenly sampled).
+fn compute_x_labels(x_is_non_numeric: bool, raw_x_strings: &[String]) -> Option<Vec<String>> {
+    if x_is_non_numeric && !raw_x_strings.is_empty() {
+        let unique = unique_ordered(raw_x_strings);
+        Some(pick_evenly(&unique, 5))
+    } else {
+        None
+    }
+}
+
+/// Derive X and Y axes by collecting all data points from series.
+fn axes_from_series(series: &[Series], x_label: &str, y_label: &str) -> (Axis, Axis) {
     let all_x: Vec<f64> = series
         .iter()
         .flat_map(|s| s.data.iter().map(|(x, _)| *x))
@@ -267,24 +294,10 @@ pub fn build_chart_config(
         .iter()
         .flat_map(|s| s.data.iter().map(|(_, y)| *y))
         .collect();
-
-    let x_labels = if x_is_non_numeric && !raw_x_strings.is_empty() {
-        let unique = unique_ordered(&raw_x_strings);
-        Some(pick_evenly(&unique, 5))
-    } else {
-        None
-    };
-
-    ChartConfig {
-        title,
-        x_axis: Axis::from_data(&x_label, &all_x),
-        y_axis: Axis::from_data(&y_label, &all_y),
-        series,
-        x_labels,
-        series_colors: vec![],
-        axis_color: None,
-        label_color: None,
-    }
+    (
+        Axis::from_data(x_label, &all_x),
+        Axis::from_data(y_label, &all_y),
+    )
 }
 
 /// Sample large datasets to keep rendering fast. Returns None if no sampling needed.
@@ -307,6 +320,7 @@ pub fn build_histogram(
     col_idx: usize,
     title: Option<String>,
     x_label: String,
+    bin_count: Option<usize>,
 ) -> HistogramData {
     let values: Vec<f64> = rows
         .iter()
@@ -316,7 +330,7 @@ pub fn build_histogram(
     HistogramData {
         title,
         values,
-        bin_count: 10,
+        bin_count: bin_count.unwrap_or(10),
         x_label,
         axis_color: None,
     }

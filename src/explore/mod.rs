@@ -284,7 +284,7 @@ impl ExploreApp {
         let title = format!("Distribution of {}", x_label);
 
         let mut data =
-            data_builder::build_histogram(&self.data, self.selected_x, Some(title), x_label);
+            data_builder::build_histogram(&self.data, self.selected_x, Some(title), x_label, None);
         data.axis_color = Some(self.theme.axis_color);
         data
     }

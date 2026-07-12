@@ -19,28 +19,25 @@ pub fn buffer_to_svg(buf: &Buffer, bg_color: &str) -> String {
     let height = area.height as f64 * CELL_HEIGHT;
 
     let mut svg = String::with_capacity(4096);
-    writeln!(
+    let _ = writeln!(
         svg,
         r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="{width}" height="{height}">"#,
-    )
-    .unwrap();
+    );
     // Background
-    writeln!(
+    let _ = writeln!(
         svg,
         r#"<rect width="100%" height="100%" fill="{bg_color}"/>"#,
-    )
-    .unwrap();
+    );
     // Font style
-    writeln!(
+    let _ = writeln!(
         svg,
         r#"<style>text {{ font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: {FONT_SIZE}px; white-space: pre; }}</style>"#,
-    )
-    .unwrap();
+    );
 
     // Render each row as a <text> element with colored <tspan>s
     for y in 0..area.height {
         let text_y = (y as f64 + 1.0) * CELL_HEIGHT - 3.0;
-        write!(svg, r#"<text y="{text_y}">"#).unwrap();
+        let _ = write!(svg, r#"<text y="{text_y}">"#);
 
         let mut current_style = Style::default();
         let mut span_text = String::new();
@@ -67,10 +64,10 @@ pub fn buffer_to_svg(buf: &Buffer, bg_color: &str) -> String {
             write_tspan(&mut svg, span_x, span_text.trim_end(), current_style);
         }
 
-        writeln!(svg, "</text>").unwrap();
+        let _ = writeln!(svg, "</text>");
     }
 
-    writeln!(svg, "</svg>").unwrap();
+    let _ = writeln!(svg, "</svg>");
     svg
 }
 
@@ -78,7 +75,7 @@ fn write_tspan(svg: &mut String, x: f64, text: &str, style: Style) {
     let fg = style.fg.unwrap_or(Color::Gray);
     let color = color_to_hex(fg);
     let escaped = xml_escape(text);
-    write!(svg, r#"<tspan x="{x}" fill="{color}">{escaped}</tspan>"#).unwrap();
+    let _ = write!(svg, r#"<tspan x="{x}" fill="{color}">{escaped}</tspan>"#);
 }
 
 fn xml_escape(s: &str) -> String {
