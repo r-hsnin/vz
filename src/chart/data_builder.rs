@@ -738,3 +738,32 @@ fn test_resolved_axes_single_column() {
     assert_eq!(axes.x_idx, 0);
     assert_eq!(axes.y_idx, 0); // min(1, len-1) = min(1, 0) = 0
 }
+
+#[test]
+fn test_collect_groups_sum() {
+    let rows = vec![
+        vec!["A".to_string(), "10".to_string()],
+        vec!["B".to_string(), "20".to_string()],
+        vec!["A".to_string(), "30".to_string()],
+    ];
+    let (groups, used) = collect_groups(&rows, 0, 1, AggFunction::Sum);
+    assert_eq!(used, 3);
+    assert_eq!(groups.len(), 2);
+    assert_eq!(groups[0].0, "A");
+    assert_eq!(groups[0].1, vec![10.0, 30.0]);
+    assert_eq!(groups[1].0, "B");
+    assert_eq!(groups[1].1, vec![20.0]);
+}
+
+#[test]
+fn test_collect_groups_count() {
+    let rows = vec![
+        vec!["X".to_string(), "ignored".to_string()],
+        vec!["Y".to_string(), "also_ignored".to_string()],
+        vec!["X".to_string(), "nope".to_string()],
+    ];
+    let (groups, used) = collect_groups(&rows, 0, 1, AggFunction::Count);
+    assert_eq!(used, 3);
+    assert_eq!(groups[0].0, "X");
+    assert_eq!(groups[0].1.len(), 2); // two entries for X
+}

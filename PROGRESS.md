@@ -3056,3 +3056,12 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - 影響: tests/integration_test.rs
 - テスト追加: 1 integration (test_output_svg_light_theme)
 - 検証: PASS (523 tests: 398 unit + 121 integration + 4 snapshot)
+
+---
+
+## Cycle 185 — 2026-07-12T16:15
+- 種別: テスト追加
+- 改善: `collect_groups` ユニットテスト2件追加 (sum, count)。
+- 影響: src/chart/data_builder.rs
+- テスト追加: 2 unit (test_collect_groups_sum, _count)
+- 検証: PASS (525 tests: 400 unit + 121 integration + 4 snapshot)
