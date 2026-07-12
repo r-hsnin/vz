@@ -221,8 +221,8 @@ vz present slides.md
 ### Out (future)
 - Parquet / SQLite / DB connections
 - Export (PNG, SVG)
-- Custom themes / color configuration
-- Streaming / live data
+- ~~Custom themes / color configuration~~ → **実装済み** (`--theme dark|light|high-contrast`)
+- Streaming / live data (部分的に `--watch` で実現)
 
 ## Key Design Decisions
 
