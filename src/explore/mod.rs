@@ -27,6 +27,8 @@ pub struct ExploreApp {
     pub table_offset: usize,
     /// Transient status message shown for one render cycle.
     pub status_message: Option<String>,
+    /// Whether to show the help overlay.
+    pub show_help: bool,
     /// Color theme for chart rendering.
     pub theme: crate::theme::Theme,
 }
@@ -45,6 +47,7 @@ impl ExploreApp {
             view_mode: ViewMode::Chart,
             table_offset: 0,
             status_message: None,
+            show_help: false,
             theme,
         }
     }
@@ -66,8 +69,15 @@ impl ExploreApp {
     pub fn handle_key(&mut self, key: KeyCode) {
         let prev_chart_type = self.effective_chart_type();
 
+        // If help overlay is showing, any key dismisses it
+        if self.show_help {
+            self.show_help = false;
+            return;
+        }
+
         match key {
             KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
+            KeyCode::Char('?') => self.show_help = true,
             KeyCode::Char('d') | KeyCode::Tab => {
                 self.view_mode = match self.view_mode {
                     ViewMode::Chart => ViewMode::Table,
@@ -657,5 +667,18 @@ mod tests {
                 "Notification should contain 'auto:'"
             );
         }
+    }
+
+    #[test]
+    fn test_help_overlay_toggle() {
+        let mut app = make_test_app();
+        assert!(!app.show_help);
+        app.handle_key(KeyCode::Char('?'));
+        assert!(app.show_help, "? should open help");
+        // Any key closes it
+        app.handle_key(KeyCode::Char('x'));
+        assert!(!app.show_help, "any key should close help");
+        // The 'x' key should not have done anything else (not quit, etc.)
+        assert!(!app.should_quit);
     }
 }

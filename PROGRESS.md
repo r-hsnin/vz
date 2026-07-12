@@ -2779,3 +2779,15 @@ VitePress選定理由: 純粋Markdown保守、starship.rs実績、最小設定
 - テスト: 既存496テスト全パス
 - 検証: PASS (496 tests: 375 unit + 117 integration + 4 snapshot)
 - 次の候補: Explore help overlay (RICE=80)
+
+---
+
+## Cycle 162 — 2026-07-12T15:26
+- 種別: 機能追加
+- ユーザーストーリー: Explore初回ユーザーが、`?` キーでキーバインド一覧を即座に確認したい（クリプトなステータスバーで迷わない）。
+- スコア: RICE = (8×5×8)/4 = 80
+- 改善: `?` キーでヘルプオーバーレイ表示。任意キーで閉じる。`show_help` フィールド追加。
+- 影響: src/explore/mod.rs, src/explore/render.rs
+- テスト追加: 1 unit (test_help_overlay_toggle)
+- 検証: PASS (497 tests: 376 unit + 117 integration + 4 snapshot)
+- 次の候補: oneshot/mod.rs ファイルサイズ修正 (RICE=107)

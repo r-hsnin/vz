@@ -32,6 +32,11 @@ pub fn draw_ui(frame: &mut Frame, app: &ExploreApp) {
     // Status bar
     let status = build_status_bar(app);
     frame.render_widget(status, chunks[2]);
+
+    // Help overlay (rendered last so it appears on top)
+    if app.show_help {
+        render_help_overlay(frame);
+    }
 }
 
 fn render_chart(frame: &mut Frame, app: &ExploreApp, area: ratatui::layout::Rect) {
@@ -147,6 +152,53 @@ fn build_header(app: &ExploreApp) -> Paragraph<'static> {
     ]);
 
     Paragraph::new(text).block(Block::default().borders(Borders::BOTTOM))
+}
+
+fn render_help_overlay(frame: &mut Frame) {
+    use ratatui::layout::Alignment;
+    use ratatui::widgets::Clear;
+
+    let area = frame.area();
+    let help_width = 44.min(area.width.saturating_sub(4));
+    let help_height = 14.min(area.height.saturating_sub(2));
+    let x = (area.width.saturating_sub(help_width)) / 2;
+    let y = (area.height.saturating_sub(help_height)) / 2;
+    let popup = ratatui::layout::Rect::new(x, y, help_width, help_height);
+
+    frame.render_widget(Clear, popup);
+
+    let help_text = vec![
+        Line::from(Span::styled(
+            " Keybindings ",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::raw(""),
+        Line::raw(" h / l (←/→)   Change X axis column"),
+        Line::raw(" j / k (↑/↓)   Change Y axis column"),
+        Line::raw(" c              Cycle color/group column"),
+        Line::raw(" 1-4            Force chart type"),
+        Line::raw("                (Line/Bar/Scatter/Hist)"),
+        Line::raw(" 0              Auto chart type"),
+        Line::raw(" d / Tab        Toggle chart ↔ table"),
+        Line::raw(" ?              Show/hide this help"),
+        Line::raw(" q / Esc        Quit"),
+        Line::raw(""),
+        Line::from(Span::styled(
+            " Press any key to close ",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+
+    let paragraph = Paragraph::new(help_text).alignment(Alignment::Left).block(
+        Block::default()
+            .title(" Help ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan)),
+    );
+
+    frame.render_widget(paragraph, popup);
 }
 
 fn build_column_display(app: &ExploreApp) -> String {
