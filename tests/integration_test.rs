@@ -2549,7 +2549,7 @@ fn test_theme_flag_invalid_rejected() {
 #[test]
 fn test_summary_shows_skipped_rows() {
     let output = vz_binary()
-        .args(["fixtures/mixed_values.csv"])
+        .args(["fixtures/mixed_values.csv", "-t", "line"])
         .output()
         .expect("Failed to run vz");
     let stderr = String::from_utf8_lossy(&output.stderr);

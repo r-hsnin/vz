@@ -63,7 +63,11 @@ pub fn render_oneshot(
         None
     };
 
-    let skipped_rows = count_skipped_y_rows(recommendation, headers, rows);
+    let skipped_rows = if chart_type == ChartType::Heatmap {
+        0 // Heatmap Y is categorical, not numeric — skip counting makes no sense
+    } else {
+        count_skipped_y_rows(recommendation, headers, rows)
+    };
 
     summary::print_summary(&summary::SummaryContext {
         recommendation,
