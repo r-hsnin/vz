@@ -242,6 +242,9 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
     let pre_filter_count = data.rows.len();
     let data = apply_filters(data, &cli.filter)?;
     let data = if let Some(max_rows) = cli.sample {
+        if max_rows == 0 {
+            anyhow::bail!("--sample must be at least 1");
+        }
         loader::apply_sampling(data, max_rows)
     } else {
         data

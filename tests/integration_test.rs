@@ -1912,6 +1912,21 @@ fn test_sample_flag() {
 }
 
 #[test]
+fn test_sample_zero_gives_clear_error() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--sample", "0"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--sample must be at least 1"),
+        "Expected clear error for --sample 0, got: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_title_flag() {
     let output = vz_binary()
         .args(["fixtures/sales.csv", "-t", "bar", "--title", "Custom Title"])
