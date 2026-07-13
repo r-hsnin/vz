@@ -2955,6 +2955,64 @@ fn test_output_table_respects_sort_asc() {
 }
 
 #[test]
+fn test_output_table_respects_top_flag() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+        .args([
+            "fixtures/sales.csv",
+            "-o",
+            "table",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "--top",
+            "2",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.lines().collect();
+    // Header + separator + 2 data rows = 4 lines
+    assert_eq!(
+        lines.len(),
+        4,
+        "Expected 4 lines (header + sep + 2 rows), got {}:\n{}",
+        lines.len(),
+        stdout
+    );
+}
+
+#[test]
+fn test_output_markdown_respects_top_flag() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+        .args([
+            "fixtures/sales.csv",
+            "-o",
+            "markdown",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "--top",
+            "2",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.lines().collect();
+    // Markdown: header + separator + 2 data rows = 4 lines
+    assert_eq!(
+        lines.len(),
+        4,
+        "Expected 4 lines (header + sep + 2 rows), got {}:\n{}",
+        lines.len(),
+        stdout
+    );
+}
+
+#[test]
 fn test_output_markdown_respects_sort_desc() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
         .args([

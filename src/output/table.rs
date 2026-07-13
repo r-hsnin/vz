@@ -31,6 +31,7 @@ pub fn print_table(
         let (mut bar_data, _) =
             data_builder::aggregate_bar(rows, xi, yi, None, y_label.to_string(), agg);
         crate::oneshot::builders::sort_bar_data(&mut bar_data, cli.sort);
+        crate::oneshot::builders::truncate_bar_data(&mut bar_data, cli.top.or(cli.tail));
         print_two_col_values(
             &recommendation.x_column,
             y_label,
