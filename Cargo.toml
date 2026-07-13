@@ -10,7 +10,7 @@ repository = "https://github.com/r-hsnin/vz"
 homepage = "https://r-hsnin.github.io/vz/"
 keywords = ["cli", "visualization", "csv", "chart", "terminal"]
 categories = ["command-line-utilities", "visualization"]
-exclude = ["fixtures/", "tests/", "docs/", ".github/", "demo/"]
+exclude = ["fixtures/", "tests/", "docs/", ".github/", "demo/", "scripts/", "release-manifest.txt"]
 
 [dependencies]
 # CLI
