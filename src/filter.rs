@@ -243,4 +243,49 @@ mod tests {
         assert_eq!(result.rows.len(), 1);
         assert_eq!(result.rows[0][1], "1000");
     }
+
+    #[test]
+    fn test_parse_predicate_lte() {
+        let p = parse_predicate("score<=100").unwrap();
+        assert_eq!(p.column, "score");
+        assert_eq!(p.op, FilterOp::Lte);
+        assert_eq!(p.value, "100");
+    }
+
+    #[test]
+    fn test_filter_data_not_eq() {
+        let data = LoadedData {
+            headers: vec!["status".into(), "count".into()],
+            rows: vec![
+                vec!["active".into(), "10".into()],
+                vec!["inactive".into(), "5".into()],
+                vec!["active".into(), "8".into()],
+                vec!["pending".into(), "3".into()],
+            ],
+        };
+        let pred = parse_predicate("status!=active").unwrap();
+        let result = filter_data(data, &[pred]).unwrap();
+        assert_eq!(result.rows.len(), 2);
+        assert_eq!(result.rows[0][0], "inactive");
+        assert_eq!(result.rows[1][0], "pending");
+    }
+
+    #[test]
+    fn test_filter_data_gte_lte_numeric() {
+        let data = LoadedData {
+            headers: vec!["name".into(), "age".into()],
+            rows: vec![
+                vec!["Alice".into(), "25".into()],
+                vec!["Bob".into(), "30".into()],
+                vec!["Charlie".into(), "35".into()],
+                vec!["Dave".into(), "40".into()],
+            ],
+        };
+        let p1 = parse_predicate("age>=30").unwrap();
+        let p2 = parse_predicate("age<=35").unwrap();
+        let result = filter_data(data, &[p1, p2]).unwrap();
+        assert_eq!(result.rows.len(), 2);
+        assert_eq!(result.rows[0][0], "Bob");
+        assert_eq!(result.rows[1][0], "Charlie");
+    }
 }

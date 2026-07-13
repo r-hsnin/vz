@@ -448,6 +448,30 @@ mod tests {
         assert_eq!(data.rows[1][b_idx], ""); // missing → empty
     }
 
+    #[test]
+    fn test_load_ndjson_nested_objects_serialized() {
+        // Nested objects/arrays should be serialized as JSON strings (not panic)
+        let content = r#"{"name": "Alice", "address": {"city": "Tokyo", "zip": "100"}}
+{"name": "Bob", "address": {"city": "Osaka", "zip": "530"}}
+"#;
+        let data = load_ndjson(content).unwrap();
+        let addr_idx = data.headers.iter().position(|h| h == "address").unwrap();
+        let name_idx = data.headers.iter().position(|h| h == "name").unwrap();
+        assert_eq!(data.rows[0][name_idx], "Alice");
+        // Nested object rendered as JSON string
+        let addr_val = &data.rows[0][addr_idx];
+        assert!(
+            addr_val.contains("Tokyo"),
+            "Nested object should contain city value, got: {}",
+            addr_val
+        );
+        assert!(
+            addr_val.contains("zip"),
+            "Nested object should preserve structure, got: {}",
+            addr_val
+        );
+    }
+
     // --- CSV/TSV Loading Tests ---
 
     #[test]

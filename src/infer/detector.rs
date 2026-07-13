@@ -243,4 +243,20 @@ mod tests {
             .collect();
         assert_eq!(classify_by_cardinality(&values), DataType::Nominal);
     }
+
+    #[test]
+    fn test_detect_percentage_string_is_nominal() {
+        // "45%" contains non-numeric char '%', should NOT be quantitative
+        assert_eq!(detect_value_type("45%"), DataType::Nominal);
+        assert_eq!(detect_value_type("100%"), DataType::Nominal);
+        assert_eq!(detect_value_type("0.5%"), DataType::Nominal);
+    }
+
+    #[test]
+    fn test_detect_currency_string_is_nominal() {
+        // "$100" and "€50" contain currency symbols, should NOT be quantitative
+        assert_eq!(detect_value_type("$100"), DataType::Nominal);
+        assert_eq!(detect_value_type("€50"), DataType::Nominal);
+        assert_eq!(detect_value_type("¥1000"), DataType::Nominal);
+    }
 }

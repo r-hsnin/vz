@@ -559,6 +559,20 @@ mod tests {
     }
 
     #[test]
+    fn test_dedup_tick_labels_all_same() {
+        // When all tick labels are identical (e.g., axis with zero range),
+        // only the first should remain; rest become empty.
+        let ticks = vec![
+            "0".to_string(),
+            "0".to_string(),
+            "0".to_string(),
+            "0".to_string(),
+        ];
+        let deduped = dedup_tick_labels(&ticks);
+        assert_eq!(deduped, vec!["0", "", "", ""]);
+    }
+
+    #[test]
     fn test_split_y_axis_produces_two_areas() {
         let ticks = vec!["100".to_string(), "50".to_string(), "0".to_string()];
         let area = Rect::new(0, 0, 80, 24);
