@@ -388,6 +388,21 @@ fn test_color_column_produces_multi_series() {
 }
 
 #[test]
+fn test_color_column_not_found_errors() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-c", "nonexistent"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Color column 'nonexistent' not found"),
+        "Expected color column not found error, got: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_json_array_input() {
     let mut f = NamedTempFile::with_suffix(".json").unwrap();
     writeln!(

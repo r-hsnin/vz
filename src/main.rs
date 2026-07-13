@@ -262,6 +262,17 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
 
     validate_loaded_data(&data, file, &cli.filter, pre_filter_count)?;
 
+    // Validate -c column exists in the loaded data
+    if let Some(ref color_col) = cli.color_col {
+        if !data.headers.iter().any(|h| h == color_col) {
+            anyhow::bail!(
+                "Color column '{}' not found. Available columns: {}",
+                color_col,
+                data.headers.join(", ")
+            );
+        }
+    }
+
     let schema = infer_from_data(&data);
 
     if cli.info {
