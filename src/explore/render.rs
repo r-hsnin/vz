@@ -121,13 +121,13 @@ fn build_header(app: &ExploreApp) -> Paragraph<'static> {
         .schema
         .columns
         .get(app.selected_x)
-        .map(|c| format!("{:?}", c.data_type))
+        .map(|c| c.data_type.to_string())
         .unwrap_or_else(|| "?".to_string());
     let y_type = app
         .schema
         .columns
         .get(app.selected_y)
-        .map(|c| format!("{:?}", c.data_type))
+        .map(|c| c.data_type.to_string())
         .unwrap_or_else(|| "?".to_string());
     let chart_type = app.effective_chart_type();
     let row_count = app.data.len();

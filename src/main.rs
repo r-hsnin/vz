@@ -46,10 +46,7 @@ fn print_info(file: &Path, data: &LoadedData, schema: &infer::types::Schema) {
         let stats = output::stats_text::compute_column_stats_text(i, &col.data_type, data);
         println!(
             "{:<20} {:<15} {:>6}  {}",
-            col.name,
-            format!("{:?}", col.data_type),
-            col.null_count,
-            stats
+            col.name, col.data_type, col.null_count, stats
         );
     }
     println!();

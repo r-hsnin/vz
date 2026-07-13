@@ -234,7 +234,7 @@ fn no_chart_error(schema: &Schema) -> String {
     let type_summary: Vec<String> = schema
         .columns
         .iter()
-        .map(|c| format!("{}={:?}", c.name, c.data_type))
+        .map(|c| format!("{}={}", c.name, c.data_type))
         .collect();
     format!(
         "Could not determine chart type. Detected columns: [{}]. \
@@ -411,8 +411,8 @@ mod tests {
         let rec = select_chart(&schema, None, None);
         assert!(rec.is_err());
         let err = rec.unwrap_err();
-        assert!(err.contains("id=Nominal"));
-        assert!(err.contains("description=Nominal"));
+        assert!(err.contains("id=Text"));
+        assert!(err.contains("description=Text"));
         assert!(err.contains("Hint: specify axes with -x and -y"));
     }
 

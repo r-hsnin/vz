@@ -815,12 +815,9 @@ fn test_info_flag_shows_column_metadata() {
     assert!(stdout.contains("date"), "Missing column 'date'");
     assert!(stdout.contains("city"), "Missing column 'city'");
     assert!(stdout.contains("revenue"), "Missing column 'revenue'");
-    assert!(stdout.contains("Temporal"), "Missing type 'Temporal'");
+    assert!(stdout.contains("Date/Time"), "Missing type 'Date/Time'");
     assert!(stdout.contains("Categorical"), "Missing type 'Categorical'");
-    assert!(
-        stdout.contains("Quantitative"),
-        "Missing type 'Quantitative'"
-    );
+    assert!(stdout.contains("Numeric"), "Missing type 'Numeric'");
     // Should show row count
     assert!(stdout.contains("6"), "Missing row count '6'");
 }
