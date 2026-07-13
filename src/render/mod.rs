@@ -151,7 +151,7 @@ pub struct HeatmapData {
 }
 
 /// Format a number concisely for tick labels.
-fn format_number(val: f64) -> String {
+pub(crate) fn format_number(val: f64) -> String {
     let abs = val.abs();
     if abs >= 1_000_000_000_000.0 {
         format!("{:.1}T", val / 1_000_000_000_000.0)
@@ -168,11 +168,6 @@ fn format_number(val: f64) -> String {
     } else {
         format!("{:.1}", val)
     }
-}
-
-/// Public re-export of format_number for use in submodules.
-pub fn format_number_pub(val: f64) -> String {
-    format_number(val)
 }
 
 /// Compute histogram bins from raw values.
@@ -333,11 +328,7 @@ fn render_y_axis_frame_inner(
         }
     }
 
-    let y_ticks: Vec<String> = tick_vals
-        .iter()
-        .rev()
-        .map(|&v| format_number_pub(v))
-        .collect();
+    let y_ticks: Vec<String> = tick_vals.iter().rev().map(|&v| format_number(v)).collect();
     let y_ticks = dedup_tick_labels(&y_ticks);
 
     let (y_area, chart_area) = split_y_axis(*area, &y_ticks);

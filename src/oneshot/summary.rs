@@ -2,7 +2,7 @@
 
 use crate::chart::selector::{ChartRecommendation, ChartType};
 use crate::cli::AggFunction;
-use crate::render::format_number_pub;
+use crate::render::format_number;
 
 use super::ansi;
 
@@ -105,8 +105,8 @@ fn format_y_part(
             format!(
                 "y={} ({}–{})",
                 y_display,
-                format_number_pub(min),
-                format_number_pub(max)
+                format_number(min),
+                format_number(max)
             )
         } else {
             format!("y={}", y_display)

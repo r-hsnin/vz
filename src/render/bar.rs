@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Bar, BarChart as RatatuiBarChart, BarGroup, Block, Borders, Widget},
 };
 
-use super::{BarChartData, SERIES_COLORS, format_number_pub};
+use super::{BarChartData, SERIES_COLORS, format_number};
 
 /// Bar chart widget wrapping ratatui's BarChart with Y-axis tick labels.
 pub struct BarChart<'a> {
@@ -104,9 +104,9 @@ fn build_bars<'a>(
             let scaled = (value * scale_factor).round() as u64;
             let text = if show_labels && total > 0.0 {
                 let pct = (value / total * 100.0).round() as u32;
-                format!("{} ({}%)", format_number_pub(value), pct)
+                format!("{} ({}%)", format_number(value), pct)
             } else {
-                format_number_pub(value)
+                format_number(value)
             };
             Bar::default()
                 .label(Line::from(label.clone()))
