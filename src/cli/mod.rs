@@ -16,7 +16,7 @@ pub struct Cli {
     #[arg(short = 'x', long = "x-col")]
     pub x_col: Option<String>,
 
-    /// Column to use for Y axis. Supports label override with "col:Label".
+    /// Column(s) for Y axis. Comma-separated for multi-series. Supports "col:Label" override.
     #[arg(short = 'y', long = "y-col")]
     pub y_col: Option<String>,
 
@@ -52,7 +52,7 @@ pub struct Cli {
     #[arg(short = 'f', long = "format", value_enum)]
     pub format: Option<InputFormatArg>,
 
-    /// Filter rows: col=value or col>value or col<value (repeatable).
+    /// Filter rows: col=value, col!=value, col>value, col>=value, col<value, col<=value (repeatable).
     #[arg(short = 'w', long = "where", value_name = "FILTER")]
     pub filter: Vec<String>,
 
@@ -72,7 +72,7 @@ pub struct Cli {
     #[arg(long = "title")]
     pub title: Option<String>,
 
-    /// Output format: text (default), json (machine-readable), or table.
+    /// Output format: text (default), json, table, spark, svg, markdown.
     #[arg(short = 'o', long = "output", value_enum)]
     pub output: Option<OutputFormat>,
 
