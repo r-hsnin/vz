@@ -60,9 +60,15 @@ pub fn build_summary_parts(ctx: &SummaryContext<'_>) -> Vec<String> {
         ));
     }
     parts.push(if ctx.skipped_rows > 0 {
-        format!("{} rows ({} skipped)", ctx.rows.len(), ctx.skipped_rows)
+        format!(
+            "{} {} ({} skipped)",
+            ctx.rows.len(),
+            if ctx.rows.len() == 1 { "row" } else { "rows" },
+            ctx.skipped_rows
+        )
     } else {
-        format!("{} rows", ctx.rows.len())
+        let n = ctx.rows.len();
+        format!("{} {}", n, if n == 1 { "row" } else { "rows" })
     });
 
     let extra_names: Vec<&str> = ctx

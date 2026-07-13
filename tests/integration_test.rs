@@ -1284,7 +1284,7 @@ fn test_where_filter_multiple() {
     assert!(output.status.success(), "Failed: {}", stderr);
     // Tokyo + revenue>1500 should give 1 row
     assert!(
-        stderr.contains("1 rows"),
+        stderr.contains("1 row"),
         "Expected 1 filtered row, got: '{}'",
         stderr
     );
