@@ -103,6 +103,8 @@ fn warn_incompatible_flags(chart_type: ChartType, opts: &RenderOptions<'_>) {
     if opts.sort_order.is_some()
         && opts.sort_order != Some(SortOrder::None)
         && !matches!(chart_type, ChartType::Bar)
+        && opts.limit.is_none()
+    // Don't warn about sort when it was implied by --top/--tail
     {
         eprintln!(
             "warning: --sort has no effect on {} charts (only applies to bar charts)",
@@ -127,6 +129,13 @@ fn warn_incompatible_flags(chart_type: ChartType, opts: &RenderOptions<'_>) {
     if opts.bins.is_some() && !matches!(chart_type, ChartType::Histogram) {
         eprintln!(
             "warning: --bins has no effect on {} charts (only applies to histogram charts)",
+            chart_type
+        );
+    }
+
+    if opts.limit.is_some() && !matches!(chart_type, ChartType::Bar) {
+        eprintln!(
+            "warning: --top/--tail has no effect on {} charts (only applies to bar charts)",
             chart_type
         );
     }

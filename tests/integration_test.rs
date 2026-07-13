@@ -1045,6 +1045,21 @@ fn test_sort_on_line_chart_warns() {
 }
 
 #[test]
+fn test_top_on_non_bar_chart_warns() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--top", "3"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--top/--tail") && stderr.contains("bar"),
+        "Expected warning about --top/--tail only applying to bar charts, got stderr: '{}'",
+        stderr
+    );
+}
+
+#[test]
 fn test_bar_type_override_prefers_categorical_x() {
     // sales.csv has: date(temporal), city(categorical), revenue(quantitative), profit(quantitative)
     // When user says -t bar without -x, the X axis should be categorical (city) not temporal (date)
