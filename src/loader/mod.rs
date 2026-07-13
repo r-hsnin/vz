@@ -158,6 +158,14 @@ fn load_delimited_no_header(content: &str, delimiter: u8) -> Result<LoadedData> 
 /// Load a JSON array of objects.
 /// Expected format: [{"col1": val1, "col2": val2}, ...]
 fn load_json_array(content: &str) -> Result<LoadedData> {
+    let trimmed = content.trim_start();
+    if trimmed.starts_with('{') {
+        anyhow::bail!(
+            "Input is a single JSON object, not an array.\n\n  \
+             vz expects a JSON array of objects: [{{\"col\": \"val\"}}, ...]\n  \
+             Tip: wrap in brackets, or use NDJSON format (-f ndjson) for single objects."
+        );
+    }
     let values: Vec<serde_json::Value> =
         serde_json::from_str(content).context("Failed to parse JSON array")?;
     objects_to_tabular(values)
