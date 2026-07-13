@@ -518,3 +518,41 @@ fn test_parse_inline_spans_code() {
     assert_eq!(spans[1].content, "code");
     assert_eq!(spans[1].style.fg, Some(Color::Yellow));
 }
+
+#[test]
+fn test_parse_inline_spans_empty_string() {
+    let spans = parse_inline_spans("");
+    assert_eq!(spans.len(), 1);
+    assert_eq!(spans[0].content, "");
+}
+
+#[test]
+fn test_parse_inline_spans_unclosed_bold() {
+    // "**" without a closing pair — the italic matcher picks up the two *'s
+    let spans = parse_inline_spans("hello **world");
+    assert!(!spans.is_empty());
+    // All original text content is preserved (markers consumed as formatting)
+    let reconstructed: String = spans.iter().map(|s| s.content.as_ref()).collect();
+    assert_eq!(reconstructed, "hello world");
+}
+
+#[test]
+fn test_parse_inline_spans_unclosed_italic() {
+    // Single "*" with no closing — treated as plain text
+    let spans = parse_inline_spans("hello * world");
+    assert_eq!(spans.len(), 1);
+    assert_eq!(spans[0].content, "hello * world");
+}
+
+#[test]
+fn test_parse_inline_spans_empty_bold_markers() {
+    // Adjacent "****" — opening "**" and immediately closing "**" with empty content
+    let spans = parse_inline_spans("before **** after");
+    assert!(
+        spans
+            .iter()
+            .any(|s| s.style.add_modifier.contains(Modifier::BOLD))
+    );
+    let reconstructed: String = spans.iter().map(|s| s.content.as_ref()).collect();
+    assert_eq!(reconstructed, "before  after");
+}
