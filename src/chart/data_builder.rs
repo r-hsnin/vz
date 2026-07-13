@@ -10,12 +10,9 @@ use crate::render::{Axis, BarChartData, ChartConfig, HistogramData, Series};
 pub const MAX_CHART_POINTS: usize = 5000;
 
 /// Pick `count` evenly spaced items from a slice of strings.
-/// Returns all items if the slice is smaller than or equal to `count + 2`.
+/// Returns all items if the slice is empty or `count >= items.len()`.
 pub fn pick_evenly(items: &[String], count: usize) -> Vec<String> {
-    if items.is_empty() {
-        return vec![];
-    }
-    if items.len() <= count + 2 {
+    if items.is_empty() || count >= items.len() {
         return items.to_vec();
     }
     let step = (items.len() - 1) as f64 / (count - 1) as f64;
@@ -278,7 +275,13 @@ pub fn build_chart_config(
 fn compute_x_labels(x_is_non_numeric: bool, raw_x_strings: &[String]) -> Option<Vec<String>> {
     if x_is_non_numeric && !raw_x_strings.is_empty() {
         let unique = unique_ordered(raw_x_strings);
-        Some(pick_evenly(&unique, 5))
+        // Show all labels when close to target count (avoids confusing elision)
+        let target = 5;
+        if unique.len() <= target + 2 {
+            Some(unique)
+        } else {
+            Some(pick_evenly(&unique, target))
+        }
     } else {
         None
     }

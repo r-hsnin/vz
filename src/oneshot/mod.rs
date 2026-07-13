@@ -302,18 +302,7 @@ pub(crate) fn fit_labels_to_width(labels: &[String], available_width: usize) -> 
     if labels.len() <= labels_that_fit {
         return labels.to_vec();
     }
-    pick_evenly(labels, labels_that_fit)
-}
-
-/// Pick n items evenly spaced from a slice, always including first and last.
-fn pick_evenly(items: &[String], n: usize) -> Vec<String> {
-    if n >= items.len() {
-        return items.to_vec();
-    }
-    let step = (items.len() - 1) as f64 / (n - 1) as f64;
-    (0..n)
-        .map(|i| items[(i as f64 * step).round() as usize].clone())
-        .collect()
+    data_builder::pick_evenly(labels, labels_that_fit)
 }
 
 /// Resolve the chart type: use override if given, otherwise use the recommended type.
