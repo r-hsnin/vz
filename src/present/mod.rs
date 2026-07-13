@@ -235,11 +235,11 @@ pub fn parse_inline_spans(text: &str) -> Vec<Span<'static>> {
 /// Run the Present mode TUI.
 pub fn run_present(path: &Path, theme: crate::theme::Theme) -> Result<()> {
     let content = std::fs::read_to_string(path)
-        .with_context(|| format!("Failed to read presentation file: {:?}", path))?;
+        .with_context(|| format!("Failed to read presentation file: {}", path.display()))?;
     let presentation = parse_presentation(&content);
 
     if presentation.slides.is_empty() {
-        anyhow::bail!("No slides found in {:?}", path);
+        anyhow::bail!("No slides found in {}", path.display());
     }
 
     // Resolve the base directory for relative chart source paths

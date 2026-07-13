@@ -27,7 +27,7 @@ pub fn print_summary(ctx: &SummaryContext<'_>) {
 
 /// Build the summary parts vector (pure logic, no IO).
 pub fn build_summary_parts(ctx: &SummaryContext<'_>) -> Vec<String> {
-    let mut parts = vec![format!("{}", ctx.chart_type)];
+    let mut parts = vec![ctx.chart_type.to_string()];
     parts.push(format!("x={}", ctx.recommendation.x_column));
 
     if let Some(ref y) = ctx.recommendation.y_column {

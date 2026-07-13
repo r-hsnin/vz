@@ -79,7 +79,8 @@ pub fn load_data_full(
         std::io::stdin().read_to_string(&mut buf)?;
         expand_literal_escapes_if_needed(buf)
     } else {
-        std::fs::read_to_string(path).with_context(|| format!("Failed to read file: {:?}", path))?
+        std::fs::read_to_string(path)
+            .with_context(|| format!("Failed to read file: {}", path.display()))?
     };
 
     let format = format_override.unwrap_or_else(|| detect_format(path, &content));

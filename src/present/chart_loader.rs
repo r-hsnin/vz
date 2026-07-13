@@ -33,8 +33,9 @@ pub fn load_chart_data(
 
     let mut data = crate::loader::load_data(&path).with_context(|| {
         format!(
-            "Chart source not found: {} (tried: {:?})",
-            block.source, path
+            "Chart source not found: {} (tried: {})",
+            block.source,
+            path.display()
         )
     })?;
 
