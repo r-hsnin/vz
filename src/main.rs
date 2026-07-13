@@ -238,6 +238,10 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
 
 /// Single render pass: load → infer → render. Used by both normal and watch modes.
 fn render_once(cli: &Cli, file: &Path) -> Result<()> {
+    if cli.bins == Some(0) {
+        anyhow::bail!("--bins must be at least 1");
+    }
+
     let data = loader::load_data_full(file, cli.no_header, format_override(cli))?;
     let pre_filter_count = data.rows.len();
     let data = apply_filters(data, &cli.filter)?;

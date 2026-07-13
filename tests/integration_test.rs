@@ -2614,6 +2614,21 @@ fn test_bins_flag_controls_histogram_bin_count() {
 }
 
 #[test]
+fn test_bins_zero_gives_clear_error() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--bins", "0"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--bins must be at least 1"),
+        "Expected clear error for --bins 0, got: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_bins_flag_warns_on_non_histogram() {
     let output = vz_binary()
         .args(["fixtures/sales.csv", "-t", "bar", "--bins", "20"])
