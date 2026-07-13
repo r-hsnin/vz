@@ -434,8 +434,7 @@ fn build_recommendation(
     y_opts: &YOptions,
 ) -> Result<chart::selector::ChartRecommendation> {
     let x_hint = cli.x_col.as_deref().map(|s| parse_column_spec(s).0);
-    let mut recommendation = chart::select_chart(schema, x_hint, y_opts.hint.as_deref())
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    let mut recommendation = chart::select_chart(schema, x_hint, y_opts.hint.as_deref())?;
 
     if cli.chart_type == Some(cli::ChartTypeArg::Bar) && cli.x_col.is_none() {
         adjust_bar_recommendation(&mut recommendation, schema);

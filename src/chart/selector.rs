@@ -1,3 +1,5 @@
+use anyhow::{Result, bail};
+
 use crate::infer::types::{ColumnMeta, DataType, Schema};
 
 /// Supported chart types.
@@ -36,7 +38,7 @@ pub fn select_chart(
     schema: &Schema,
     x_hint: Option<&str>,
     y_hint: Option<&str>,
-) -> Result<ChartRecommendation, String> {
+) -> Result<ChartRecommendation> {
     // If user specified both axes, use them
     if let (Some(x_name), Some(y_name)) = (x_hint, y_hint) {
         let x_col = validate_column(schema, x_name)?;
@@ -65,9 +67,9 @@ pub fn select_chart(
 }
 
 /// Validate that a column exists in the schema, returning a descriptive error if not.
-fn validate_column<'a>(schema: &'a Schema, name: &str) -> Result<&'a ColumnMeta, String> {
+fn validate_column<'a>(schema: &'a Schema, name: &str) -> Result<&'a ColumnMeta> {
     schema.find_column(name).ok_or_else(|| {
-        format!(
+        anyhow::anyhow!(
             "Column '{}' not found. Available columns: {}",
             name,
             schema
@@ -81,7 +83,7 @@ fn validate_column<'a>(schema: &'a Schema, name: &str) -> Result<&'a ColumnMeta,
 }
 
 /// Select chart with Y column fixed by user hint, auto-picking the best X.
-fn select_with_y_hint(schema: &Schema, y_name: &str) -> Result<ChartRecommendation, String> {
+fn select_with_y_hint(schema: &Schema, y_name: &str) -> Result<ChartRecommendation> {
     let y_col = validate_column(schema, y_name)?;
     let temporal_cols = schema.columns_of_type(DataType::Temporal);
     let cat_cols = schema.columns_of_type(DataType::Categorical);
@@ -130,7 +132,7 @@ fn select_with_y_hint(schema: &Schema, y_name: &str) -> Result<ChartRecommendati
 }
 
 /// Select chart with X column fixed by user hint, auto-picking the best Y.
-fn select_with_x_hint(schema: &Schema, x_name: &str) -> Result<ChartRecommendation, String> {
+fn select_with_x_hint(schema: &Schema, x_name: &str) -> Result<ChartRecommendation> {
     let x_col = validate_column(schema, x_name)?;
     let quant_cols: Vec<&ColumnMeta> = schema
         .columns_of_type(DataType::Quantitative)
@@ -159,11 +161,11 @@ fn select_with_x_hint(schema: &Schema, x_name: &str) -> Result<ChartRecommendati
         });
     }
 
-    Err(format!(
+    bail!(
         "Cannot find a suitable Y axis column to pair with '{}'. \
          Hint: add a numeric column or specify -y explicitly.",
         x_name
-    ))
+    )
 }
 
 /// Determine chart type from a pair of data types.
@@ -180,7 +182,7 @@ fn chart_type_for_pair(x_type: DataType, y_type: DataType) -> ChartType {
 }
 
 /// Auto-select chart based on schema column types.
-fn auto_select(schema: &Schema) -> Result<ChartRecommendation, String> {
+fn auto_select(schema: &Schema) -> Result<ChartRecommendation> {
     let temporal_cols = schema.columns_of_type(DataType::Temporal);
     let quant_cols = schema.columns_of_type(DataType::Quantitative);
     let cat_cols = schema.columns_of_type(DataType::Categorical);
@@ -235,7 +237,7 @@ fn auto_select(schema: &Schema) -> Result<ChartRecommendation, String> {
         });
     }
 
-    Err(no_chart_error(schema))
+    bail!("{}", no_chart_error(schema))
 }
 
 /// Build a descriptive error when no chart type can be inferred.
@@ -376,7 +378,7 @@ mod tests {
         let schema = make_schema(vec![("date", DataType::Temporal)]);
         let rec = select_chart(&schema, Some("nonexistent"), Some("also_bad"));
         assert!(rec.is_err());
-        let err = rec.unwrap_err();
+        let err = rec.unwrap_err().to_string();
         assert!(err.contains("nonexistent"));
         assert!(err.contains("Available columns: date"));
     }
@@ -411,7 +413,7 @@ mod tests {
         let schema = make_schema(vec![]);
         let rec = select_chart(&schema, None, None);
         assert!(rec.is_err());
-        assert!(rec.unwrap_err().contains("No columns detected"));
+        assert!(rec.unwrap_err().to_string().contains("No columns detected"));
     }
 
     #[test]
@@ -422,7 +424,7 @@ mod tests {
         ]);
         let rec = select_chart(&schema, None, None);
         assert!(rec.is_err());
-        let err = rec.unwrap_err();
+        let err = rec.unwrap_err().to_string();
         assert!(err.contains("id=Text"));
         assert!(err.contains("description=Text"));
         assert!(err.contains("Hint: specify axes with -x and -y"));
@@ -496,7 +498,7 @@ mod tests {
         ]);
         let rec = select_chart(&schema, None, Some("nonexistent"));
         assert!(rec.is_err());
-        assert!(rec.unwrap_err().contains("nonexistent"));
+        assert!(rec.unwrap_err().to_string().contains("nonexistent"));
     }
 
     #[test]
@@ -507,6 +509,6 @@ mod tests {
         ]);
         let rec = select_chart(&schema, Some("nonexistent"), None);
         assert!(rec.is_err());
-        assert!(rec.unwrap_err().contains("nonexistent"));
+        assert!(rec.unwrap_err().to_string().contains("nonexistent"));
     }
 }
