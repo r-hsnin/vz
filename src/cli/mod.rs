@@ -57,7 +57,7 @@ pub struct Cli {
     pub filter: Vec<String>,
 
     /// Show only the top N categories (by Y value, descending). Implies --sort desc.
-    #[arg(long = "top", value_name = "N")]
+    #[arg(long = "top", value_name = "N", conflicts_with = "tail")]
     pub top: Option<usize>,
 
     /// Show only the bottom N categories (by Y value, ascending). Implies --sort asc.
