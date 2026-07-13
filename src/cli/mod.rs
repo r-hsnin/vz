@@ -238,6 +238,22 @@ pub enum ThemeArg {
     HighContrast,
 }
 
+impl Cli {
+    /// Compute the effective sort order, considering --top (implies desc) and --tail (implies asc).
+    pub fn effective_sort(&self) -> Option<SortOrder> {
+        if self.sort.is_some() {
+            return self.sort;
+        }
+        if self.top.is_some() {
+            return Some(SortOrder::Desc);
+        }
+        if self.tail.is_some() {
+            return Some(SortOrder::Asc);
+        }
+        None
+    }
+}
+
 /// Parse a column spec that may include a label override.
 /// "revenue" → ("revenue", None)
 /// "revenue:Revenue (USD)" → ("revenue", Some("Revenue (USD)"))
@@ -260,6 +276,30 @@ pub fn parse_multi_y_specs(spec: &str) -> Vec<(&str, Option<&str>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_effective_sort_explicit_sort_takes_priority() {
+        let cli = Cli::try_parse_from(["vz", "data.csv", "--sort", "asc", "--top", "5"]).unwrap();
+        assert_eq!(cli.effective_sort(), Some(SortOrder::Asc));
+    }
+
+    #[test]
+    fn test_effective_sort_top_implies_desc() {
+        let cli = Cli::try_parse_from(["vz", "data.csv", "--top", "3"]).unwrap();
+        assert_eq!(cli.effective_sort(), Some(SortOrder::Desc));
+    }
+
+    #[test]
+    fn test_effective_sort_tail_implies_asc() {
+        let cli = Cli::try_parse_from(["vz", "data.csv", "--tail", "3"]).unwrap();
+        assert_eq!(cli.effective_sort(), Some(SortOrder::Asc));
+    }
+
+    #[test]
+    fn test_effective_sort_none_by_default() {
+        let cli = Cli::try_parse_from(["vz", "data.csv"]).unwrap();
+        assert_eq!(cli.effective_sort(), None);
+    }
 
     #[test]
     fn test_parse_column_spec_simple() {

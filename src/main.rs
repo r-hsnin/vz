@@ -80,7 +80,7 @@ fn print_chart_json(
             .chart_type
             .map(|ct| ct.to_chart_type())
             .unwrap_or(recommendation.chart_type),
-        sort: effective_sort(cli),
+        sort: cli.effective_sort(),
         agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
         limit: cli.top.or(cli.tail),
         extra_y_columns: y_opts.extra_columns.clone(),
@@ -197,7 +197,7 @@ fn print_spark(
     let params = output::spark::SparkParams {
         chart_type_override: cli.chart_type,
         agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
-        sort: effective_sort(cli),
+        sort: cli.effective_sort(),
         limit: cli.top.or(cli.tail),
         color_col: cli.color_col.clone(),
     };
@@ -378,7 +378,7 @@ fn build_render_options<'a>(cli: &'a Cli, y_opts: &'a YOptions) -> oneshot::Rend
         y_label_override: y_opts.label_override.as_deref(),
         width: cli.width,
         height: cli.height,
-        sort_order: effective_sort(cli),
+        sort_order: cli.effective_sort(),
         extra_y_columns: y_opts.extra_columns.clone(),
         limit: cli.top.or(cli.tail),
         agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
@@ -433,20 +433,6 @@ fn build_recommendation(
     }
 
     Ok(recommendation)
-}
-
-/// Determine effective sort order: --top implies desc, --tail implies asc.
-fn effective_sort(cli: &Cli) -> Option<cli::SortOrder> {
-    if cli.sort.is_some() {
-        return cli.sort;
-    }
-    if cli.top.is_some() {
-        return Some(cli::SortOrder::Desc);
-    }
-    if cli.tail.is_some() {
-        return Some(cli::SortOrder::Asc);
-    }
-    None
 }
 
 /// Convert CLI format argument to loader InputFormat.
