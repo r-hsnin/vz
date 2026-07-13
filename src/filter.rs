@@ -85,8 +85,9 @@ pub fn filter_data(data: LoadedData, predicates: &[Predicate]) -> Result<LoadedD
                 .position(|h| h == &p.column)
                 .with_context(|| {
                     format!(
-                        "Filter column '{}' not found. Available: {:?}",
-                        p.column, data.headers
+                        "Filter column '{}' not found. Available columns: {}",
+                        p.column,
+                        data.headers.join(", ")
                     )
                 })?;
             Ok((idx, &p.op, p.value.as_str()))
