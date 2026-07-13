@@ -1,0 +1,26 @@
+{
+  "name": "looper-3agent",
+  "description": "3フェーズ自律ループ: 分析(3並列) → 実装 → 評価",
+  "prompt": "file://./looper-3agent.prompt.md",
+  "tools": ["*"],
+  "allowedTools": ["@builtin"],
+  "includeMcpJson": true,
+  "toolsSettings": {
+    "shell": {
+      "autoAllowReadonly": true,
+      "deniedCommands": [
+        "rm -rf .*",
+        "git push.*",
+        "git reset --hard.*"
+      ]
+    }
+  },
+  "resources": [
+    "file://.kiro/steering/**/*.md",
+    "file://~/.kiro/steering/**/*.md",
+    "file://RULES.md",
+    "file://PROGRESS.md",
+    "skill://.kiro/skills/**/SKILL.md",
+    "skill://~/.kiro/skills/**/SKILL.md"
+  ]
+}
