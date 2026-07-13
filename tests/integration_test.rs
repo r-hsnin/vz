@@ -2629,6 +2629,36 @@ fn test_bins_zero_gives_clear_error() {
 }
 
 #[test]
+fn test_top_zero_gives_clear_error() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--top", "0"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--top must be at least 1"),
+        "Expected clear error for --top 0, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_tail_zero_gives_clear_error() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--tail", "0"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--tail must be at least 1"),
+        "Expected clear error for --tail 0, got: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_bins_flag_warns_on_non_histogram() {
     let output = vz_binary()
         .args(["fixtures/sales.csv", "-t", "bar", "--bins", "20"])
