@@ -1,0 +1,24 @@
+# release-manifest.txt — 公開許可リスト
+# ここに記載されたパスのみ origin (public) に反映される
+# 新しいファイルを公開する場合はここに追加すること
+#
+# フォーマット:
+#   - ディレクトリは末尾に / をつける（配下すべて許可）
+#   - ファイルはそのまま記載
+#   - # で始まる行と空行は無視
+
+.github/
+.gitignore
+CONTRIBUTING.md
+Cargo.lock
+Cargo.toml
+DESIGN.md
+LICENSE
+README.md
+RUNBOOK.md
+demo/
+docs/
+fixtures/
+skill/
+src/
+tests/

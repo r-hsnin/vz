@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# pre-push hook — origin への直接 push を阻止
+# release ブランチ (release/*) のみ許可、それ以外は拒否
+#
+# インストール: git config core.hooksPath scripts/hooks
+
+remote="$1"
+url="$2"
+
+# origin 以外は素通り
+if [[ "$remote" != "origin" ]]; then
+  exit 0
+fi
+
+# push されるブランチを確認
+while read -r local_ref local_oid remote_ref remote_oid; do
+  # tag push は常に許可
+  if [[ "$remote_ref" == refs/tags/* ]]; then
+    continue
+  fi
+
+  branch="${remote_ref#refs/heads/}"
+
+  # release/* ブランチは許可（スクリプト経由）
+  if [[ "$branch" == release/* ]]; then
+    continue
+  fi
+
+  # それ以外は拒否
+  echo ""
+  echo "⛔ BLOCKED: Direct push to origin/$branch is not allowed."
+  echo ""
+  echo "   origin (public) へは scripts/release.sh 経由で PR を作成してください。"
+  echo ""
+  echo "   Usage: ./scripts/release.sh <version-tag> [--dry-run]"
+  echo ""
+  echo "   バイパス (非推奨): git push --no-verify"
+  echo ""
+  exit 1
+done
+
+exit 0
