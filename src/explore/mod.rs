@@ -101,10 +101,7 @@ impl ExploreApp {
         // Notify when chart type auto-changes due to column navigation
         let new_chart_type = self.effective_chart_type();
         if new_chart_type != prev_chart_type && self.chart_type_override.is_none() {
-            self.status_message = Some(format!(
-                "auto: {:?} → {:?}",
-                prev_chart_type, new_chart_type
-            ));
+            self.status_message = Some(format!("auto: {} → {}", prev_chart_type, new_chart_type));
         }
     }
 
@@ -342,6 +339,13 @@ pub fn run_explore(
     if data.is_empty() {
         anyhow::bail!("No data rows to explore");
     }
+
+    // In headless/CI environments, skip the TUI event loop to prevent hangs.
+    // Tests use this to verify CLI flag parsing without entering the interactive loop.
+    if std::env::var("VZ_TEST_HEADLESS").is_ok() {
+        return Ok(());
+    }
+
     let mut terminal = ratatui::init();
     let mut app = ExploreApp::new(schema, data, theme);
 

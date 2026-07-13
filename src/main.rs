@@ -112,7 +112,7 @@ fn print_recommendation(schema: &Schema) {
                 .map(|c| format!(", color={}", c))
                 .unwrap_or_default();
             println!(
-                "Recommendation: {:?} (x={}{}{})",
+                "Recommendation: {} (x={}{}{})",
                 rec.chart_type, rec.x_column, y_part, color_part
             );
         }

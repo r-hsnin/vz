@@ -80,7 +80,7 @@ pub fn build_info_output(
         .collect();
 
     let rec = recommendation.map(|r| RecommendationOutput {
-        chart_type: format!("{:?}", r.chart_type).to_lowercase(),
+        chart_type: r.chart_type.to_string().to_lowercase(),
         x: r.x_column.clone(),
         y: r.y_column.clone(),
         color: r.color_column.clone(),

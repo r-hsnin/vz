@@ -101,28 +101,28 @@ fn warn_incompatible_flags(chart_type: ChartType, opts: &RenderOptions<'_>) {
         && !matches!(chart_type, ChartType::Bar)
     {
         eprintln!(
-            "warning: --sort has no effect on {:?} charts (only applies to bar charts)",
+            "warning: --sort has no effect on {} charts (only applies to bar charts)",
             chart_type
         );
     }
 
     if opts.agg != AggFunction::Sum && !matches!(chart_type, ChartType::Bar) {
         eprintln!(
-            "warning: --agg has no effect on {:?} charts (only applies to bar charts)",
+            "warning: --agg has no effect on {} charts (only applies to bar charts)",
             chart_type
         );
     }
 
     if opts.labels && !matches!(chart_type, ChartType::Bar) {
         eprintln!(
-            "warning: --labels has no effect on {:?} charts (only applies to bar charts)",
+            "warning: --labels has no effect on {} charts (only applies to bar charts)",
             chart_type
         );
     }
 
     if opts.bins.is_some() && !matches!(chart_type, ChartType::Histogram) {
         eprintln!(
-            "warning: --bins has no effect on {:?} charts (only applies to histogram charts)",
+            "warning: --bins has no effect on {} charts (only applies to histogram charts)",
             chart_type
         );
     }

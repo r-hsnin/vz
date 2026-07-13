@@ -216,7 +216,7 @@ fn render_chart_placeholder(
     } else {
         // Fallback: show chart block info
         let info = format!(
-            "📊 Chart: source={}, type={:?}",
+            "📊 Chart: source={}, type={}",
             block.source,
             block.chart_type.unwrap_or(ChartType::Line)
         );

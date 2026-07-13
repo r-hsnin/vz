@@ -10,6 +10,18 @@ pub enum ChartType {
     Heatmap,
 }
 
+impl std::fmt::Display for ChartType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChartType::Line => write!(f, "Line"),
+            ChartType::Bar => write!(f, "Bar"),
+            ChartType::Scatter => write!(f, "Scatter"),
+            ChartType::Histogram => write!(f, "Histogram"),
+            ChartType::Heatmap => write!(f, "Heatmap"),
+        }
+    }
+}
+
 /// Chart recommendation with axis assignments.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChartRecommendation {

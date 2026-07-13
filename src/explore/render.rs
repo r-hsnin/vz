@@ -146,7 +146,7 @@ fn build_header(app: &ExploreApp) -> Paragraph<'static> {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw(format!(
-            "│ X: {} ({}) │ Y: {} ({}) │ {:?} │ {} rows{}",
+            "│ X: {} ({}) │ Y: {} ({}) │ {} │ {} rows{}",
             x_name, x_type, y_name, y_type, chart_type, row_count, color_info
         )),
     ]);

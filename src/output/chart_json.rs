@@ -150,7 +150,7 @@ fn build_series_json(
         series.push(json!({"name": name, "data": pts}));
     }
 
-    json!({ "type": format!("{:?}", params.chart_type).to_lowercase(), "series": series })
+    json!({ "type": params.chart_type.to_string().to_lowercase(), "series": series })
 }
 
 /// Build series JSON grouped by color column values.
@@ -181,7 +181,7 @@ fn build_grouped_series_json(
         .map(|(name, data)| json!({"name": name, "data": data}))
         .collect();
 
-    json!({ "type": format!("{:?}", params.chart_type).to_lowercase(), "series": series })
+    json!({ "type": params.chart_type.to_string().to_lowercase(), "series": series })
 }
 
 #[cfg(test)]
