@@ -18,16 +18,25 @@ impl<'a> HeatmapChart<'a> {
     }
 }
 
-/// Map a count value to a color intensity (darker = higher count).
+/// Map a count value to a color intensity using a perceptually uniform gradient.
+/// Palette: dark teal (low) → cyan (mid) → yellow (high).
 fn count_to_color(count: usize, max_count: usize) -> Color {
     if max_count == 0 || count == 0 {
         return Color::DarkGray;
     }
-    let ratio = count as f64 / max_count as f64;
-    // Gradient from dark blue (low) through cyan to white (high)
-    let r = (ratio * 255.0) as u8;
-    let g = (ratio * 255.0) as u8;
-    let b = 128 + (ratio * 127.0) as u8;
+    let t = count as f64 / max_count as f64;
+    // 3-stop sequential gradient optimized for dark terminals
+    let (r, g, b) = if t < 0.5 {
+        let s = t * 2.0;
+        (
+            (20.0 + s * 10.0) as u8,
+            (60.0 + s * 195.0) as u8,
+            (120.0 + s * 135.0) as u8,
+        )
+    } else {
+        let s = (t - 0.5) * 2.0;
+        ((30.0 + s * 225.0) as u8, 255, (255.0 - s * 255.0) as u8)
+    };
     Color::Rgb(r, g, b)
 }
 
@@ -198,7 +207,8 @@ mod tests {
     #[test]
     fn test_count_to_color_max() {
         let color = count_to_color(10, 10);
-        assert_eq!(color, Color::Rgb(255, 255, 255));
+        // At t=1.0: r=255, g=255, b=0 (yellow)
+        assert_eq!(color, Color::Rgb(255, 255, 0));
     }
 
     #[test]
