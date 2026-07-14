@@ -182,6 +182,8 @@ revenue  ▁▂▃▅▇  (100–500) ↑ +400%
 | Single Quantitative | — | Histogram |
 | Categorical | Categorical | Heatmap |
 
+When axes are specified in reverse order (e.g. Quantitative × Temporal), vz automatically assigns the correct chart type. Unmatched combinations default to Bar.
+
 ## Explore Mode Keybindings
 
 | Key | Action |
