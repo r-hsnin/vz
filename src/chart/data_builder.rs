@@ -84,8 +84,8 @@ fn collect_groups(
     let mut rows_used = 0usize;
 
     for row in rows {
-        let label = match row.get(x_idx) {
-            Some(l) if !l.is_empty() => l.clone(),
+        let label_ref = match row.get(x_idx) {
+            Some(l) if !l.is_empty() => l.as_str(),
             _ => continue,
         };
 
@@ -99,10 +99,10 @@ fn collect_groups(
         };
 
         rows_used += 1;
-        if let Some(entry) = groups.iter_mut().find(|(l, _)| l == &label) {
+        if let Some(entry) = groups.iter_mut().find(|(l, _)| l == label_ref) {
             entry.1.push(value);
         } else {
-            groups.push((label, vec![value]));
+            groups.push((label_ref.to_owned(), vec![value]));
         }
     }
 

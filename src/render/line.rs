@@ -88,7 +88,7 @@ impl<'a> Widget for XYChart<'a> {
             .map(|(i, series)| {
                 let spec = dataset_spec(self.mode, series.data.len());
                 Dataset::default()
-                    .name(series.name.clone())
+                    .name(series.name.as_str())
                     .marker(spec.marker)
                     .graph_type(spec.graph_type)
                     .style(Style::default().fg(self.color_at(i)))
@@ -103,13 +103,14 @@ impl<'a> Widget for XYChart<'a> {
         let title = self
             .config
             .title
-            .clone()
-            .unwrap_or_else(|| default_title.to_string());
+            .as_deref()
+            .unwrap_or(default_title)
+            .to_string();
 
         let axis_style = Style::default().fg(self.config.axis_color.unwrap_or(Color::DarkGray));
 
         let x_axis = RatatuiAxis::default()
-            .title(self.config.x_axis.label.clone())
+            .title(self.config.x_axis.label.as_str())
             .bounds([self.config.x_axis.min, self.config.x_axis.max])
             .labels(
                 self.config
@@ -120,7 +121,7 @@ impl<'a> Widget for XYChart<'a> {
             .style(axis_style);
 
         let y_axis = RatatuiAxis::default()
-            .title(self.config.y_axis.label.clone())
+            .title(self.config.y_axis.label.as_str())
             .bounds([self.config.y_axis.min, self.config.y_axis.max])
             .labels(self.config.y_axis.tick_labels(5))
             .style(axis_style);
