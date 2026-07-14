@@ -1,8 +1,8 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Style},
-    text::Line,
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Bar, BarChart as RatatuiBarChart, BarGroup, Block, Borders, Widget},
 };
 
@@ -51,7 +51,13 @@ impl<'a> Widget for BarChart<'a> {
         let chart = RatatuiBarChart::default()
             .block(
                 Block::default()
-                    .title(title)
+                    .title(
+                        Line::from(Span::styled(
+                            title,
+                            Style::default().add_modifier(Modifier::BOLD),
+                        ))
+                        .centered(),
+                    )
                     .borders(Borders::TOP | Borders::RIGHT | Borders::BOTTOM),
             )
             .bar_width(bar_width)

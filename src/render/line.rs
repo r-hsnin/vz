@@ -1,8 +1,9 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     symbols::Marker,
+    text::{Line as TextLine, Span},
     widgets::{Axis as RatatuiAxis, Block, Borders, Chart, Dataset, GraphType, Widget},
 };
 
@@ -125,7 +126,17 @@ impl<'a> Widget for XYChart<'a> {
             .style(axis_style);
 
         let chart = Chart::new(datasets)
-            .block(Block::default().title(title).borders(Borders::ALL))
+            .block(
+                Block::default()
+                    .title(
+                        TextLine::from(Span::styled(
+                            title,
+                            Style::default().add_modifier(Modifier::BOLD),
+                        ))
+                        .centered(),
+                    )
+                    .borders(Borders::ALL),
+            )
             .x_axis(x_axis)
             .y_axis(y_axis);
 

@@ -1,7 +1,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     widgets::Widget,
 };
 
@@ -102,7 +102,13 @@ impl Widget for HeatmapChart<'_> {
 
         if let Some(ref title) = data.title {
             let title_str: String = title.chars().take(area.width as usize).collect();
-            buf.set_string(area.x, area.y, &title_str, Style::default());
+            let title_x = area.x + (area.width.saturating_sub(title_str.len() as u16)) / 2;
+            buf.set_string(
+                title_x,
+                area.y,
+                &title_str,
+                Style::default().add_modifier(Modifier::BOLD),
+            );
         }
 
         render_legend(data.max_count, area, buf);
@@ -235,8 +241,9 @@ mod tests {
         let mut buf = Buffer::empty(area);
         HeatmapChart::new(&data).render(area, &mut buf);
 
-        // Check title rendered
-        let first_line: String = (0..4)
+        // Check title rendered (centered: x = (40 - 4) / 2 = 18)
+        let title_x = (40u16 - 4) / 2;
+        let first_line: String = (title_x..title_x + 4)
             .map(|x| buf.cell((x, 0)).unwrap().symbol().to_string())
             .collect();
         assert_eq!(first_line.trim(), "Test");

@@ -1,8 +1,8 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Style},
-    text::Line,
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Bar, BarChart as RatatuiBarChart, BarGroup, Block, Borders, Widget},
 };
 
@@ -99,7 +99,13 @@ fn render_histogram_bars(
     let chart = RatatuiBarChart::default()
         .block(
             Block::default()
-                .title(title.to_string())
+                .title(
+                    Line::from(Span::styled(
+                        title.to_string(),
+                        Style::default().add_modifier(Modifier::BOLD),
+                    ))
+                    .centered(),
+                )
                 .borders(Borders::TOP | Borders::RIGHT | Borders::BOTTOM),
         )
         .bar_width(bar_width)
