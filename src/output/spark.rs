@@ -17,6 +17,7 @@ pub struct SparkParams {
     pub sort: Option<SortOrder>,
     pub limit: Option<usize>,
     pub color_col: Option<String>,
+    pub bins: Option<usize>,
 }
 
 /// Print sparkline output: single-line, grouped, or aggregated for bar charts.
@@ -32,12 +33,39 @@ pub fn print_spark(
         .as_ref()
         .and_then(|y| data_builder::column_index(headers, y));
     let y_name = recommendation.y_column.as_deref().unwrap_or("value");
+
+    let chart_type = oneshot::resolve_chart_type(recommendation, params.chart_type_override);
+
+    // Histogram with no Y column: bin the X column values and sparkline the counts
+    if y_idx.is_none() && chart_type == ChartType::Histogram {
+        if let Some(xi) = x_idx {
+            let values: Vec<f64> = rows
+                .iter()
+                .filter_map(|r| r.get(xi)?.parse::<f64>().ok())
+                .collect();
+            if values.is_empty() {
+                println!("{}", recommendation.x_column);
+                return;
+            }
+            let bin_count = params.bins.unwrap_or(10);
+            let bins = crate::render::compute_bins(&values, bin_count);
+            let counts: Vec<f64> = bins.iter().map(|(_, _, c)| *c as f64).collect();
+            let spark = make_sparkline(&counts);
+            let range = util::min_max(&values)
+                .map(|(min, max)| format!("({}–{})", format_number(min), format_number(max)))
+                .unwrap_or_default();
+            let x_name = &recommendation.x_column;
+            println!("{x_name}  {spark}  {range} {} rows", values.len());
+            return;
+        }
+        println!("▄");
+        return;
+    }
+
     let Some(yi) = y_idx else {
         println!("▄");
         return;
     };
-
-    let chart_type = oneshot::resolve_chart_type(recommendation, params.chart_type_override);
 
     // For bar charts, aggregate values by category then sparkline
     if chart_type == ChartType::Bar
@@ -147,6 +175,7 @@ mod tests {
             sort: None,
             limit: None,
             color_col: None,
+            bins: None,
         }
     }
 

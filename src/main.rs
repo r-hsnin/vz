@@ -207,6 +207,7 @@ fn print_spark(
         sort: cli.effective_sort(),
         limit: cli.top.or(cli.tail),
         color_col: cli.color_col.clone(),
+        bins: cli.bins,
     };
     output::spark::print_spark(recommendation, headers, rows, &params);
 }
