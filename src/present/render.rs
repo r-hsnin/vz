@@ -142,10 +142,9 @@ fn render_element(
             let lines: Vec<Line> = items
                 .iter()
                 .map(|item| {
-                    Line::from(vec![
-                        Span::styled("  • ", Style::default().fg(Color::Yellow)),
-                        Span::raw(item.clone()),
-                    ])
+                    let mut spans = vec![Span::styled("  • ", Style::default().fg(Color::Yellow))];
+                    spans.extend(parse_inline_spans(item));
+                    Line::from(spans)
                 })
                 .collect();
             frame.render_widget(Paragraph::new(lines), area);
@@ -173,13 +172,12 @@ fn render_element(
                 .iter()
                 .enumerate()
                 .map(|(idx, item)| {
-                    Line::from(vec![
-                        Span::styled(
-                            format!("  {}. ", idx + 1),
-                            Style::default().fg(Color::Yellow),
-                        ),
-                        Span::raw(item.clone()),
-                    ])
+                    let mut spans = vec![Span::styled(
+                        format!("  {}. ", idx + 1),
+                        Style::default().fg(Color::Yellow),
+                    )];
+                    spans.extend(parse_inline_spans(item));
+                    Line::from(spans)
                 })
                 .collect();
             frame.render_widget(Paragraph::new(lines), area);
