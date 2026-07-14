@@ -190,7 +190,7 @@ fn render_element(
     }
 }
 
-/// Render a fenced code block with syntax-highlighted border.
+/// Render a fenced code block with line numbers and border.
 fn render_code_block(
     frame: &mut Frame,
     language: Option<&str>,
@@ -198,13 +198,25 @@ fn render_code_block(
     area: ratatui::layout::Rect,
 ) {
     let title = language.map(|l| format!(" {} ", l)).unwrap_or_default();
+    let line_count = content.lines().count();
+    let gutter_width = if line_count >= 100 {
+        4
+    } else if line_count >= 10 {
+        3
+    } else {
+        2
+    };
     let code_lines: Vec<Line> = content
         .lines()
-        .map(|l| {
-            Line::from(Span::styled(
-                l.to_string(),
-                Style::default().fg(Color::Green),
-            ))
+        .enumerate()
+        .map(|(i, l)| {
+            Line::from(vec![
+                Span::styled(
+                    format!("{:>width$} │ ", i + 1, width = gutter_width),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled(l.to_string(), Style::default().fg(Color::Green)),
+            ])
         })
         .collect();
     let block_widget = Block::default()
