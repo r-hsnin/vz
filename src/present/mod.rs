@@ -33,6 +33,11 @@ pub enum SlideElement {
     Heading { level: u8, text: String },
     /// Numbered/ordered list.
     OrderedList(Vec<String>),
+    /// Markdown table (GFM-style).
+    Table {
+        headers: Vec<String>,
+        rows: Vec<Vec<String>>,
+    },
 }
 
 /// Configuration for a chart embedded in a slide.

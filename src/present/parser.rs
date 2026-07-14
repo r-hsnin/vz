@@ -22,6 +22,7 @@ struct ParseContext {
     code_language: Option<String>,
     code_lines: Vec<String>,
     text_buffer: String,
+    table_lines: Vec<String>,
 }
 
 impl ParseContext {
@@ -36,6 +37,7 @@ impl ParseContext {
             code_language: None,
             code_lines: Vec::new(),
             text_buffer: String::new(),
+            table_lines: Vec::new(),
         }
     }
 
@@ -50,6 +52,9 @@ impl ParseContext {
             return;
         }
         if self.try_fenced_block_start(line) {
+            return;
+        }
+        if self.try_table_line(line) {
             return;
         }
         if self.try_heading(line) {
@@ -104,6 +109,7 @@ impl ParseContext {
         if line.trim() != "---" {
             return false;
         }
+        self.flush_table();
         self.flush_text();
         self.push_slide_if_nonempty();
         true
@@ -114,6 +120,7 @@ impl ParseContext {
         if !trimmed.starts_with("```") {
             return false;
         }
+        self.flush_table();
         self.flush_text();
         let lang = trimmed.strip_prefix("```").unwrap_or("").trim();
         if lang == "chart" {
@@ -131,10 +138,45 @@ impl ParseContext {
         true
     }
 
+    fn try_table_line(&mut self, line: &str) -> bool {
+        let trimmed = line.trim();
+        if trimmed.starts_with('|') && trimmed.ends_with('|') && trimmed.len() >= 3 {
+            self.flush_text();
+            self.table_lines.push(trimmed.to_string());
+            return true;
+        }
+        // Not a table line — flush any accumulated table
+        self.flush_table();
+        false
+    }
+
+    fn flush_table(&mut self) {
+        if self.table_lines.is_empty() {
+            return;
+        }
+        // Need at least header + separator (2 lines) to be a valid table
+        if self.table_lines.len() >= 2 && is_separator_row(&self.table_lines[1]) {
+            let headers = parse_table_row(&self.table_lines[0]);
+            let rows: Vec<Vec<String>> = self.table_lines[2..]
+                .iter()
+                .map(|l| parse_table_row(l))
+                .collect();
+            self.current_elements
+                .push(SlideElement::Table { headers, rows });
+        } else {
+            // Not a valid table — push as text
+            for line in &self.table_lines {
+                self.current_elements.push(SlideElement::Text(line.clone()));
+            }
+        }
+        self.table_lines.clear();
+    }
+
     fn try_heading(&mut self, line: &str) -> bool {
         if !line.starts_with("# ") {
             return false;
         }
+        self.flush_table();
         self.flush_text();
         self.push_slide_if_nonempty();
         self.current_title = Some(line.trim_start_matches("# ").to_string());
@@ -220,12 +262,30 @@ impl ParseContext {
     }
 
     fn finalize(mut self) -> Presentation {
+        self.flush_table();
         self.flush_text();
         self.push_slide_if_nonempty();
         Presentation {
             slides: self.slides,
         }
     }
+}
+
+/// Check if a table line is a separator row (e.g., `|---|---|`).
+fn is_separator_row(line: &str) -> bool {
+    let inner = line.trim_matches('|');
+    inner.split('|').all(|cell| {
+        let trimmed = cell.trim();
+        !trimmed.is_empty() && trimmed.chars().all(|c| c == '-' || c == ':' || c == ' ')
+    })
+}
+
+/// Parse a GFM table row into cells.
+fn parse_table_row(line: &str) -> Vec<String> {
+    line.trim_matches('|')
+        .split('|')
+        .map(|cell| cell.trim().to_string())
+        .collect()
 }
 
 /// Parse chart block key-value pairs.
@@ -425,6 +485,80 @@ mod tests {
         assert_eq!(elems.len(), 2, "Expected 2 elements, got {:?}", elems);
         assert!(matches!(&elems[0], SlideElement::Chart(_)));
         assert!(matches!(&elems[1], SlideElement::Code { .. }));
+    }
+
+    #[test]
+    fn test_table_basic_parsing() {
+        let content = "# Data\n\n| Name | Age |\n|------|-----|\n| Alice | 30 |\n| Bob | 25 |";
+        let pres = parse_presentation(content);
+        let elems = &pres.slides[0].content;
+        assert_eq!(elems.len(), 1, "Expected 1 table element, got {:?}", elems);
+        match &elems[0] {
+            SlideElement::Table { headers, rows } => {
+                assert_eq!(headers, &["Name", "Age"]);
+                assert_eq!(rows.len(), 2);
+                assert_eq!(rows[0], &["Alice", "30"]);
+                assert_eq!(rows[1], &["Bob", "25"]);
+            }
+            other => panic!("Expected Table element, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_table_with_alignment_markers() {
+        let content =
+            "# Slide\n\n| Left | Center | Right |\n|:-----|:------:|------:|\n| a | b | c |";
+        let pres = parse_presentation(content);
+        let elems = &pres.slides[0].content;
+        match &elems[0] {
+            SlideElement::Table { headers, rows } => {
+                assert_eq!(headers, &["Left", "Center", "Right"]);
+                assert_eq!(rows.len(), 1);
+                assert_eq!(rows[0], &["a", "b", "c"]);
+            }
+            other => panic!("Expected Table element, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_table_interleaved_with_text() {
+        let content = "# Slide\n\nBefore\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nAfter";
+        let pres = parse_presentation(content);
+        let elems = &pres.slides[0].content;
+        assert_eq!(elems.len(), 3, "Expected 3 elements, got {:?}", elems);
+        assert!(matches!(&elems[0], SlideElement::Text(t) if t == "Before"));
+        assert!(matches!(&elems[1], SlideElement::Table { .. }));
+        assert!(matches!(&elems[2], SlideElement::Text(t) if t == "After"));
+    }
+
+    #[test]
+    fn test_table_without_separator_treated_as_text() {
+        // A pipe line without a separator row is not a valid table
+        let content = "# Slide\n\n| Not | A | Table |\n| just | pipes | here |";
+        let pres = parse_presentation(content);
+        let elems = &pres.slides[0].content;
+        // Should produce Text elements, not a Table
+        assert!(
+            !elems
+                .iter()
+                .any(|e| matches!(e, SlideElement::Table { .. })),
+            "Should not produce a Table without separator row, got {:?}",
+            elems
+        );
+    }
+
+    #[test]
+    fn test_table_header_only_no_rows() {
+        let content = "# Slide\n\n| Col1 | Col2 |\n|------|------|";
+        let pres = parse_presentation(content);
+        let elems = &pres.slides[0].content;
+        match &elems[0] {
+            SlideElement::Table { headers, rows } => {
+                assert_eq!(headers, &["Col1", "Col2"]);
+                assert!(rows.is_empty());
+            }
+            other => panic!("Expected Table element, got {:?}", other),
+        }
     }
 }
 

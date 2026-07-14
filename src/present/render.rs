@@ -4,8 +4,8 @@ use ratatui::{
     Frame,
     layout::{Constraint, Layout},
     style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    text::{Line, Span, Text},
+    widgets::{Block, Borders, Paragraph, Row, Table, Wrap},
 };
 use std::path::Path;
 
@@ -110,6 +110,7 @@ fn element_constraint(el: &SlideElement) -> Constraint {
         }
         SlideElement::Heading { .. } => Constraint::Length(2),
         SlideElement::OrderedList(items) => Constraint::Length(items.len() as u16 + 1),
+        SlideElement::Table { rows, .. } => Constraint::Length(rows.len() as u16 + 4),
     }
 }
 
@@ -173,6 +174,9 @@ fn render_element(
                 .collect();
             frame.render_widget(Paragraph::new(lines), area);
         }
+        SlideElement::Table { headers, rows } => {
+            render_slide_table(frame, headers, rows, area);
+        }
     }
 }
 
@@ -224,6 +228,44 @@ fn render_chart_placeholder(
             Paragraph::new(info).block(Block::default().title("Chart").borders(Borders::ALL));
         frame.render_widget(placeholder, area);
     }
+}
+
+/// Render a GFM markdown table using ratatui's Table widget.
+fn render_slide_table(
+    frame: &mut Frame,
+    headers: &[String],
+    rows: &[Vec<String>],
+    area: ratatui::layout::Rect,
+) {
+    let header_cells: Vec<Text> = headers
+        .iter()
+        .map(|h| {
+            Text::styled(
+                h.clone(),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+        })
+        .collect();
+    let header_row = Row::new(header_cells).height(1);
+
+    let data_rows: Vec<Row> = rows
+        .iter()
+        .map(|r| Row::new(r.iter().map(|c| Text::raw(c.clone())).collect::<Vec<_>>()))
+        .collect();
+
+    let col_count = headers.len().max(1);
+    let widths: Vec<Constraint> = (0..col_count)
+        .map(|_| Constraint::Percentage((100 / col_count as u16).max(1)))
+        .collect();
+
+    let table = Table::new(data_rows, widths).header(header_row).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::DarkGray)),
+    );
+    frame.render_widget(table, area);
 }
 
 #[cfg(test)]
@@ -295,6 +337,15 @@ mod tests {
     fn test_element_constraint_ordered_list() {
         let el = SlideElement::OrderedList(vec!["one".into(), "two".into()]);
         assert_eq!(element_constraint(&el), Constraint::Length(3)); // 2 items + 1
+    }
+
+    #[test]
+    fn test_element_constraint_table() {
+        let el = SlideElement::Table {
+            headers: vec!["A".into(), "B".into()],
+            rows: vec![vec!["1".into(), "2".into()], vec!["3".into(), "4".into()]],
+        };
+        assert_eq!(element_constraint(&el), Constraint::Length(6)); // 2 rows + 4
     }
 
     #[test]
