@@ -178,6 +178,8 @@ fn render_help_overlay(frame: &mut Frame) {
         Line::raw(" h / l (←/→)   Change X axis column"),
         Line::raw(" j / k (↑/↓)   Change Y axis column"),
         Line::raw(" c              Cycle color/group column"),
+        Line::raw(" s              Cycle sort (desc/asc/off)"),
+        Line::raw(" a              Cycle aggregation function"),
         Line::raw(" y              Yank equivalent command"),
         Line::raw(" 1-4            Force chart type"),
         Line::raw("                (Line/Bar/Scatter/Hist)"),

@@ -3,7 +3,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 use crate::chart::data_builder;
 use crate::chart::selector::{ChartRecommendation, ChartType, select_chart};
-use crate::cli::AggFunction;
+use crate::cli::{AggFunction, SortOrder};
 use crate::infer::types::{DataType, Schema};
 use crate::render::{BarChartData, ChartConfig, HistogramData};
 
@@ -31,6 +31,10 @@ pub struct ExploreApp {
     pub show_help: bool,
     /// Color theme for chart rendering.
     pub theme: crate::theme::Theme,
+    /// Sort order for bar charts.
+    pub sort_order: Option<SortOrder>,
+    /// Aggregation function for bar charts.
+    pub agg_function: AggFunction,
 }
 
 impl ExploreApp {
@@ -49,6 +53,8 @@ impl ExploreApp {
             status_message: Some("? help │ h/l axis │ j/k col │ d table │ q quit".to_string()),
             show_help: false,
             theme,
+            sort_order: None,
+            agg_function: AggFunction::Sum,
         }
     }
 
@@ -95,6 +101,8 @@ impl ExploreApp {
             KeyCode::Char('0') => self.chart_type_override = None,
             KeyCode::Char('c') => self.cycle_color_column(),
             KeyCode::Char('y') => self.yank_command(),
+            KeyCode::Char('s') => self.cycle_sort(),
+            KeyCode::Char('a') => self.cycle_agg(),
             _ => {}
         }
 
@@ -181,6 +189,41 @@ impl ExploreApp {
         };
     }
 
+    /// Cycle sort order: None → Desc → Asc → None.
+    fn cycle_sort(&mut self) {
+        self.sort_order = match self.sort_order {
+            None => Some(SortOrder::Desc),
+            Some(SortOrder::Desc) => Some(SortOrder::Asc),
+            Some(SortOrder::Asc) | Some(SortOrder::None) => None,
+        };
+        let label = match self.sort_order {
+            None => "sort: off",
+            Some(SortOrder::Desc) => "sort: desc",
+            Some(SortOrder::Asc) => "sort: asc",
+            Some(SortOrder::None) => "sort: off",
+        };
+        self.status_message = Some(label.to_string());
+    }
+
+    /// Cycle aggregation function: Sum → Mean → Count → Max → Min → Sum.
+    fn cycle_agg(&mut self) {
+        self.agg_function = match self.agg_function {
+            AggFunction::Sum => AggFunction::Mean,
+            AggFunction::Mean => AggFunction::Count,
+            AggFunction::Count => AggFunction::Max,
+            AggFunction::Max => AggFunction::Min,
+            AggFunction::Min => AggFunction::Sum,
+        };
+        let label = match self.agg_function {
+            AggFunction::Sum => "agg: sum",
+            AggFunction::Mean => "agg: mean",
+            AggFunction::Count => "agg: count",
+            AggFunction::Max => "agg: max",
+            AggFunction::Min => "agg: min",
+        };
+        self.status_message = Some(label.to_string());
+    }
+
     /// Generate the equivalent oneshot command for the current view.
     fn yank_command(&mut self) {
         let x = self.x_label();
@@ -198,7 +241,19 @@ impl ExploreApp {
             .and_then(|i| self.schema.columns.get(i))
             .map(|c| format!(" -c {}", c.name))
             .unwrap_or_default();
-        let cmd = format!("vz <FILE> -x {x} -y {y}{type_flag}{color_part}");
+        let sort_part = match self.sort_order {
+            Some(SortOrder::Desc) => " --sort desc",
+            Some(SortOrder::Asc) => " --sort asc",
+            _ => "",
+        };
+        let agg_part = match self.agg_function {
+            AggFunction::Sum => "",
+            AggFunction::Mean => " --agg mean",
+            AggFunction::Count => " --agg count",
+            AggFunction::Max => " --agg max",
+            AggFunction::Min => " --agg min",
+        };
+        let cmd = format!("vz <FILE> -x {x} -y {y}{type_flag}{color_part}{sort_part}{agg_part}");
         self.status_message = Some(cmd);
     }
 
@@ -269,8 +324,9 @@ impl ExploreApp {
             self.selected_y,
             Some(title),
             y_label,
-            AggFunction::Sum,
+            self.agg_function,
         );
+        crate::oneshot::builders::sort_bar_data(&mut data, self.sort_order);
         data.axis_color = Some(self.theme.axis_color);
         data
     }
