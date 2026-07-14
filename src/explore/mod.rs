@@ -74,7 +74,6 @@ impl ExploreApp {
 
     pub fn handle_key(&mut self, key: KeyCode) {
         let prev_chart_type = self.effective_chart_type();
-
         // If help overlay is showing, any key dismisses it
         if self.show_help {
             self.show_help = false;
@@ -84,16 +83,18 @@ impl ExploreApp {
         match key {
             KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
             KeyCode::Char('?') => self.show_help = true,
-            KeyCode::Char('d') | KeyCode::Tab => {
-                self.view_mode = match self.view_mode {
-                    ViewMode::Chart => ViewMode::Table,
-                    ViewMode::Table => ViewMode::Chart,
-                };
-            }
+            KeyCode::Char('d') | KeyCode::Tab => match self.view_mode {
+                ViewMode::Chart => self.view_mode = ViewMode::Table,
+                ViewMode::Table => self.view_mode = ViewMode::Chart,
+            },
             KeyCode::Char('h') | KeyCode::Left => self.navigate_x(-1),
             KeyCode::Char('l') | KeyCode::Right => self.navigate_x(1),
             KeyCode::Char('j') | KeyCode::Down => self.navigate_y(1),
             KeyCode::Char('k') | KeyCode::Up => self.navigate_y(-1),
+            KeyCode::Char('G') | KeyCode::End => self.navigate_y(isize::MAX),
+            KeyCode::Char('g') | KeyCode::Home => self.navigate_y(isize::MIN),
+            KeyCode::PageDown => self.navigate_y(12),
+            KeyCode::PageUp => self.navigate_y(-12),
             KeyCode::Char('1') => self.chart_type_override = Some(ChartType::Line),
             KeyCode::Char('2') => self.chart_type_override = Some(ChartType::Bar),
             KeyCode::Char('3') => self.chart_type_override = Some(ChartType::Scatter),
@@ -129,16 +130,19 @@ impl ExploreApp {
         }
     }
 
-    /// Move Y axis column selection or scroll table.
+    /// Move Y axis column or scroll table. Large magnitude = page/jump.
     fn navigate_y(&mut self, direction: isize) {
         if self.view_mode == ViewMode::Table {
-            if direction > 0 {
-                if self.table_offset < self.data.len().saturating_sub(1) {
-                    self.table_offset += 1;
-                }
-            } else {
-                self.table_offset = self.table_offset.saturating_sub(1);
+            let max = self.data.len().saturating_sub(1);
+            match direction {
+                isize::MAX => self.table_offset = max,
+                isize::MIN => self.table_offset = 0,
+                d if d > 0 => self.table_offset = (self.table_offset + d as usize).min(max),
+                d => self.table_offset = self.table_offset.saturating_sub(d.unsigned_abs()),
             }
+            return;
+        }
+        if direction.unsigned_abs() > 1 {
             return;
         }
         let max_idx = self.schema.columns.len().saturating_sub(1);
@@ -602,6 +606,24 @@ mod tests {
         assert_eq!(app.table_offset, 0);
         // Should not go below 0
         app.handle_key(KeyCode::Char('k'));
+        assert_eq!(app.table_offset, 0);
+    }
+
+    #[test]
+    fn test_table_jump_and_page_navigation() {
+        let mut app = make_test_app();
+        app.handle_key(KeyCode::Char('d'));
+        app.handle_key(KeyCode::Char('G'));
+        assert_eq!(app.table_offset, app.data.len() - 1);
+        app.handle_key(KeyCode::Char('g'));
+        assert_eq!(app.table_offset, 0);
+        app.handle_key(KeyCode::PageDown);
+        assert_eq!(app.table_offset, 3);
+        app.handle_key(KeyCode::PageUp);
+        assert_eq!(app.table_offset, 0);
+        // G is noop in chart mode
+        app.handle_key(KeyCode::Char('d'));
+        app.handle_key(KeyCode::Char('G'));
         assert_eq!(app.table_offset, 0);
     }
 
