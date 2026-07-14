@@ -78,6 +78,24 @@ vz sales.csv -W 80 -H 20
 # Sort bar chart
 vz sales.csv -x city -y revenue -t bar --sort desc
 
+# Show top 5 categories
+vz sales.csv -x city -y revenue -t bar --top 5
+
+# Aggregation: mean instead of default sum
+vz sales.csv -x city -y revenue -t bar --agg mean
+
+# Count rows per category (auto-applies count aggregation)
+vz sales.csv -x city -t bar
+
+# Show value and percentage labels on bars
+vz sales.csv -x city -y revenue -t bar --labels
+
+# Custom histogram bins
+vz data.csv -y age -t histogram --bins 20
+
+# Filter rows
+vz sales.csv -x city -y revenue -w "revenue>=1000"
+
 # Headerless data
 vz raw_numbers.csv --no-header
 
@@ -101,7 +119,7 @@ vz present slides.md
 | `-W` | `--width` | Chart width in columns (default: terminal width) |
 | `-H` | `--height` | Chart height in rows (default: 24) |
 | `-I` | `--info` | Show column metadata without rendering a chart |
-| `-w` | `--where` | Filter rows: `col=value`, `col>value`, `col<value` (repeatable) |
+| `-w` | `--where` | Filter rows: `col=value`, `col!=value`, `col>value`, `col>=value`, `col<value`, `col<=value` (repeatable) |
 | `-o` | `--output` | Output format: `text`, `json`, `table`, `spark`, `svg`, `markdown` |
 | `-Y` | `--all-y` | Plot all quantitative columns as multi-series overlay |
 | | `--no-header` | Treat first row as data (auto-detected if all-numeric) |
