@@ -54,6 +54,42 @@ fn render_chart(frame: &mut Frame, app: &ExploreApp, area: ratatui::layout::Rect
     frame.render_widget(ChartWidget(&chart_data), area);
 }
 
+/// Compute content-aware column widths based on header names and visible data.
+/// Samples visible rows and caps each column between 4 and 40 characters.
+/// If total exceeds available width, proportionally shrinks wider columns.
+fn compute_column_widths(
+    columns: &[crate::infer::types::ColumnMeta],
+    visible_data: &[Vec<String>],
+    available_width: u16,
+) -> Vec<Constraint> {
+    if columns.is_empty() {
+        return vec![];
+    }
+    let col_count = columns.len();
+    let mut col_widths: Vec<u16> = (0..col_count)
+        .map(|ci| {
+            let header_len = columns[ci].name.len() as u16;
+            let max_data_len = visible_data
+                .iter()
+                .map(|row| row.get(ci).map(|v| v.len() as u16).unwrap_or(0))
+                .max()
+                .unwrap_or(0);
+            header_len.max(max_data_len).clamp(4, 40)
+        })
+        .collect();
+
+    // Add 1 char padding per column for separators
+    let total: u16 = col_widths.iter().sum::<u16>() + col_count.saturating_sub(1) as u16;
+    if total > available_width && available_width > 0 {
+        let ratio = available_width as f64 / total as f64;
+        for w in &mut col_widths {
+            *w = ((*w as f64 * ratio) as u16).max(4);
+        }
+    }
+
+    col_widths.into_iter().map(Constraint::Length).collect()
+}
+
 fn render_table(frame: &mut Frame, app: &ExploreApp, area: ratatui::layout::Rect) {
     let col_count = app.schema.columns.len();
     let header_cells: Vec<&str> = app.schema.columns.iter().map(|c| c.name.as_str()).collect();
@@ -90,9 +126,11 @@ fn render_table(frame: &mut Frame, app: &ExploreApp, area: ratatui::layout::Rect
         })
         .collect();
 
-    let widths: Vec<Constraint> = (0..col_count)
-        .map(|_| Constraint::Percentage((100 / col_count.max(1)) as u16))
-        .collect();
+    let widths: Vec<Constraint> = compute_column_widths(
+        &app.schema.columns,
+        &app.data[app.table_offset..end],
+        area.width.saturating_sub(2), // subtract border width
+    );
 
     let table = Table::new(visible_rows, widths).header(header_row).block(
         Block::default()
