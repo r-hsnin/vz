@@ -163,7 +163,7 @@ Summary line components:
 - Non-sum aggregation label: `y=mean(revenue)`
 - Color legend with series-color mapping
 - Row count with skip notation: `6 rows (2 skipped)`
-- Unused columns hint: `+2: profit, tax (try -y revenue,profit or -c profit)`
+- Unused columns hint: `+1: profit (try -y revenue,profit or -c profit)`
 
 Bar charts automatically aggregate (sum) values by category. When only an X column is specified with no Y column, count aggregation is auto-applied.
 
@@ -232,7 +232,7 @@ Supported chart block parameters:
 | `bins` | Number of histogram bins |
 | `height` | Chart height in rows |
 
-Navigate: `←`/`→` or `h`/`l` or `Space`/`Backspace`, jump: `g`/`G` or type slide number + `Enter`, quit: `q`/`Esc`
+Navigate: `←`/`→` or `h`/`l` or `Space`/`Enter`/`Backspace`, jump: `g`/`G`/`Home`/`End` or type slide number + `Enter`, quit: `q`/`Esc`
 
 ## Supported Input Formats
 
