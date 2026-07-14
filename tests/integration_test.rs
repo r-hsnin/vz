@@ -2256,18 +2256,33 @@ fn test_spark_output_mode() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let trimmed = stdout.trim();
     assert!(!trimmed.is_empty(), "Expected sparkline output");
-    // Format: "column_name  ▂▅▃▁█▇"
+    // Format: "column_name  ▂▅▃▁█▇  (min–max) ↑ +N%"
     assert!(
         trimmed.contains("revenue"),
         "Expected column name in spark output, got: {}",
         trimmed
     );
-    let spark_part = trimmed.split("  ").last().unwrap_or("");
+    let parts: Vec<&str> = trimmed.split("  ").collect();
+    assert!(
+        parts.len() >= 2,
+        "Expected at least label and sparkline parts, got: {}",
+        trimmed
+    );
+    let spark_part = parts[1];
     assert!(
         spark_part.chars().all(|c| "▁▂▃▄▅▆▇█".contains(c)),
-        "Expected only sparkline chars after label, got: {}",
+        "Expected only sparkline chars in second segment, got: {}",
         spark_part
     );
+    // Stats suffix should contain range info
+    if parts.len() >= 3 {
+        let stats_part = parts[2..].join("  ");
+        assert!(
+            stats_part.contains('(') && stats_part.contains(')'),
+            "Expected range in stats suffix, got: {}",
+            stats_part
+        );
+    }
 }
 
 #[test]
@@ -2304,8 +2319,14 @@ fn test_spark_shorthand_flag() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     let trimmed = stdout.trim();
-    // Format: "column_name  ▂▅▃▁█▇"
-    let spark_part = trimmed.split("  ").last().unwrap_or("");
+    // Format: "column_name  ▂▅▃▁█▇  (min–max) ↑ +N%"
+    let parts: Vec<&str> = trimmed.split("  ").collect();
+    assert!(
+        parts.len() >= 2,
+        "Expected at least label and sparkline, got: {}",
+        trimmed
+    );
+    let spark_part = parts[1];
     assert!(
         spark_part.chars().all(|c| "▁▂▃▄▅▆▇█".contains(c)),
         "Expected sparkline from --spark, got: {}",
@@ -2752,8 +2773,14 @@ fn test_spark_output_respects_bar_aggregation() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     let trimmed = stdout.trim();
-    // Format: "revenue  █▆▁" — extract spark part after double-space
-    let spark_part = trimmed.split("  ").last().unwrap_or(trimmed);
+    // Format: "revenue  █▆▁  (min–max) trend" — sparkline is second segment
+    let parts: Vec<&str> = trimmed.split("  ").collect();
+    assert!(
+        parts.len() >= 2,
+        "Expected at least label and sparkline, got: {}",
+        trimmed
+    );
+    let spark_part = parts[1];
     let spark_chars: Vec<char> = spark_part.chars().collect();
     // Should have 3 characters (one per aggregated category), not 6 (one per raw row)
     assert_eq!(
@@ -2789,8 +2816,14 @@ fn test_spark_output_respects_sort_and_top() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     let trimmed = stdout.trim();
-    // Format: "revenue  █▇" — extract spark part after double-space
-    let spark_part = trimmed.split("  ").last().unwrap_or(trimmed);
+    // Format: "revenue  █▇  (min–max) trend" — sparkline is second segment
+    let parts: Vec<&str> = trimmed.split("  ").collect();
+    assert!(
+        parts.len() >= 2,
+        "Expected at least label and sparkline, got: {}",
+        trimmed
+    );
+    let spark_part = parts[1];
     let spark_chars: Vec<char> = spark_part.chars().collect();
     assert_eq!(
         spark_chars.len(),
