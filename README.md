@@ -199,7 +199,24 @@ type: line
 ```
 ````
 
-Navigate: `←`/`→` or `h`/`l`, jump: `g`/`G`, quit: `q`
+Supported chart block parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `source` | Data file path (required) |
+| `x` | X axis column |
+| `y` | Y axis column |
+| `type` | Chart type: `line`, `bar`, `scatter`, `histogram`, `heatmap` |
+| `color` | Color/group-by column |
+| `title` | Custom chart title |
+| `where` | Filter rows (repeatable): e.g. `where: revenue>1000` |
+| `sort` | Sort bar chart: `desc`, `asc` |
+| `agg` | Aggregation: `sum`, `mean`, `count`, `max`, `min` |
+| `top` | Show only top N categories |
+| `bins` | Number of histogram bins |
+| `height` | Chart height in rows |
+
+Navigate: `←`/`→` or `h`/`l` or `Space`/`Backspace`, jump: `g`/`G` or type slide number + `Enter`, quit: `q`/`Esc`
 
 ## Supported Input Formats
 
