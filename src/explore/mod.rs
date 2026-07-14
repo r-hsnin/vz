@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use std::io::IsTerminal;
 
 use crate::chart::data_builder;
 use crate::chart::selector::{ChartRecommendation, ChartType, select_chart};
@@ -404,6 +405,13 @@ pub fn run_explore(
     // Tests use this to verify CLI flag parsing without entering the interactive loop.
     if std::env::var("VZ_TEST_HEADLESS").is_ok() {
         return Ok(());
+    }
+
+    if !std::io::stdout().is_terminal() {
+        anyhow::bail!(
+            "Explore mode requires an interactive terminal. \
+             Cannot run in a pipe or non-TTY environment."
+        );
     }
 
     let mut terminal = ratatui::init();

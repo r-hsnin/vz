@@ -4,6 +4,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::Span,
 };
+use std::io::IsTerminal;
 use std::path::Path;
 
 use crate::chart::selector::ChartType;
@@ -38,6 +39,8 @@ pub enum SlideElement {
         headers: Vec<String>,
         rows: Vec<Vec<String>>,
     },
+    /// Blockquote (lines prefixed with `>`).
+    Blockquote(Vec<String>),
 }
 
 /// Configuration for a chart embedded in a slide.
@@ -264,6 +267,13 @@ pub fn run_present(path: &Path, theme: crate::theme::Theme) -> Result<()> {
         .parent()
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+    if !std::io::stdout().is_terminal() {
+        anyhow::bail!(
+            "Present mode requires an interactive terminal. \
+             Cannot run in a pipe or non-TTY environment."
+        );
+    }
 
     let mut terminal = ratatui::init();
     let mut app = PresentApp::new(presentation, base_dir, theme);
