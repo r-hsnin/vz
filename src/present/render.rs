@@ -253,6 +253,9 @@ mod tests {
             color_col: None,
             title: None,
             filter: vec![],
+            sort: None,
+            agg: None,
+            top: None,
         });
         assert_eq!(element_constraint(&el), Constraint::Min(10));
     }

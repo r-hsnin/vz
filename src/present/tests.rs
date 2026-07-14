@@ -227,6 +227,9 @@ fn test_load_chart_data_relative_to_base_dir() {
         color_col: None,
         title: Some("Revenue Trend".to_string()),
         filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
     };
 
     // Use the fixtures directory as base_dir (where demo.md lives)
@@ -249,6 +252,9 @@ fn test_load_chart_data_with_filter() {
         color_col: None,
         title: None,
         filter: vec!["city=Tokyo".to_string()],
+        sort: None,
+        agg: None,
+        top: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -270,6 +276,9 @@ fn test_load_chart_data_nonexistent_source() {
         color_col: None,
         title: None,
         filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -287,6 +296,9 @@ fn test_load_chart_data_with_color_column() {
         color_col: Some("city".to_string()),
         title: Some("Multi-Series".to_string()),
         filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -338,6 +350,9 @@ fn test_load_chart_data_json_source() {
         color_col: None,
         title: Some("Scores".to_string()),
         filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -367,6 +382,9 @@ fn test_load_chart_data_infers_type_when_not_specified() {
         color_col: None,
         title: None,
         filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -389,6 +407,9 @@ fn test_load_chart_data_infers_line_for_temporal() {
         color_col: None,
         title: None,
         filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");

@@ -104,14 +104,21 @@ fn build_chart_data_for_type(
             Ok(ChartData::Heatmap(data))
         }
         ChartType::Bar => {
+            let agg_fn = block.agg.unwrap_or(AggFunction::Sum);
             let (mut data, _) = data_builder::aggregate_bar(
                 rows,
                 cols.x_idx,
                 cols.y_idx,
                 block.title.clone(),
                 cols.y_label.clone(),
-                AggFunction::Sum,
+                agg_fn,
             );
+            let sort = block
+                .top
+                .map(|_| crate::cli::SortOrder::Desc)
+                .or(block.sort);
+            crate::oneshot::builders::sort_bar_data(&mut data, sort);
+            crate::oneshot::builders::truncate_bar_data(&mut data, block.top);
             data.series_colors = theme.series_colors.clone();
             data.axis_color = Some(theme.axis_color);
             Ok(ChartData::Bar(data))
@@ -194,6 +201,9 @@ mod tests {
             color_col: None,
             title: None,
             filter: vec![],
+            sort: None,
+            agg: None,
+            top: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Line);
@@ -215,6 +225,9 @@ mod tests {
             color_col: None,
             title: None,
             filter: vec![],
+            sort: None,
+            agg: None,
+            top: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Bar);
@@ -236,6 +249,9 @@ mod tests {
             color_col: None,
             title: None,
             filter: vec![],
+            sort: None,
+            agg: None,
+            top: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Scatter);
@@ -268,6 +284,9 @@ mod tests {
             color_col: None,
             title: None,
             filter: vec![],
+            sort: None,
+            agg: None,
+            top: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Bar);

@@ -237,6 +237,9 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
     let mut color_col = None;
     let mut title = None;
     let mut filter = Vec::new();
+    let mut sort = None;
+    let mut agg = None;
+    let mut top = None;
 
     for line in lines {
         if let Some((key, value)) = line.split_once(':') {
@@ -259,6 +262,26 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
                 "color" => color_col = Some(value),
                 "title" => title = Some(value),
                 "where" => filter.push(value),
+                "sort" => {
+                    sort = match value.to_lowercase().as_str() {
+                        "desc" => Some(crate::cli::SortOrder::Desc),
+                        "asc" => Some(crate::cli::SortOrder::Asc),
+                        _ => None,
+                    }
+                }
+                "agg" => {
+                    agg = match value.to_lowercase().as_str() {
+                        "sum" => Some(crate::cli::AggFunction::Sum),
+                        "mean" => Some(crate::cli::AggFunction::Mean),
+                        "count" => Some(crate::cli::AggFunction::Count),
+                        "max" => Some(crate::cli::AggFunction::Max),
+                        "min" => Some(crate::cli::AggFunction::Min),
+                        _ => None,
+                    }
+                }
+                "top" => {
+                    top = value.parse::<usize>().ok();
+                }
                 _ => {}
             }
         }
@@ -272,6 +295,9 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
         color_col,
         title,
         filter,
+        sort,
+        agg,
+        top,
     }
 }
 

@@ -46,6 +46,12 @@ pub struct ChartBlock {
     pub title: Option<String>,
     /// Optional filter expressions (same syntax as `--where`).
     pub filter: Vec<String>,
+    /// Sort order for bar charts.
+    pub sort: Option<crate::cli::SortOrder>,
+    /// Aggregation function for bar charts.
+    pub agg: Option<crate::cli::AggFunction>,
+    /// Limit bar chart to top N categories.
+    pub top: Option<usize>,
 }
 
 /// A parsed presentation.
