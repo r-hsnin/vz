@@ -2,14 +2,15 @@
 
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout},
+    layout::{Alignment, Constraint, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
 use crate::chart::selector::ChartType;
 use crate::cli::{AggFunction, SortOrder};
+use crate::infer::types::DataType;
 
 use super::{ExploreApp, ViewMode};
 
@@ -114,8 +115,21 @@ fn render_table(frame: &mut Frame, app: &ExploreApp, area: ratatui::layout::Rect
         .iter()
         .enumerate()
         .map(|(i, row)| {
-            let cells: Vec<String> = (0..col_count)
-                .map(|ci| row.get(ci).cloned().unwrap_or_default())
+            let cells: Vec<Cell> = (0..col_count)
+                .map(|ci| {
+                    let value = row.get(ci).cloned().unwrap_or_default();
+                    let is_numeric = app
+                        .schema
+                        .columns
+                        .get(ci)
+                        .map(|c| c.data_type == DataType::Quantitative)
+                        .unwrap_or(false);
+                    if is_numeric {
+                        Cell::new(ratatui::text::Text::from(value).alignment(Alignment::Right))
+                    } else {
+                        Cell::new(value)
+                    }
+                })
                 .collect();
             let r = Row::new(cells);
             if i == 0 {
