@@ -105,6 +105,8 @@ impl<'a> Widget for XYChart<'a> {
             .clone()
             .unwrap_or_else(|| default_title.to_string());
 
+        let axis_style = Style::default().fg(self.config.axis_color.unwrap_or(Color::DarkGray));
+
         let x_axis = RatatuiAxis::default()
             .title(self.config.x_axis.label.clone())
             .bounds([self.config.x_axis.min, self.config.x_axis.max])
@@ -113,9 +115,8 @@ impl<'a> Widget for XYChart<'a> {
                     .x_labels
                     .clone()
                     .unwrap_or_else(|| self.config.x_axis.tick_labels(5)),
-            );
-
-        let axis_style = Style::default().fg(self.config.axis_color.unwrap_or(Color::DarkGray));
+            )
+            .style(axis_style);
 
         let y_axis = RatatuiAxis::default()
             .title(self.config.y_axis.label.clone())
