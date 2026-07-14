@@ -90,6 +90,7 @@ fn print_chart_json(
         limit: cli.top.or(cli.tail),
         extra_y_columns: y_opts.extra_columns.clone(),
         color_column: cli.color_col.clone(),
+        bins: cli.bins,
     };
     output::chart_json::print_chart_json(
         file,
