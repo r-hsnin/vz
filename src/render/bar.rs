@@ -44,6 +44,7 @@ impl<'a> Widget for BarChart<'a> {
             max_val,
             self.data.show_labels,
             &self.data.series_colors,
+            bar_width,
         );
         let group = BarGroup::default().bars(&bars);
 
@@ -71,6 +72,19 @@ fn compute_bar_width(chart_width: u16, bar_count: usize) -> u16 {
     max_width.saturating_sub(1).clamp(3, 20) as u16
 }
 
+/// Truncate a label to fit within max_width columns, adding "…" if needed.
+fn truncate_label(label: &str, max_width: u16) -> String {
+    let max = max_width as usize;
+    if label.chars().count() <= max {
+        return label.to_string();
+    }
+    if max <= 1 {
+        return "…".to_string();
+    }
+    let truncated: String = label.chars().take(max - 1).collect();
+    format!("{truncated}…")
+}
+
 /// Build ratatui Bar widgets from labels and values, scaling floats to u64.
 fn build_bars<'a>(
     labels: &'a [String],
@@ -78,6 +92,7 @@ fn build_bars<'a>(
     max_val: f64,
     show_labels: bool,
     series_colors: &[Color],
+    bar_width: u16,
 ) -> Vec<Bar<'a>> {
     let scale_factor = if max_val > 0.0 {
         10000.0 / max_val
@@ -109,7 +124,7 @@ fn build_bars<'a>(
                 format_number(value)
             };
             Bar::default()
-                .label(Line::from(label.clone()))
+                .label(Line::from(truncate_label(label, bar_width)))
                 .value(scaled)
                 .text_value(text)
                 .style(Style::default().fg(color))
@@ -259,5 +274,15 @@ mod tests {
         // Normal case
         let w = compute_bar_width(80, 5);
         assert!((3..=20).contains(&w));
+    }
+
+    #[test]
+    fn test_truncate_label() {
+        assert_eq!(truncate_label("Tokyo", 10), "Tokyo");
+        assert_eq!(truncate_label("Tokyo", 5), "Tokyo");
+        assert_eq!(truncate_label("San Francisco", 5), "San …");
+        assert_eq!(truncate_label("Philadelphia", 3), "Ph…");
+        assert_eq!(truncate_label("AB", 1), "…");
+        assert_eq!(truncate_label("X", 1), "X");
     }
 }
