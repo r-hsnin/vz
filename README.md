@@ -156,7 +156,11 @@ Bar charts automatically aggregate (sum) values by category.
 |-----|--------|
 | `h`/`l` (←/→) | Change X axis column |
 | `j`/`k` (↑/↓) | Change Y axis column (chart) / Scroll rows (table) |
+| `G`/`g` | Jump to last/first row (table view) |
+| `PgDn`/`PgUp` | Page scroll (table view) |
 | `c` | Cycle color/group-by column |
+| `s` | Cycle sort order (desc/asc/none) |
+| `a` | Cycle aggregation (sum/mean/count/max/min) |
 | `y` | Show equivalent oneshot command |
 | `d` / `Tab` | Toggle between chart and data table view |
 | `1`-`4` | Force chart type (Line/Bar/Scatter/Histogram) |
