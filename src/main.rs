@@ -300,7 +300,14 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
         return Ok(());
     }
 
-    dispatch_output(cli, &recommendation, &data.headers, &data.rows, &y_opts)
+    dispatch_output(
+        cli,
+        &recommendation,
+        &data.headers,
+        &data.rows,
+        &y_opts,
+        &schema,
+    )
 }
 
 /// Validate that loaded data is non-empty and produce clear error messages.
@@ -338,6 +345,7 @@ fn dispatch_output(
     headers: &[String],
     rows: &[Vec<String>],
     y_opts: &YOptions,
+    schema: &Schema,
 ) -> Result<()> {
     match cli.output {
         Some(cli::OutputFormat::Table) => {
@@ -347,14 +355,14 @@ fn dispatch_output(
             print_spark(recommendation, headers, rows, cli);
         }
         Some(cli::OutputFormat::Svg) => {
-            let opts = build_render_options(cli, y_opts);
+            let opts = build_render_options(cli, y_opts, recommendation, schema);
             print_svg(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Markdown) => {
             output::markdown::print_markdown(recommendation, headers, rows, cli)?;
         }
         _ => {
-            let opts = build_render_options(cli, y_opts);
+            let opts = build_render_options(cli, y_opts, recommendation, schema);
             oneshot::render_oneshot(recommendation, headers, rows, &opts)?;
         }
     }

@@ -9,7 +9,10 @@ use crate::{chart, filter, loader, oneshot, theme};
 pub(crate) fn build_render_options<'a>(
     cli: &'a Cli,
     y_opts: &'a YOptions,
+    recommendation: &chart::selector::ChartRecommendation,
+    schema: &Schema,
 ) -> oneshot::RenderOptions<'a> {
+    let agg = effective_agg(cli, recommendation, schema);
     oneshot::RenderOptions {
         chart_type_override: cli.chart_type,
         y_label_override: y_opts.label_override.as_deref(),
@@ -18,12 +21,42 @@ pub(crate) fn build_render_options<'a>(
         sort_order: cli.effective_sort(),
         extra_y_columns: y_opts.extra_columns.clone(),
         limit: cli.top.or(cli.tail),
-        agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
+        agg,
         title: cli.title.clone(),
         labels: cli.labels,
         theme: resolve_theme(cli),
         bins: cli.bins,
     }
+}
+
+/// Determine effective aggregation function.
+/// Auto-switches to Count when bar chart is forced on a categorical Y column
+/// that was auto-inferred (not explicitly specified by the user).
+fn effective_agg(
+    cli: &Cli,
+    recommendation: &chart::selector::ChartRecommendation,
+    schema: &Schema,
+) -> cli::AggFunction {
+    if let Some(agg) = cli.agg {
+        return agg;
+    }
+
+    // When bar chart is forced, Y was auto-inferred (not explicit), and Y is not numeric,
+    // default to Count. This handles the case where both columns are categorical
+    // (e.g., departments.csv with department + status).
+    if cli.chart_type == Some(cli::ChartTypeArg::Bar) && cli.y_col.is_none() {
+        let y_is_categorical = recommendation
+            .y_column
+            .as_ref()
+            .and_then(|y| schema.find_column(y))
+            .map(|c| c.data_type != crate::infer::types::DataType::Quantitative)
+            .unwrap_or(false);
+        if y_is_categorical {
+            return cli::AggFunction::Count;
+        }
+    }
+
+    cli::AggFunction::Sum
 }
 
 /// Resolve the theme from CLI args.
