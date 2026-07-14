@@ -153,10 +153,24 @@ vz present slides.md
 ## Output Format
 
 The default mode renders a chart to stdout with:
-1. A summary line: `Line │ x=date │ y=revenue │ color=city │ 6 rows`
+1. A summary line: `Line │ x=date │ y=revenue (100–500) ▁▃▅▇ │ ↑ +50% │ color=city [Tokyo=cyan, Osaka=yellow] │ 6 rows`
 2. A Braille/Unicode chart with title, axis tick labels, and legend
 
-Bar charts automatically aggregate (sum) values by category.
+Summary line components:
+- Chart type and axis assignments
+- Y-axis range `(min–max)` with inline sparkline (for line/scatter)
+- Trend annotation `↑ +N%` / `↓ -N%` / `→ stable` (for line/scatter)
+- Non-sum aggregation label: `y=mean(revenue)`
+- Color legend with series-color mapping
+- Row count with skip notation: `6 rows (2 skipped)`
+- Unused columns hint: `+2: profit, tax (try -y revenue,profit or -c profit)`
+
+Bar charts automatically aggregate (sum) values by category. When only an X column is specified with no Y column, count aggregation is auto-applied.
+
+Spark output (`--output spark`) renders a single-line sparkline with statistics suffix:
+```
+revenue  ▁▂▃▅▇  (100–500) ↑ +400%
+```
 
 ## Chart Selection Rules
 
