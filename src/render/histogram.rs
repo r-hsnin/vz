@@ -81,6 +81,8 @@ fn render_histogram_bars(
         max_width.saturating_sub(1).clamp(3, 12) as u16
     };
 
+    let max_count = bins.iter().map(|(_, _, c)| *c).max().unwrap_or(0);
+
     let bars: Vec<Bar> = bins
         .iter()
         .map(|(start, end, count)| {
@@ -88,7 +90,7 @@ fn render_histogram_bars(
             Bar::default()
                 .label(Line::from(label))
                 .value(*count as u64)
-                .style(Style::default().fg(Color::Cyan))
+                .style(Style::default().fg(bin_count_to_color(*count, max_count)))
         })
         .collect();
 
@@ -105,6 +107,27 @@ fn render_histogram_bars(
         .data(group);
 
     chart.render(chart_area, buf);
+}
+
+/// Map a bin count to a color using a sequential gradient.
+/// Palette: dark teal (low frequency) → cyan (mid) → yellow (high frequency).
+fn bin_count_to_color(count: usize, max_count: usize) -> Color {
+    if max_count == 0 || count == 0 {
+        return Color::DarkGray;
+    }
+    let t = count as f64 / max_count as f64;
+    let (r, g, b) = if t < 0.5 {
+        let s = t * 2.0;
+        (
+            (20.0 + s * 10.0) as u8,
+            (60.0 + s * 195.0) as u8,
+            (120.0 + s * 135.0) as u8,
+        )
+    } else {
+        let s = (t - 0.5) * 2.0;
+        ((30.0 + s * 225.0) as u8, 255, (255.0 - s * 255.0) as u8)
+    };
+    Color::Rgb(r, g, b)
 }
 
 /// Format a bin label to fit within the given max width.
@@ -244,5 +267,37 @@ mod tests {
         assert_eq!(abbreviate_number(500.0), "500");
         assert_eq!(abbreviate_number(1500.0), "1.5k");
         assert_eq!(abbreviate_number(2_500_000.0), "2.5M");
+    }
+
+    #[test]
+    fn test_bin_count_to_color_gradient() {
+        let low = bin_count_to_color(1, 10);
+        let high = bin_count_to_color(10, 10);
+        let zero = bin_count_to_color(0, 10);
+        assert_eq!(zero, Color::DarkGray);
+        assert_ne!(low, high);
+        // High frequency should be warm (yellow-ish: high R+G, low B)
+        if let Color::Rgb(r, _g, b) = high {
+            assert!(r > 200);
+            assert!(b < 50);
+        } else {
+            panic!("Expected Rgb color for high count");
+        }
+    }
+
+    #[test]
+    fn test_bin_count_to_color_zero_max() {
+        assert_eq!(bin_count_to_color(5, 0), Color::DarkGray);
+    }
+
+    #[test]
+    fn test_bin_count_to_color_mid() {
+        let mid = bin_count_to_color(5, 10);
+        // Mid-range should be a cyan-ish color (high G, moderate B)
+        if let Color::Rgb(_r, g, _b) = mid {
+            assert!(g > 200);
+        } else {
+            panic!("Expected Rgb color for mid count");
+        }
     }
 }
