@@ -121,6 +121,7 @@ fn element_constraint(el: &SlideElement) -> Constraint {
         SlideElement::Heading { .. } => Constraint::Length(2),
         SlideElement::OrderedList(items) => Constraint::Length(items.len() as u16 + 1),
         SlideElement::Table { rows, .. } => Constraint::Length(rows.len() as u16 + 4),
+        SlideElement::Blockquote(lines) => Constraint::Length(lines.len() as u16 + 1),
     }
 }
 
@@ -184,6 +185,23 @@ fn render_element(
         }
         SlideElement::Table { headers, rows } => {
             render_slide_table(frame, headers, rows, area);
+        }
+        SlideElement::Blockquote(lines) => {
+            let styled_lines: Vec<Line> = lines
+                .iter()
+                .map(|l| {
+                    Line::from(vec![
+                        Span::styled("  │ ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            l.clone(),
+                            Style::default()
+                                .fg(Color::Gray)
+                                .add_modifier(Modifier::ITALIC),
+                        ),
+                    ])
+                })
+                .collect();
+            frame.render_widget(Paragraph::new(styled_lines), area);
         }
     }
 }
