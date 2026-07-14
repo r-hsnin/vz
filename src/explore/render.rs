@@ -76,11 +76,17 @@ fn render_table(frame: &mut Frame, app: &ExploreApp, area: ratatui::layout::Rect
     let end = (app.table_offset + visible_height).min(app.data.len());
     let visible_rows: Vec<Row> = app.data[app.table_offset..end]
         .iter()
-        .map(|row| {
+        .enumerate()
+        .map(|(i, row)| {
             let cells: Vec<String> = (0..col_count)
-                .map(|i| row.get(i).cloned().unwrap_or_default())
+                .map(|ci| row.get(ci).cloned().unwrap_or_default())
                 .collect();
-            Row::new(cells)
+            let r = Row::new(cells);
+            if i == 0 {
+                r.style(Style::default().fg(Color::Yellow))
+            } else {
+                r
+            }
         })
         .collect();
 
@@ -88,19 +94,16 @@ fn render_table(frame: &mut Frame, app: &ExploreApp, area: ratatui::layout::Rect
         .map(|_| Constraint::Percentage((100 / col_count.max(1)) as u16))
         .collect();
 
-    let table = Table::new(visible_rows, widths)
-        .header(header_row)
-        .block(
-            Block::default()
-                .title(format!(
-                    " Data ({}-{} of {}) ",
-                    app.table_offset + 1,
-                    end,
-                    app.data.len()
-                ))
-                .borders(Borders::ALL),
-        )
-        .row_highlight_style(Style::default().fg(Color::Yellow));
+    let table = Table::new(visible_rows, widths).header(header_row).block(
+        Block::default()
+            .title(format!(
+                " Data ({}-{} of {}) ",
+                app.table_offset + 1,
+                end,
+                app.data.len()
+            ))
+            .borders(Borders::ALL),
+    );
 
     frame.render_widget(table, area);
 }
