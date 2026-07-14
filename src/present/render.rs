@@ -24,18 +24,25 @@ pub fn draw_slide(frame: &mut Frame, app: &PresentApp) {
         render_slide_content(frame, slide, chunks[0], &app.base_dir, &app.theme);
     }
 
-    // Footer with slide indicator
-    let footer = Paragraph::new(Line::from(vec![
-        Span::styled(
-            format!(" {} ", app.slide_indicator()),
-            Style::default().fg(Color::DarkGray),
-        ),
-        Span::raw("  "),
-        Span::styled("←/→", Style::default().fg(Color::Yellow)),
-        Span::raw(" navigate  "),
-        Span::styled("q", Style::default().fg(Color::Yellow)),
-        Span::raw(" quit"),
-    ]));
+    // Footer with slide indicator and progress bar
+    let bar_width = (chunks[1].width as usize).saturating_sub(32);
+    let progress_bar =
+        build_progress_bar(app.current_slide, app.presentation.slides.len(), bar_width);
+
+    let mut footer_spans = vec![Span::styled(
+        format!(" {} ", app.slide_indicator()),
+        Style::default().fg(Color::DarkGray),
+    )];
+    if !progress_bar.is_empty() {
+        footer_spans.push(Span::styled(progress_bar, Style::default().fg(Color::Cyan)));
+        footer_spans.push(Span::raw("  "));
+    }
+    footer_spans.push(Span::styled("←/→", Style::default().fg(Color::Yellow)));
+    footer_spans.push(Span::raw(" navigate  "));
+    footer_spans.push(Span::styled("q", Style::default().fg(Color::Yellow)));
+    footer_spans.push(Span::raw(" quit"));
+
+    let footer = Paragraph::new(Line::from(footer_spans));
     frame.render_widget(footer, chunks[1]);
 }
 
@@ -230,6 +237,23 @@ fn render_chart_placeholder(
     }
 }
 
+/// Build a Unicode progress bar showing current position within total slides.
+fn build_progress_bar(current: usize, total: usize, width: usize) -> String {
+    if total <= 1 || width < 3 {
+        return String::new();
+    }
+    let pos = (current * (width - 1)) / (total - 1);
+    let mut bar = String::with_capacity(width * 3); // Unicode chars are multi-byte
+    for i in 0..width {
+        if i == pos {
+            bar.push('●');
+        } else {
+            bar.push('━');
+        }
+    }
+    bar
+}
+
 /// Render a GFM markdown table using ratatui's Table widget.
 fn render_slide_table(
     frame: &mut Frame,
@@ -420,5 +444,38 @@ mod tests {
             s.push('\n');
         }
         s
+    }
+
+    #[test]
+    fn test_build_progress_bar_first_slide() {
+        let bar = build_progress_bar(0, 5, 10);
+        assert_eq!(bar.chars().next(), Some('●'));
+        assert_eq!(bar.chars().count(), 10);
+    }
+
+    #[test]
+    fn test_build_progress_bar_last_slide() {
+        let bar = build_progress_bar(4, 5, 10);
+        assert_eq!(bar.chars().last(), Some('●'));
+        assert_eq!(bar.chars().count(), 10);
+    }
+
+    #[test]
+    fn test_build_progress_bar_middle() {
+        let bar = build_progress_bar(2, 5, 9);
+        let chars: Vec<char> = bar.chars().collect();
+        assert_eq!(chars[4], '●'); // position 2/(5-1) * (9-1) = 4
+    }
+
+    #[test]
+    fn test_build_progress_bar_single_slide() {
+        let bar = build_progress_bar(0, 1, 10);
+        assert!(bar.is_empty());
+    }
+
+    #[test]
+    fn test_build_progress_bar_narrow() {
+        let bar = build_progress_bar(0, 5, 2);
+        assert!(bar.is_empty()); // width < 3
     }
 }
