@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Bar, BarChart as RatatuiBarChart, BarGroup, Block, Borders, Widget},
 };
 
-use super::{BarChartData, SERIES_COLORS, format_number};
+use super::{BarChartData, format_number};
 
 /// Bar chart widget wrapping ratatui's BarChart with Y-axis tick labels.
 pub struct BarChart<'a> {
@@ -85,6 +85,27 @@ fn truncate_label(label: &str, max_width: u16) -> String {
     format!("{truncated}…")
 }
 
+/// Map a bar value to a color using a sequential gradient (matching histogram palette).
+/// Palette: dark teal (low) → cyan (mid) → yellow (high).
+fn value_to_bar_color(value: f64, max_val: f64) -> Color {
+    if max_val <= 0.0 || value <= 0.0 {
+        return Color::DarkGray;
+    }
+    let t = (value / max_val).clamp(0.0, 1.0);
+    let (r, g, b) = if t < 0.5 {
+        let s = t * 2.0;
+        (
+            (20.0 + s * 10.0) as u8,
+            (60.0 + s * 195.0) as u8,
+            (120.0 + s * 135.0) as u8,
+        )
+    } else {
+        let s = (t - 0.5) * 2.0;
+        ((30.0 + s * 225.0) as u8, 255, (255.0 - s * 255.0) as u8)
+    };
+    Color::Rgb(r, g, b)
+}
+
 /// Build ratatui Bar widgets from labels and values, scaling floats to u64.
 fn build_bars<'a>(
     labels: &'a [String],
@@ -112,7 +133,7 @@ fn build_bars<'a>(
         .enumerate()
         .map(|(i, (label, &value))| {
             let color = if series_colors.is_empty() {
-                SERIES_COLORS[i % SERIES_COLORS.len()]
+                value_to_bar_color(value, max_val)
             } else {
                 series_colors[i % series_colors.len()]
             };
