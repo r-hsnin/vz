@@ -154,13 +154,13 @@ pub struct HeatmapData {
 pub(crate) fn format_number(val: f64) -> String {
     let abs = val.abs();
     if abs >= 1_000_000_000_000.0 {
-        format!("{:.1}T", val / 1_000_000_000_000.0)
+        format_with_suffix(val / 1_000_000_000_000.0, "T")
     } else if abs >= 1_000_000_000.0 {
-        format!("{:.1}B", val / 1_000_000_000.0)
+        format_with_suffix(val / 1_000_000_000.0, "B")
     } else if abs >= 1_000_000.0 {
-        format!("{:.1}M", val / 1_000_000.0)
+        format_with_suffix(val / 1_000_000.0, "M")
     } else if abs >= 1_000.0 {
-        format!("{:.1}k", val / 1_000.0)
+        format_with_suffix(val / 1_000.0, "k")
     } else if abs < 0.01 && abs > 0.0 {
         format!("{:.2e}", val)
     } else if (val - val.round()).abs() < f64::EPSILON {
@@ -168,6 +168,13 @@ pub(crate) fn format_number(val: f64) -> String {
     } else {
         format!("{:.1}", val)
     }
+}
+
+/// Format a scaled value with a suffix, removing trailing ".0" for clean integers.
+fn format_with_suffix(val: f64, suffix: &str) -> String {
+    let s = format!("{:.1}", val);
+    let trimmed = s.strip_suffix(".0").unwrap_or(&s);
+    format!("{trimmed}{suffix}")
 }
 
 /// Compute histogram bins from raw values.
@@ -519,8 +526,8 @@ mod tests {
 
     #[test]
     fn test_format_number_large_value() {
-        // 999,999,999,999 should be ~1.0T
-        assert_eq!(super::format_number(999_999_999_999.0), "1000.0B");
+        // 999,999,999,999 should be ~1000B (trailing .0 stripped)
+        assert_eq!(super::format_number(999_999_999_999.0), "1000B");
     }
 
     #[test]
@@ -633,7 +640,7 @@ mod tests {
             .map(|c| c.symbol().chars().next().unwrap_or(' '))
             .collect();
         assert!(
-            normal_content.contains("5.0k") || normal_content.contains("5000"),
+            normal_content.contains("5k") || normal_content.contains("5000"),
             "Normal mode should show 5k tick"
         );
 
@@ -645,12 +652,12 @@ mod tests {
             .map(|c| c.symbol().chars().next().unwrap_or(' '))
             .collect();
         assert!(
-            !tight_content.contains("5.0k") && !tight_content.contains("5000"),
+            !tight_content.contains("5k") && !tight_content.contains("5000"),
             "Tight mode should NOT show 5k tick, got:\n{}",
             tight_content.trim()
         );
         assert!(
-            tight_content.contains("4.0k") || tight_content.contains("4000"),
+            tight_content.contains("4k") || tight_content.contains("4000"),
             "Tight mode should show 4k as top tick"
         );
     }
