@@ -109,7 +109,10 @@ fn render_slide_body(
 /// Compute the layout constraint for a single slide element.
 fn element_constraint(el: &SlideElement) -> Constraint {
     match el {
-        SlideElement::Chart(_) => Constraint::Min(10),
+        SlideElement::Chart(block) => match block.height {
+            Some(h) => Constraint::Length(h),
+            None => Constraint::Min(10),
+        },
         SlideElement::Text(_) => Constraint::Length(2),
         SlideElement::Bullets(items) => Constraint::Length(items.len() as u16 + 1),
         SlideElement::Code { content, .. } => {
@@ -323,6 +326,7 @@ mod tests {
             agg: None,
             top: None,
             bins: None,
+            height: None,
         });
         assert_eq!(element_constraint(&el), Constraint::Min(10));
     }

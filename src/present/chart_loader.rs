@@ -205,6 +205,7 @@ mod tests {
             agg: None,
             top: None,
             bins: None,
+            height: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Line);
@@ -230,6 +231,7 @@ mod tests {
             agg: None,
             top: None,
             bins: None,
+            height: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Bar);
@@ -255,6 +257,7 @@ mod tests {
             agg: None,
             top: None,
             bins: None,
+            height: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Scatter);
@@ -291,6 +294,7 @@ mod tests {
             agg: None,
             top: None,
             bins: None,
+            height: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Bar);

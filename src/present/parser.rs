@@ -301,6 +301,7 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
     let mut agg = None;
     let mut top = None;
     let mut bins = None;
+    let mut height = None;
 
     for line in lines {
         if let Some((key, value)) = line.split_once(':') {
@@ -346,6 +347,9 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
                 "bins" => {
                     bins = value.parse::<usize>().ok();
                 }
+                "height" => {
+                    height = value.parse::<u16>().ok();
+                }
                 _ => {}
             }
         }
@@ -363,6 +367,7 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
         agg,
         top,
         bins,
+        height,
     }
 }
 
@@ -446,6 +451,24 @@ mod tests {
         let lines = vec!["source: data.csv".into(), "bins: not_a_number".into()];
         let chart = parse_chart_block(&lines);
         assert_eq!(chart.bins, None);
+    }
+
+    #[test]
+    fn test_chart_block_height_parsed() {
+        let lines = vec![
+            "source: data.csv".into(),
+            "type: line".into(),
+            "height: 20".into(),
+        ];
+        let chart = parse_chart_block(&lines);
+        assert_eq!(chart.height, Some(20));
+    }
+
+    #[test]
+    fn test_chart_block_height_invalid_ignored() {
+        let lines = vec!["source: data.csv".into(), "height: abc".into()];
+        let chart = parse_chart_block(&lines);
+        assert_eq!(chart.height, None);
     }
 
     #[test]

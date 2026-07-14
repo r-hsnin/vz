@@ -59,6 +59,8 @@ pub struct ChartBlock {
     pub top: Option<usize>,
     /// Number of bins for histogram charts.
     pub bins: Option<usize>,
+    /// Chart height in terminal rows (defaults to flexible sizing).
+    pub height: Option<u16>,
 }
 
 /// A parsed presentation.
