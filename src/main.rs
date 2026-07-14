@@ -22,8 +22,8 @@ use std::path::Path;
 
 use cli::{Cli, Command};
 use helpers::{
-    YOptions, apply_filters, build_recommendation, build_render_options, format_override,
-    parse_y_options, resolve_input_file, resolve_theme,
+    YOptions, apply_filters, build_recommendation, build_render_options, effective_agg,
+    format_override, parse_y_options, resolve_input_file, resolve_theme,
 };
 use infer::types::Schema;
 use loader::LoadedData;
@@ -86,7 +86,7 @@ fn print_chart_json(
             .map(|ct| ct.to_chart_type())
             .unwrap_or(recommendation.chart_type),
         sort: cli.effective_sort(),
-        agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
+        agg: effective_agg(cli, recommendation, schema),
         limit: cli.top.or(cli.tail),
         extra_y_columns: y_opts.extra_columns.clone(),
         color_column: cli.color_col.clone(),
@@ -198,10 +198,11 @@ fn print_spark(
     headers: &[String],
     rows: &[Vec<String>],
     cli: &Cli,
+    schema: &Schema,
 ) {
     let params = output::spark::SparkParams {
         chart_type_override: cli.chart_type,
-        agg: cli.agg.unwrap_or(cli::AggFunction::Sum),
+        agg: effective_agg(cli, recommendation, schema),
         sort: cli.effective_sort(),
         limit: cli.top.or(cli.tail),
         color_col: cli.color_col.clone(),
@@ -352,14 +353,14 @@ fn dispatch_output(
             output::table::print_table(recommendation, headers, rows, cli)?;
         }
         Some(cli::OutputFormat::Spark) => {
-            print_spark(recommendation, headers, rows, cli);
+            print_spark(recommendation, headers, rows, cli, schema);
         }
         Some(cli::OutputFormat::Svg) => {
             let opts = build_render_options(cli, y_opts, recommendation, schema);
             print_svg(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Markdown) => {
-            output::markdown::print_markdown(recommendation, headers, rows, cli)?;
+            output::markdown::print_markdown(recommendation, headers, rows, cli, schema)?;
         }
         _ => {
             let opts = build_render_options(cli, y_opts, recommendation, schema);

@@ -32,7 +32,7 @@ pub(crate) fn build_render_options<'a>(
 /// Determine effective aggregation function.
 /// Auto-switches to Count when bar chart is forced on a categorical Y column
 /// that was auto-inferred (not explicitly specified by the user).
-fn effective_agg(
+pub(crate) fn effective_agg(
     cli: &Cli,
     recommendation: &chart::selector::ChartRecommendation,
     schema: &Schema,
