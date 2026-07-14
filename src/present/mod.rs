@@ -57,6 +57,8 @@ pub struct ChartBlock {
     pub agg: Option<crate::cli::AggFunction>,
     /// Limit bar chart to top N categories.
     pub top: Option<usize>,
+    /// Number of bins for histogram charts.
+    pub bins: Option<usize>,
 }
 
 /// A parsed presentation.

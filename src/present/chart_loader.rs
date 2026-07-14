@@ -129,7 +129,7 @@ fn build_chart_data_for_type(
                 cols.x_idx,
                 block.title.clone(),
                 cols.x_label.clone(),
-                None,
+                block.bins,
             );
             data.axis_color = Some(theme.axis_color);
             Ok(ChartData::Histogram(data))
@@ -204,6 +204,7 @@ mod tests {
             sort: None,
             agg: None,
             top: None,
+            bins: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Line);
@@ -228,6 +229,7 @@ mod tests {
             sort: None,
             agg: None,
             top: None,
+            bins: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Bar);
@@ -252,6 +254,7 @@ mod tests {
             sort: None,
             agg: None,
             top: None,
+            bins: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Scatter);
@@ -287,6 +290,7 @@ mod tests {
             sort: None,
             agg: None,
             top: None,
+            bins: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Bar);

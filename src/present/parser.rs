@@ -300,6 +300,7 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
     let mut sort = None;
     let mut agg = None;
     let mut top = None;
+    let mut bins = None;
 
     for line in lines {
         if let Some((key, value)) = line.split_once(':') {
@@ -342,6 +343,9 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
                 "top" => {
                     top = value.parse::<usize>().ok();
                 }
+                "bins" => {
+                    bins = value.parse::<usize>().ok();
+                }
                 _ => {}
             }
         }
@@ -358,6 +362,7 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
         sort,
         agg,
         top,
+        bins,
     }
 }
 
@@ -423,6 +428,24 @@ mod tests {
         let chart = parse_chart_block(&lines);
         assert_eq!(chart.source, "data.csv");
         assert_eq!(chart.chart_type, None); // Unknown type → None
+    }
+
+    #[test]
+    fn test_chart_block_bins_parsed() {
+        let lines = vec![
+            "source: data.csv".into(),
+            "type: histogram".into(),
+            "bins: 20".into(),
+        ];
+        let chart = parse_chart_block(&lines);
+        assert_eq!(chart.bins, Some(20));
+    }
+
+    #[test]
+    fn test_chart_block_bins_invalid_ignored() {
+        let lines = vec!["source: data.csv".into(), "bins: not_a_number".into()];
+        let chart = parse_chart_block(&lines);
+        assert_eq!(chart.bins, None);
     }
 
     #[test]

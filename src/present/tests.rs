@@ -230,6 +230,7 @@ fn test_load_chart_data_relative_to_base_dir() {
         sort: None,
         agg: None,
         top: None,
+        bins: None,
     };
 
     // Use the fixtures directory as base_dir (where demo.md lives)
@@ -255,6 +256,7 @@ fn test_load_chart_data_with_filter() {
         sort: None,
         agg: None,
         top: None,
+        bins: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -279,6 +281,7 @@ fn test_load_chart_data_nonexistent_source() {
         sort: None,
         agg: None,
         top: None,
+        bins: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -299,6 +302,7 @@ fn test_load_chart_data_with_color_column() {
         sort: None,
         agg: None,
         top: None,
+        bins: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -353,6 +357,7 @@ fn test_load_chart_data_json_source() {
         sort: None,
         agg: None,
         top: None,
+        bins: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -385,6 +390,7 @@ fn test_load_chart_data_infers_type_when_not_specified() {
         sort: None,
         agg: None,
         top: None,
+        bins: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -410,6 +416,7 @@ fn test_load_chart_data_infers_line_for_temporal() {
         sort: None,
         agg: None,
         top: None,
+        bins: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");

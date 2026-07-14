@@ -298,6 +298,7 @@ mod tests {
             sort: None,
             agg: None,
             top: None,
+            bins: None,
         });
         assert_eq!(element_constraint(&el), Constraint::Min(10));
     }
