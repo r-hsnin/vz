@@ -9,6 +9,7 @@ use ratatui::{
 };
 
 use crate::chart::selector::ChartType;
+use crate::cli::{AggFunction, SortOrder};
 
 use super::{ExploreApp, ViewMode};
 
@@ -239,10 +240,27 @@ fn build_binding_spans(app: &ExploreApp) -> Vec<Span<'static>> {
         None => "off".to_string(),
     };
 
+    let sort_label = match app.sort_order {
+        None | Some(SortOrder::None) => "off".to_string(),
+        Some(SortOrder::Desc) => "desc".to_string(),
+        Some(SortOrder::Asc) => "asc".to_string(),
+    };
+
+    let agg_label = match app.agg_function {
+        AggFunction::Sum => "sum",
+        AggFunction::Mean => "mean",
+        AggFunction::Count => "count",
+        AggFunction::Max => "max",
+        AggFunction::Min => "min",
+    }
+    .to_string();
+
     let bindings: &[(&str, String)] = &[
         ("h/l", "X".to_string()),
         ("j/k", "Y".to_string()),
         ("c", color_label),
+        ("s", sort_label),
+        ("a", agg_label),
         ("1-4", "type".to_string()),
         ("0", "auto".to_string()),
         ("d", "data".to_string()),
