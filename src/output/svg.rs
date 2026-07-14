@@ -2,7 +2,7 @@
 
 use ratatui::{
     buffer::Buffer,
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
 };
 use std::fmt::Write;
 
@@ -116,7 +116,17 @@ fn write_tspan(svg: &mut String, x: f64, text: &str, style: Style) {
     let fg = style.fg.unwrap_or(Color::Gray);
     let color = color_to_hex(fg);
     let escaped = xml_escape(text);
-    let _ = write!(svg, r#"<tspan x="{x}" fill="{color}">{escaped}</tspan>"#);
+    let mut extra = String::new();
+    if style.add_modifier.contains(Modifier::BOLD) {
+        extra.push_str(r#" font-weight="bold""#);
+    }
+    if style.add_modifier.contains(Modifier::ITALIC) {
+        extra.push_str(r#" font-style="italic""#);
+    }
+    let _ = write!(
+        svg,
+        r#"<tspan x="{x}" fill="{color}"{extra}>{escaped}</tspan>"#
+    );
 }
 
 fn xml_escape(s: &str) -> String {
@@ -201,5 +211,35 @@ mod tests {
         // Should contain a rect with the red background
         assert!(svg.contains("#ff0000"), "Expected Rgb bg rect in SVG");
         assert!(svg.contains("<rect"), "Expected background rect element");
+    }
+
+    #[test]
+    fn test_write_tspan_bold_italic() {
+        let mut svg = String::new();
+        let style = Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD | Modifier::ITALIC);
+        write_tspan(&mut svg, 0.0, "Title", style);
+        assert!(
+            svg.contains(r#"font-weight="bold""#),
+            "Expected bold attribute, got: {}",
+            svg
+        );
+        assert!(
+            svg.contains(r#"font-style="italic""#),
+            "Expected italic attribute, got: {}",
+            svg
+        );
+        assert!(svg.contains("Title"));
+    }
+
+    #[test]
+    fn test_write_tspan_no_modifiers() {
+        let mut svg = String::new();
+        let style = Style::default().fg(Color::White);
+        write_tspan(&mut svg, 8.0, "Plain", style);
+        assert!(!svg.contains("font-weight"));
+        assert!(!svg.contains("font-style"));
+        assert!(svg.contains("Plain"));
     }
 }
