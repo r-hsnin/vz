@@ -13,7 +13,7 @@ use super::{ChartConfig, SERIES_COLORS};
 pub enum XYMode {
     /// Line chart: multi-point uses Braille+Line, single-point uses Dot+Scatter.
     Line,
-    /// Scatter plot: always uses Dot+Scatter.
+    /// Scatter plot: multi-point uses Braille+Scatter, single-point uses Dot+Scatter.
     Scatter,
 }
 
@@ -27,10 +27,19 @@ struct DatasetSpec {
 /// Determine marker and graph type based on mode and series length.
 fn dataset_spec(mode: XYMode, series_len: usize) -> DatasetSpec {
     match mode {
-        XYMode::Scatter => DatasetSpec {
-            marker: Marker::Dot,
-            graph_type: GraphType::Scatter,
-        },
+        XYMode::Scatter => {
+            if series_len <= 1 {
+                DatasetSpec {
+                    marker: Marker::Dot,
+                    graph_type: GraphType::Scatter,
+                }
+            } else {
+                DatasetSpec {
+                    marker: Marker::Braille,
+                    graph_type: GraphType::Scatter,
+                }
+            }
+        }
         XYMode::Line => {
             if series_len <= 1 {
                 DatasetSpec {
@@ -298,14 +307,18 @@ mod tests {
     }
 
     #[test]
-    fn test_scatter_always_uses_dot_marker() {
+    fn test_scatter_uses_braille_for_multi_point() {
         let single = dataset_spec(XYMode::Scatter, 1);
         assert_eq!(single.marker, Marker::Dot);
         assert_eq!(single.graph_type, GraphType::Scatter);
 
         let multi = dataset_spec(XYMode::Scatter, 3);
-        assert_eq!(multi.marker, Marker::Dot);
+        assert_eq!(multi.marker, Marker::Braille);
         assert_eq!(multi.graph_type, GraphType::Scatter);
+
+        let empty = dataset_spec(XYMode::Scatter, 0);
+        assert_eq!(empty.marker, Marker::Dot);
+        assert_eq!(empty.graph_type, GraphType::Scatter);
     }
 
     #[test]
