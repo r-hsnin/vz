@@ -7,6 +7,7 @@ use std::io::Read;
 use std::path::Path;
 
 /// Raw loaded data before type inference.
+#[derive(Debug)]
 pub struct LoadedData {
     pub headers: Vec<String>,
     pub rows: Vec<Vec<String>>,

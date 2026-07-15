@@ -16,6 +16,7 @@ pub struct SkipReason {
 }
 
 /// Result of combining multiple data files.
+#[derive(Debug)]
 pub struct CombineResult {
     /// Combined data with `_source` column appended.
     pub data: LoadedData,

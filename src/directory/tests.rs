@@ -234,3 +234,65 @@ fn test_combine_rows_follow_file_order() {
     assert_eq!(result.data.rows[6][1], "Tokyo");
     assert_eq!(result.data.rows[6][2], "400");
 }
+
+// === Combiner error case tests (Cycle 5) ===
+
+#[test]
+fn test_combine_schema_mismatch_skips_file() {
+    let entries = scan_directory(&fixture("mixed_schema"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+
+    // mixed_schema has: also_sales.csv (date,city,revenue), sales.csv (date,city,revenue), users.csv (name,email,age)
+    // First file lexicographically is also_sales.csv → sets schema to date,city,revenue
+    // sales.csv matches → included
+    // users.csv doesn't match → skipped
+    assert_eq!(result.file_count, 2);
+    assert_eq!(result.skipped.len(), 1);
+    assert_eq!(result.skipped[0].file, "users");
+    assert!(result.skipped[0].reason.contains("schema mismatch"));
+}
+
+#[test]
+fn test_combine_header_only_file_skipped() {
+    let entries = scan_directory(&fixture("header_only"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+
+    // header_only has: empty_data.csv (0 rows), good.csv (3 rows)
+    // First lex: empty_data.csv → 0 rows → skipped
+    // Second: good.csv → sets schema, 3 rows
+    assert_eq!(result.file_count, 1);
+    assert_eq!(result.data.rows.len(), 3);
+    assert_eq!(result.skipped.len(), 1);
+    assert_eq!(result.skipped[0].file, "empty_data");
+    assert!(result.skipped[0].reason.contains("0 data rows"));
+}
+
+#[test]
+fn test_combine_single_file_works() {
+    let entries = scan_directory(&fixture("single_file"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+
+    assert_eq!(result.file_count, 1);
+    assert_eq!(result.data.rows.len(), 3);
+    assert_eq!(result.data.headers, vec!["date", "value", "_source"]);
+    // All rows should have _source = "only"
+    for row in &result.data.rows {
+        assert_eq!(row[2], "only");
+    }
+}
+
+#[test]
+fn test_combine_empty_entries_returns_error() {
+    let result = combine_files(&[], false);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("no file entries"));
+}
+
+#[test]
+fn test_combine_mixed_schema_row_count_correct() {
+    let entries = scan_directory(&fixture("mixed_schema"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+
+    // also_sales.csv has 2 rows, sales.csv has 3 rows = 5 total
+    assert_eq!(result.data.rows.len(), 5);
+}
