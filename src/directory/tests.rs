@@ -2,10 +2,16 @@
 
 use std::path::Path;
 
-use super::scanner::{ScanOptions, scan_directory};
+use super::scanner::{ScanOptions, glob_matches, scan_directory};
 
 fn default_opts() -> ScanOptions {
     ScanOptions { glob_pattern: None }
+}
+
+fn glob_opts(pattern: &str) -> ScanOptions {
+    ScanOptions {
+        glob_pattern: Some(pattern.to_string()),
+    }
 }
 
 fn fixture(name: &str) -> std::path::PathBuf {
@@ -13,6 +19,8 @@ fn fixture(name: &str) -> std::path::PathBuf {
         .join("fixtures/dir_test")
         .join(name)
 }
+
+// === Scanner tests ===
 
 #[test]
 fn test_scan_finds_all_data_files() {
@@ -65,4 +73,83 @@ fn test_scan_file_entry_paths_exist() {
     for entry in &result {
         assert!(entry.path.exists(), "path does not exist: {:?}", entry.path);
     }
+}
+
+// === Glob matcher tests ===
+
+#[test]
+fn test_glob_star_matches_all() {
+    assert!(glob_matches("*", "anything.csv"));
+    assert!(glob_matches("*", ""));
+    assert!(glob_matches("*", "a"));
+}
+
+#[test]
+fn test_glob_exact_match() {
+    assert!(glob_matches("sales.csv", "sales.csv"));
+    assert!(!glob_matches("sales.csv", "orders.csv"));
+    assert!(!glob_matches("sales.csv", "sales.csv.bak"));
+}
+
+#[test]
+fn test_glob_question_mark_single_char() {
+    assert!(glob_matches("sales_?.csv", "sales_1.csv"));
+    assert!(glob_matches("sales_?.csv", "sales_a.csv"));
+    assert!(!glob_matches("sales_?.csv", "sales_12.csv"));
+    assert!(!glob_matches("sales_?.csv", "sales_.csv"));
+}
+
+#[test]
+fn test_glob_star_prefix() {
+    assert!(glob_matches("*.csv", "data.csv"));
+    assert!(glob_matches("*.csv", "long_name_file.csv"));
+    assert!(!glob_matches("*.csv", "data.tsv"));
+}
+
+#[test]
+fn test_glob_star_middle() {
+    assert!(glob_matches("sales_*_2024.csv", "sales_jan_2024.csv"));
+    assert!(glob_matches("sales_*_2024.csv", "sales_february_2024.csv"));
+    assert!(!glob_matches("sales_*_2024.csv", "sales_jan_2023.csv"));
+}
+
+#[test]
+fn test_glob_multiple_stars() {
+    assert!(glob_matches("*sales*", "my_sales_data.csv"));
+    assert!(glob_matches("*sales*", "sales"));
+    assert!(!glob_matches("*sales*", "order_data.csv"));
+}
+
+#[test]
+fn test_glob_empty_pattern_matches_empty() {
+    assert!(glob_matches("", ""));
+    assert!(!glob_matches("", "nonempty"));
+}
+
+#[test]
+fn test_glob_no_wildcard_requires_exact() {
+    assert!(glob_matches("report.tsv", "report.tsv"));
+    assert!(!glob_matches("report.tsv", "report.csv"));
+}
+
+// === Glob integration with scan_directory ===
+
+#[test]
+fn test_scan_with_glob_filters_files() {
+    let result = scan_directory(&fixture("same_schema"), &glob_opts("sales_2024-01*")).unwrap();
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].stem, "sales_2024-01");
+}
+
+#[test]
+fn test_scan_with_glob_star_csv() {
+    let result = scan_directory(&fixture("mixed_extensions"), &glob_opts("*.csv")).unwrap();
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].stem, "data");
+}
+
+#[test]
+fn test_scan_with_glob_no_match_returns_error() {
+    let result = scan_directory(&fixture("same_schema"), &glob_opts("nonexistent*"));
+    assert!(result.is_err());
 }
