@@ -1990,6 +1990,44 @@ fn test_explore_where_flag_parsed() {
 }
 
 #[test]
+fn test_explore_directory_does_not_panic() {
+    // vz explore <dir> should combine files and enter TUI (headless exits immediately)
+    let output = vz_binary()
+        .args(["explore", "fixtures/dir_test/same_schema/"])
+        .env("VZ_TEST_HEADLESS", "1")
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let combined = format!("{}{}", stdout, stderr);
+    assert!(
+        !combined.contains("panicked"),
+        "explore dir should not panic, got: '{}'",
+        combined
+    );
+    assert!(
+        output.status.success(),
+        "explore dir should succeed, stderr: '{}'",
+        stderr
+    );
+}
+
+#[test]
+fn test_explore_directory_with_case_insensitive() {
+    // vz explore <dir> with case-insensitive schema files
+    let output = vz_binary()
+        .args(["explore", "fixtures/dir_test/case_insensitive/"])
+        .env("VZ_TEST_HEADLESS", "1")
+        .output()
+        .expect("Failed to run vz");
+    assert!(
+        output.status.success(),
+        "explore dir with case-insensitive schema should succeed, stderr: '{}'",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn test_where_filter_shows_feedback() {
     let output = vz_binary()
         .args(["fixtures/sales.csv", "--where", "city=Tokyo"])

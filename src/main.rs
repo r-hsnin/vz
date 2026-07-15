@@ -175,7 +175,14 @@ fn main() {
 fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Some(Command::Explore { file, filter }) => {
-            let data = loader::load_data(file)?;
+            let data = if file.is_dir() {
+                let opts = directory::scanner::ScanOptions { glob_pattern: None };
+                let entries = directory::scanner::scan_directory(file, &opts)?;
+                let result = directory::combiner::combine_files(&entries, false)?;
+                result.data
+            } else {
+                loader::load_data(file)?
+            };
             let data = apply_filters(data, filter)?;
             let schema = infer_from_data(&data);
             explore::run_explore(schema, data.rows, resolve_theme(cli))?;

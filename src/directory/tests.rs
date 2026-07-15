@@ -422,3 +422,34 @@ fn test_large_dataset_no_warning_below_threshold() {
     let msg = super::large_dataset_warning(99_999);
     assert_eq!(msg, None);
 }
+
+// === Explore directory mode tests (Phase 2, Task 4) ===
+
+/// Test that directory scanning + combining works for explore input preparation.
+/// (The actual TUI is not tested here — only the data pipeline.)
+#[test]
+fn test_explore_directory_combine_produces_valid_data() {
+    let entries = scan_directory(&fixture("same_schema"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    // Data should be valid for explore: has headers, rows, and _source column
+    assert!(!result.data.headers.is_empty());
+    assert!(!result.data.rows.is_empty());
+    assert!(result.data.headers.contains(&"_source".to_string()));
+}
+
+#[test]
+fn test_explore_directory_schema_inferred() {
+    use crate::infer;
+    let entries = scan_directory(&fixture("same_schema"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    let headers: Vec<&str> = result.data.headers.iter().map(|s| s.as_str()).collect();
+    let rows: Vec<Vec<&str>> = result
+        .data
+        .rows
+        .iter()
+        .map(|r| r.iter().map(|s| s.as_str()).collect())
+        .collect();
+    let schema = infer::infer_schema(&headers, &rows);
+    // Schema should have 4 columns (date, city, revenue, _source)
+    assert_eq!(schema.columns.len(), 4);
+}
