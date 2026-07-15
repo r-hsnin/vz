@@ -6,9 +6,11 @@ pub mod explore;
 pub mod filter;
 mod helpers;
 pub mod infer;
+mod info;
 pub mod loader;
 pub mod oneshot;
 pub mod output;
+mod pipeline;
 pub mod present;
 pub mod render;
 pub mod sparkline;
@@ -22,114 +24,8 @@ use clap::{CommandFactory, Parser};
 use std::path::Path;
 
 use cli::{Cli, Command};
-use helpers::{
-    YOptions, apply_filters, build_recommendation, build_render_options, effective_agg,
-    format_override, parse_y_options, resolve_input_file, resolve_theme,
-};
-use infer::types::Schema;
-use loader::LoadedData;
+use helpers::{apply_filters, format_override, resolve_input_file, resolve_theme};
 
-/// Infer schema from loaded data (eliminates boilerplate in multiple call sites).
-fn infer_from_data(data: &LoadedData) -> infer::types::Schema {
-    let headers: Vec<&str> = data.headers.iter().map(|s| s.as_str()).collect();
-    let rows: Vec<Vec<&str>> = data
-        .rows
-        .iter()
-        .map(|r| r.iter().map(|s| s.as_str()).collect())
-        .collect();
-    infer::infer_schema(&headers, &rows)
-}
-
-/// Print column metadata for --info flag.
-fn print_info(file: &Path, data: &LoadedData, schema: &infer::types::Schema) {
-    println!("File: {}", file.display());
-    println!("Rows: {}", data.rows.len());
-    println!("Columns: {}", schema.columns.len());
-    println!();
-    println!("{:<20} {:<15} {:>6}  Stats", "Name", "Type", "Nulls");
-    println!("{}", "-".repeat(70));
-    for (i, col) in schema.columns.iter().enumerate() {
-        let stats = output::stats_text::compute_column_stats_text(i, &col.data_type, data);
-        println!(
-            "{:<20} {:<15} {:>6}  {}",
-            col.name, col.data_type, col.null_count, stats
-        );
-    }
-    println!();
-    print_recommendation(schema);
-}
-
-/// Print column metadata as JSON for machine-readable output.
-fn print_info_json(file: &Path, data: &LoadedData, schema: &Schema) -> anyhow::Result<()> {
-    let recommendation = chart::select_chart(schema, None, None).ok();
-    let output = output::build_info_output(
-        &file.display().to_string(),
-        data,
-        schema,
-        recommendation.as_ref(),
-    );
-    println!("{}", serde_json::to_string_pretty(&output)?);
-    Ok(())
-}
-
-/// Print chart data as JSON — delegates to output::chart_json module.
-fn print_chart_json(
-    file: &Path,
-    data: &loader::LoadedData,
-    schema: &infer::types::Schema,
-    recommendation: &chart::ChartRecommendation,
-    cli: &Cli,
-    y_opts: &YOptions,
-) -> anyhow::Result<()> {
-    let params = output::chart_json::ChartJsonParams {
-        chart_type: cli
-            .chart_type
-            .map(|ct| ct.to_chart_type())
-            .unwrap_or(recommendation.chart_type),
-        sort: cli.effective_sort(),
-        agg: effective_agg(cli, recommendation, schema),
-        limit: cli.top.or(cli.tail),
-        extra_y_columns: y_opts.extra_columns.clone(),
-        color_column: cli.color_col.clone(),
-        bins: cli.bins,
-    };
-    output::chart_json::print_chart_json(
-        file,
-        data,
-        schema,
-        recommendation,
-        &data.headers,
-        &data.rows,
-        &params,
-    )
-}
-
-/// Print the auto-detected chart recommendation for the data.
-fn print_recommendation(schema: &Schema) {
-    match chart::select_chart(schema, None, None) {
-        Ok(rec) => {
-            let y_part = rec
-                .y_column
-                .as_ref()
-                .map(|y| format!(", y={}", y))
-                .unwrap_or_default();
-            let color_part = rec
-                .color_column
-                .as_ref()
-                .map(|c| format!(", color={}", c))
-                .unwrap_or_default();
-            println!(
-                "Recommendation: {} (x={}{}{})",
-                rec.chart_type, rec.x_column, y_part, color_part
-            );
-        }
-        Err(_) => {
-            println!("Recommendation: (insufficient data for chart selection)");
-        }
-    }
-}
-
-/// Compute summary statistics for a column and format as human-readable text.
 fn main() {
     let mut cli = Cli::parse();
     // --json is a shorthand for -o json
@@ -187,7 +83,7 @@ fn run(cli: &Cli) -> Result<()> {
                 loader::load_data(file)?
             };
             let data = apply_filters(data, filter)?;
-            let schema = infer_from_data(&data);
+            let schema = pipeline::infer_from_data(&data);
             explore::run_explore(schema, data.rows, resolve_theme(cli))?;
         }
         Some(Command::Present { file }) => {
@@ -201,45 +97,6 @@ fn run(cli: &Cli) -> Result<()> {
     }
 
     Ok(())
-}
-
-/// Print data as a formatted text table (used by `--output table`).
-/// Print sparkline output (delegates to output::spark module).
-fn print_spark(
-    recommendation: &chart::selector::ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-    cli: &Cli,
-    schema: &Schema,
-) {
-    let params = output::spark::SparkParams {
-        chart_type_override: cli.chart_type,
-        agg: effective_agg(cli, recommendation, schema),
-        sort: cli.effective_sort(),
-        limit: cli.top.or(cli.tail),
-        color_col: cli.color_col.clone(),
-        bins: cli.bins,
-    };
-    output::spark::print_spark(recommendation, headers, rows, &params);
-}
-
-/// Expand `--all-y`: add all remaining quantitative columns to extra_y.
-fn expand_all_y(
-    recommendation: &chart::selector::ChartRecommendation,
-    schema: &Schema,
-    y_opts: &mut YOptions,
-) {
-    let x_col = &recommendation.x_column;
-    let primary_y = recommendation.y_column.as_deref().unwrap_or("");
-    let extra: Vec<(String, Option<String>)> = schema
-        .columns
-        .iter()
-        .filter(|c| c.data_type == infer::types::DataType::Quantitative)
-        .filter(|c| c.name != *x_col && c.name != primary_y)
-        .filter(|c| !y_opts.extra_columns.iter().any(|(n, _)| n == &c.name))
-        .map(|c| (c.name.clone(), None))
-        .collect();
-    y_opts.extra_columns.extend(extra);
 }
 
 /// Run the oneshot (default) mode: load data, infer types, render chart.
@@ -276,160 +133,9 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
     }
 
     let data = loader::load_data_full(file, cli.no_header, format_override(cli))?;
-    render_data(cli, data, file)
+    pipeline::render_data(cli, data, file)
 }
 
-/// Shared post-load pipeline: filter → sample → validate → infer → render.
-/// Used by both single-file and directory modes.
-pub(crate) fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
-    let pre_filter_count = data.rows.len();
-    let data = apply_filters(data, &cli.filter)?;
-    let data = if let Some(max_rows) = cli.sample {
-        if max_rows == 0 {
-            anyhow::bail!("--sample must be at least 1");
-        }
-        loader::apply_sampling(data, max_rows)
-    } else {
-        data
-    };
-
-    validate_loaded_data(&data, file, &cli.filter, pre_filter_count)?;
-
-    // Validate -c column exists in the loaded data
-    if let Some(ref color_col) = cli.color_col {
-        if !data.headers.iter().any(|h| h == color_col) {
-            anyhow::bail!(
-                "Color column '{}' not found. Available columns: {}",
-                color_col,
-                data.headers.join(", ")
-            );
-        }
-    }
-
-    let schema = infer_from_data(&data);
-
-    if cli.info {
-        if cli.output == Some(cli::OutputFormat::Json) {
-            print_info_json(file, &data, &schema)?;
-        } else {
-            print_info(file, &data, &schema);
-        }
-        return Ok(());
-    }
-
-    let mut y_opts = parse_y_options(cli);
-    let recommendation = build_recommendation(cli, &schema, &y_opts)?;
-    if cli.all_y {
-        expand_all_y(&recommendation, &schema, &mut y_opts);
-    }
-
-    if cli.output == Some(cli::OutputFormat::Json) {
-        print_chart_json(file, &data, &schema, &recommendation, cli, &y_opts)?;
-        return Ok(());
-    }
-
-    dispatch_output(
-        cli,
-        &recommendation,
-        &data.headers,
-        &data.rows,
-        &y_opts,
-        &schema,
-    )
-}
-
-/// Validate that loaded data is non-empty and produce clear error messages.
-fn validate_loaded_data(
-    data: &LoadedData,
-    file: &Path,
-    filters: &[String],
-    pre_filter_count: usize,
-) -> Result<()> {
-    if data.rows.is_empty() {
-        if !filters.is_empty() && pre_filter_count > 0 {
-            anyhow::bail!(
-                "No rows remain after filtering. All {} rows were excluded by --where predicates.",
-                pre_filter_count,
-            );
-        }
-        if data.headers.is_empty() || data.headers.iter().all(|h| h.is_empty()) {
-            anyhow::bail!(
-                "Input '{}' is empty — no data to visualize.\n\n  Tip: ensure the command or file produces output before piping to vz.",
-                file.display(),
-            );
-        }
-        anyhow::bail!(
-            "No data rows found in '{}'. The file appears to contain only headers.",
-            file.display(),
-        );
-    }
-    Ok(())
-}
-
-/// Dispatch to the appropriate output renderer based on CLI flags.
-fn dispatch_output(
-    cli: &Cli,
-    recommendation: &chart::ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-    y_opts: &YOptions,
-    schema: &Schema,
-) -> Result<()> {
-    match cli.output {
-        Some(cli::OutputFormat::Table) => {
-            output::table::print_table(recommendation, headers, rows, cli)?;
-        }
-        Some(cli::OutputFormat::Spark) => {
-            print_spark(recommendation, headers, rows, cli, schema);
-        }
-        Some(cli::OutputFormat::Svg) => {
-            let opts = build_render_options(cli, y_opts, recommendation, schema);
-            print_svg(recommendation, headers, rows, &opts)?;
-        }
-        Some(cli::OutputFormat::Markdown) => {
-            output::markdown::print_markdown(recommendation, headers, rows, cli, schema)?;
-        }
-        _ => {
-            let opts = build_render_options(cli, y_opts, recommendation, schema);
-            oneshot::render_oneshot(recommendation, headers, rows, &opts)?;
-        }
-    }
-    Ok(())
-}
-
-/// Render the chart to SVG and print to stdout.
-fn print_svg(
-    recommendation: &chart::ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-    opts: &oneshot::RenderOptions<'_>,
-) -> anyhow::Result<()> {
-    use ratatui::{buffer::Buffer, layout::Rect};
-
-    let width = opts.width.unwrap_or_else(oneshot::terminal_width);
-    let chart_type = oneshot::resolve_chart_type(recommendation, opts.chart_type_override);
-    let height = opts.height.unwrap_or(24);
-
-    let area = Rect::new(0, 0, width, height);
-    let mut buf = Buffer::empty(area);
-    oneshot::render_chart_to_buffer(
-        chart_type,
-        recommendation,
-        headers,
-        rows,
-        opts,
-        area,
-        &mut buf,
-    );
-
-    println!(
-        "{}",
-        output::svg::buffer_to_svg(&buf, opts.theme.svg_background())
-    );
-    Ok(())
-}
-
-/// Construct render options from CLI args and parsed Y-column config.
 #[cfg(test)]
 mod tests {
     use super::*;

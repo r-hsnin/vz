@@ -125,5 +125,5 @@ pub fn run_directory(cli: &Cli, dir: &Path) -> Result<()> {
     }
 
     // Feed combined data into the standard render pipeline
-    crate::render_data(cli, data, dir)
+    crate::pipeline::render_data(cli, data, dir)
 }
