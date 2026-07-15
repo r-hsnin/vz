@@ -153,3 +153,84 @@ fn test_scan_with_glob_no_match_returns_error() {
     let result = scan_directory(&fixture("same_schema"), &glob_opts("nonexistent*"));
     assert!(result.is_err());
 }
+
+// === Combiner tests (Cycle 4) ===
+
+use super::combiner::combine_files;
+
+#[test]
+fn test_combine_same_schema_all_rows_and_source() {
+    let entries = scan_directory(&fixture("same_schema"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+
+    // 3 files × 3 rows = 9 rows
+    assert_eq!(result.data.rows.len(), 9);
+    // Headers: date, city, revenue, _source
+    assert_eq!(result.data.headers.len(), 4);
+    assert_eq!(result.data.headers[3], "_source");
+    assert_eq!(result.file_count, 3);
+    assert!(result.skipped.is_empty());
+}
+
+#[test]
+fn test_combine_source_column_contains_file_stem() {
+    let entries = scan_directory(&fixture("same_schema"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+
+    let source_col_idx = 3;
+    // First 3 rows from sales_2024-01
+    assert_eq!(result.data.rows[0][source_col_idx], "sales_2024-01");
+    assert_eq!(result.data.rows[2][source_col_idx], "sales_2024-01");
+    // Middle rows from sales_2024-02
+    assert_eq!(result.data.rows[3][source_col_idx], "sales_2024-02");
+    assert_eq!(result.data.rows[5][source_col_idx], "sales_2024-02");
+    // Last rows from sales_2024-03
+    assert_eq!(result.data.rows[6][source_col_idx], "sales_2024-03");
+    assert_eq!(result.data.rows[8][source_col_idx], "sales_2024-03");
+}
+
+#[test]
+fn test_combine_headers_are_original_plus_source() {
+    let entries = scan_directory(&fixture("same_schema"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+
+    assert_eq!(
+        result.data.headers,
+        vec!["date", "city", "revenue", "_source"]
+    );
+}
+
+#[test]
+fn test_combine_row_columns_match_header_count() {
+    let entries = scan_directory(&fixture("same_schema"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+
+    for (i, row) in result.data.rows.iter().enumerate() {
+        assert_eq!(
+            row.len(),
+            result.data.headers.len(),
+            "row {i} has wrong column count"
+        );
+    }
+}
+
+#[test]
+fn test_combine_rows_follow_file_order() {
+    let entries = scan_directory(&fixture("same_schema"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+
+    // First file (sales_2024-01): first row is 2024-01-01,Tokyo,100
+    assert_eq!(result.data.rows[0][0], "2024-01-01");
+    assert_eq!(result.data.rows[0][1], "Tokyo");
+    assert_eq!(result.data.rows[0][2], "100");
+
+    // Second file (sales_2024-02): first row is 2024-02-01,Osaka,250
+    assert_eq!(result.data.rows[3][0], "2024-02-01");
+    assert_eq!(result.data.rows[3][1], "Osaka");
+    assert_eq!(result.data.rows[3][2], "250");
+
+    // Third file (sales_2024-03): first row is 2024-03-01,Tokyo,400
+    assert_eq!(result.data.rows[6][0], "2024-03-01");
+    assert_eq!(result.data.rows[6][1], "Tokyo");
+    assert_eq!(result.data.rows[6][2], "400");
+}
