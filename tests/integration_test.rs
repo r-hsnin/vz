@@ -3628,3 +3628,98 @@ fn test_directory_explicit_sample_flag_independent() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(!stdout.is_empty(), "Expected JSON output");
 }
+
+// === Mixed format directory tests (Cycle 5) ===
+
+#[test]
+fn test_directory_mixed_format_renders_chart() {
+    let output = vz_binary()
+        .arg("fixtures/dir_test/mixed_format/")
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(stderr.contains("3 files, 6 rows"), "stderr: {stderr}");
+    assert!(stdout.contains("revenue"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_directory_mixed_format_spark_output() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/mixed_format/", "--spark"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(stderr.contains("3 files, 6 rows"), "stderr: {stderr}");
+    assert!(stdout.contains("revenue"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_directory_mixed_format_json_output() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/mixed_format/", "--json"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success());
+
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Failed to parse JSON output");
+    // Should have 6 rows of data
+    let data = parsed["data"].as_array().unwrap();
+    assert_eq!(data.len(), 6);
+
+    // Verify data from all 3 formats is present via _source
+    let sources: Vec<&str> = data
+        .iter()
+        .map(|r| r["_source"].as_str().unwrap())
+        .collect();
+    assert!(sources.contains(&"sales"), "missing CSV data");
+    assert!(sources.contains(&"stats"), "missing JSON data");
+    assert!(sources.contains(&"summary"), "missing TSV data");
+}
+
+#[test]
+fn test_directory_mixed_format_info() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/mixed_format/", "--info"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success());
+    assert!(stdout.contains("date"), "stdout: {stdout}");
+    assert!(stdout.contains("city"), "stdout: {stdout}");
+    assert!(stdout.contains("revenue"), "stdout: {stdout}");
+    assert!(stdout.contains("Rows: 6"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_directory_mixed_format_color_by_source() {
+    let output = vz_binary()
+        .args([
+            "fixtures/dir_test/mixed_format/",
+            "-c",
+            "_source",
+            "--spark",
+        ])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(output.status.success(), "stderr: {stderr}");
+    // Should show all 3 source names
+    assert!(stdout.contains("sales"), "stdout: {stdout}");
+    assert!(stdout.contains("stats"), "stdout: {stdout}");
+    assert!(stdout.contains("summary"), "stdout: {stdout}");
+}

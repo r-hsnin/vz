@@ -10,6 +10,8 @@ pub mod catalog;
 mod catalog_tests;
 pub mod combiner;
 pub mod date_extract;
+#[cfg(test)]
+mod mixed_format_tests;
 pub mod scanner;
 #[cfg(test)]
 mod tests;

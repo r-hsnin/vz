@@ -690,3 +690,4 @@ fn test_combine_file_date_all_rows_same_per_file() {
 
 // Catalog tests are in catalog_tests.rs
 // Auto-sampling tests are in auto_sample_tests.rs
+// Mixed format tests are in mixed_format_tests.rs
