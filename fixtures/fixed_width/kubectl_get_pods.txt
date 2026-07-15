@@ -1,0 +1,5 @@
+NAME                                    READY   STATUS    RESTARTS   AGE
+frontend-deploy-7b4c9f8d6-abc12        1/1     Running   0          5d
+backend-deploy-5d6e7f8a9-def34         1/1     Running   2          3d
+redis-master-0                          1/1     Running   0          10d
+job-cleanup-28374                       0/1     Error     5          1h

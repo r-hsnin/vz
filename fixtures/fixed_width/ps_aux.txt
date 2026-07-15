@@ -1,0 +1,5 @@
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.1 169356 12344 ?        Ss   Jul01   0:05 /sbin/init
+root           2  0.0  0.0      0     0 ?        S    Jul01   0:00 [kthreadd]
+www-data    1234  1.5  2.3 456789 23456 ?        Sl   10:30   0:45 /usr/bin/nginx -g daemon off;
+postgres    5678  0.8  5.1 789012 51234 ?        Ss   Jul01   2:30 /usr/lib/postgresql/15/bin/postgres

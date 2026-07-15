@@ -114,6 +114,7 @@ pub(crate) fn format_override(cli: &Cli) -> Option<loader::InputFormat> {
         cli::InputFormatArg::Tsv => loader::InputFormat::Tsv,
         cli::InputFormatArg::Json => loader::InputFormat::Json,
         cli::InputFormatArg::Ndjson => loader::InputFormat::Ndjson,
+        cli::InputFormatArg::Space => loader::InputFormat::Space,
     })
 }
 

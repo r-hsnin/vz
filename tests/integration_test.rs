@@ -3723,3 +3723,118 @@ fn test_directory_mixed_format_color_by_source() {
     assert!(stdout.contains("stats"), "stdout: {stdout}");
     assert!(stdout.contains("summary"), "stdout: {stdout}");
 }
+
+#[test]
+fn test_fixed_width_kubectl_top_from_file() {
+    let output = vz_binary()
+        .args(["fixtures/fixed_width/kubectl_top_pods.txt", "--info"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("Rows: 3"), "stdout: {stdout}");
+    assert!(stdout.contains("NAME"), "stdout: {stdout}");
+    assert!(stdout.contains("CPU(cores)"), "stdout: {stdout}");
+    assert!(stdout.contains("MEMORY(bytes)"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_fixed_width_stdin_auto_detect() {
+    let mut child = vz_binary()
+        .args(["-", "--info"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn vz");
+
+    let stdin = child.stdin.as_mut().unwrap();
+    stdin
+        .write_all(b"NAME        CPU    MEM\npod1        100m   256Mi\npod2        200m   512Mi\n")
+        .unwrap();
+    drop(child.stdin.take());
+
+    let output = child.wait_with_output().expect("Failed to wait for vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("Rows: 2"), "stdout: {stdout}");
+    assert!(stdout.contains("NAME"), "stdout: {stdout}");
+    assert!(stdout.contains("CPU"), "stdout: {stdout}");
+    assert!(stdout.contains("MEM"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_fixed_width_format_flag_space() {
+    let output = vz_binary()
+        .args([
+            "fixtures/fixed_width/kubectl_top_pods.txt",
+            "-f",
+            "space",
+            "--info",
+        ])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("Rows: 3"), "stdout: {stdout}");
+    assert!(stdout.contains("CPU(cores)"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_fixed_width_stdin_spark_output() {
+    let mut child = vz_binary()
+        .args(["-", "--spark"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn vz");
+
+    let stdin = child.stdin.as_mut().unwrap();
+    stdin
+        .write_all(b"NAME CPU MEM\npod1 100m 256Mi\npod2 200m 512Mi\npod3 50m 128Mi\n")
+        .unwrap();
+    drop(child.stdin.take());
+
+    let output = child.wait_with_output().expect("Failed to wait for vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // Should produce some spark output
+    assert!(!stdout.trim().is_empty(), "stdout should not be empty");
+}
+
+#[test]
+fn test_fixed_width_separator_lines_handled() {
+    let output = vz_binary()
+        .args(["fixtures/fixed_width/separator_lines.txt", "--info"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("Rows: 3"), "stdout: {stdout}");
+    assert!(stdout.contains("Name"), "stdout: {stdout}");
+    assert!(stdout.contains("Score"), "stdout: {stdout}");
+}

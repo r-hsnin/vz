@@ -1,10 +1,12 @@
-//! Unified data loader: CSV, TSV, JSON (array of objects), and NDJSON.
+//! Unified data loader: CSV, TSV, JSON (array of objects), NDJSON, and fixed-width.
 //!
 //! Detects format from content (not just extension) and returns tabular data.
 
 use anyhow::{Context, Result};
 use std::io::Read;
 use std::path::Path;
+
+pub mod space;
 
 /// Raw loaded data before type inference.
 #[derive(Debug)]
@@ -20,6 +22,7 @@ pub enum InputFormat {
     Tsv,
     Json,
     Ndjson,
+    Space,
 }
 
 /// Detect the input format from file extension and content.
@@ -51,6 +54,11 @@ pub fn detect_format(path: &Path, content: &str) -> InputFormat {
         if tabs > 0 && tabs >= commas {
             return InputFormat::Tsv;
         }
+    }
+
+    // Fixed-width / space-aligned format detection
+    if space::looks_like_space_format(content) {
+        return InputFormat::Space;
     }
 
     InputFormat::Csv
@@ -91,6 +99,7 @@ pub fn load_data_full(
         InputFormat::Tsv => load_delimited(&content, b'\t', no_header),
         InputFormat::Json => load_json_array(&content),
         InputFormat::Ndjson => load_ndjson(&content),
+        InputFormat::Space => space::load_space(&content, no_header),
     }
 }
 

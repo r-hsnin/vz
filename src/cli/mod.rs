@@ -195,6 +195,8 @@ pub enum InputFormatArg {
     Json,
     /// Newline-delimited JSON (one object per line).
     Ndjson,
+    /// Fixed-width / space-aligned columns (e.g., kubectl, ps, df output).
+    Space,
 }
 
 /// Chart type for the -t/--type flag.

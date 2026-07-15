@@ -78,6 +78,7 @@ pub fn build_catalog(entries: &[FileEntry], no_header: bool) -> CatalogResult {
                     loader::InputFormat::Tsv => "tsv",
                     loader::InputFormat::Json => "json",
                     loader::InputFormat::Ndjson => "ndjson",
+                    loader::InputFormat::Space => "space",
                 };
                 infos.push(FileInfo {
                     stem: entry.stem.clone(),

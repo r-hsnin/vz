@@ -1,0 +1,4 @@
+NAME                                    CPU(cores)   MEMORY(bytes)
+frontend-deploy-7b4c9f8d6-abc12        100m         256Mi
+backend-deploy-5d6e7f8a9-def34         200m         512Mi
+redis-master-0                          50m          128Mi

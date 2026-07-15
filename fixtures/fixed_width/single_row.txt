@@ -1,0 +1,2 @@
+NAME         CPU    MEM
+my-pod       50m    128Mi
