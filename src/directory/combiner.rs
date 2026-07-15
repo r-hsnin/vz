@@ -33,17 +33,26 @@ fn normalize_header(h: &str) -> String {
     h.trim().to_lowercase()
 }
 
-/// Check if two header sets match case-insensitively (with whitespace trimming).
+/// Build a column reorder map from incoming headers to reference headers.
 ///
-/// Returns `true` if both have the same length and each normalized header matches.
-fn headers_match_normalized(reference: &[String], incoming: &[String]) -> bool {
+/// Returns `Some(indices)` where `indices[ref_pos]` is the position in `incoming`
+/// that maps to `reference[ref_pos]`. Returns `None` if headers don't match
+/// (case-insensitive, after trimming).
+fn build_reorder_map(reference: &[String], incoming: &[String]) -> Option<Vec<usize>> {
     if reference.len() != incoming.len() {
-        return false;
+        return None;
     }
-    reference
-        .iter()
-        .zip(incoming.iter())
-        .all(|(r, i)| normalize_header(r) == normalize_header(i))
+
+    let normalized_incoming: Vec<String> = incoming.iter().map(|h| normalize_header(h)).collect();
+
+    let mut indices = Vec::with_capacity(reference.len());
+    for ref_h in reference {
+        let target = normalize_header(ref_h);
+        let pos = normalized_incoming.iter().position(|h| *h == target)?;
+        indices.push(pos);
+    }
+
+    Some(indices)
 }
 
 /// Combine data from multiple file entries.
@@ -91,28 +100,52 @@ pub fn combine_files(entries: &[FileEntry], no_header: bool) -> Result<CombineRe
             continue;
         }
 
-        // Schema comparison (case-insensitive, whitespace-trimmed)
+        // Schema comparison (case-insensitive, whitespace-trimmed, order-independent)
         match &reference_headers {
             None => {
                 // First valid file sets the reference schema
                 reference_headers = Some(data.headers.clone());
             }
             Some(ref_headers) => {
-                if !headers_match_normalized(ref_headers, &data.headers) {
-                    skipped.push(SkipReason {
-                        file: entry.stem.clone(),
-                        reason: format!(
-                            "schema mismatch (expected [{}], got [{}])",
-                            ref_headers.join(", "),
-                            data.headers.join(", ")
-                        ),
-                    });
-                    continue;
+                let reorder_map = build_reorder_map(ref_headers, &data.headers);
+                match reorder_map {
+                    None => {
+                        skipped.push(SkipReason {
+                            file: entry.stem.clone(),
+                            reason: format!(
+                                "schema mismatch (expected [{}], got [{}])",
+                                ref_headers.join(", "),
+                                data.headers.join(", ")
+                            ),
+                        });
+                        continue;
+                    }
+                    Some(ref map) => {
+                        // Check if columns need reordering
+                        let needs_reorder = map.iter().enumerate().any(|(i, &m)| i != m);
+                        if needs_reorder {
+                            // Append rows with columns remapped to reference order
+                            for row in &data.rows {
+                                let mut reordered: Vec<String> =
+                                    map.iter().map(|&i| row[i].clone()).collect();
+                                reordered.push(entry.stem.clone());
+                                combined_rows.push(reordered);
+                            }
+                        } else {
+                            // Columns already in correct order
+                            for mut row in data.rows {
+                                row.push(entry.stem.clone());
+                                combined_rows.push(row);
+                            }
+                        }
+                        file_count += 1;
+                        continue;
+                    }
                 }
             }
         }
 
-        // Append rows with _source column
+        // First file: append rows with _source column (no reordering needed)
         for mut row in data.rows {
             row.push(entry.stem.clone());
             combined_rows.push(row);

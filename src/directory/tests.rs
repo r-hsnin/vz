@@ -341,3 +341,48 @@ fn test_combine_case_insensitive_whitespace_trimmed() {
     // "Date" (trimmed) matches "date" (trimmed+lowered) → combined
     assert_eq!(result.file_count, 2);
 }
+
+// === Column order normalization tests (Phase 2, Task 2) ===
+
+#[test]
+fn test_combine_reordered_columns_matches() {
+    // first.csv: date,city,revenue; second.csv: revenue,date,city
+    // Same columns, different order → should combine
+    let entries = scan_directory(&fixture("reordered"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    assert_eq!(result.file_count, 2);
+    assert_eq!(result.data.rows.len(), 6);
+    assert!(result.skipped.is_empty());
+}
+
+#[test]
+fn test_combine_reordered_columns_remaps_data() {
+    // second.csv row "500,2024-04-01,Nagoya" → remapped to reference order: date,city,revenue
+    let entries = scan_directory(&fixture("reordered"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    // First file has 3 rows, so second file starts at index 3
+    let row = &result.data.rows[3];
+    assert_eq!(row[0], "2024-04-01"); // date (was at position 1 in second.csv)
+    assert_eq!(row[1], "Nagoya"); // city (was at position 2 in second.csv)
+    assert_eq!(row[2], "500"); // revenue (was at position 0 in second.csv)
+}
+
+#[test]
+fn test_combine_reordered_uses_first_file_column_order() {
+    let entries = scan_directory(&fixture("reordered"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    assert_eq!(
+        result.data.headers,
+        vec!["date", "city", "revenue", "_source"]
+    );
+}
+
+#[test]
+fn test_combine_reordered_source_column_correct() {
+    let entries = scan_directory(&fixture("reordered"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    // Rows from first.csv have _source = "first"
+    assert_eq!(result.data.rows[0][3], "first");
+    // Rows from second.csv have _source = "second"
+    assert_eq!(result.data.rows[3][3], "second");
+}
