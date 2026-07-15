@@ -3548,3 +3548,83 @@ fn test_catalog_empty_directory_errors() {
         "should report no data files: {stderr}"
     );
 }
+
+// === Auto-sampling integration tests ===
+
+#[test]
+fn test_directory_auto_sampling_triggers_warning() {
+    // Create a temp dir with enough rows to exceed 1M
+    let dir = tempfile::tempdir().unwrap();
+    // 20 files × 60,000 rows = 1,200,000 total rows (exceeds 1M limit)
+    for i in 0..20 {
+        let path = dir.path().join(format!("data_{:02}.csv", i));
+        let mut f = std::fs::File::create(&path).unwrap();
+        use std::io::Write;
+        writeln!(f, "x,y").unwrap();
+        for j in 0..60_000 {
+            writeln!(f, "{},{}", j, j * 2 + i).unwrap();
+        }
+    }
+
+    let output = vz_binary()
+        .args([dir.path().to_str().unwrap(), "--json"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(
+        stderr.contains("auto-sampled"),
+        "Expected auto-sampling warning, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_directory_no_limit_flag_bypasses_sampling() {
+    // Create a temp dir with rows exceeding 1M, use --no-limit
+    let dir = tempfile::tempdir().unwrap();
+    // 20 files × 60,000 rows = 1,200,000 total rows
+    for i in 0..20 {
+        let path = dir.path().join(format!("data_{:02}.csv", i));
+        let mut f = std::fs::File::create(&path).unwrap();
+        use std::io::Write;
+        writeln!(f, "x,y").unwrap();
+        for j in 0..60_000 {
+            writeln!(f, "{},{}", j, j * 2 + i).unwrap();
+        }
+    }
+
+    let output = vz_binary()
+        .args([dir.path().to_str().unwrap(), "--no-limit", "--json"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(
+        !stderr.contains("auto-sampled"),
+        "Should NOT auto-sample with --no-limit: {stderr}"
+    );
+}
+
+#[test]
+fn test_directory_explicit_sample_flag_independent() {
+    // --sample works independently from auto-sampling (small dataset, no auto-sampling)
+    let output = vz_binary()
+        .args(["fixtures/dir_test/same_schema/", "--sample", "3", "--json"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {stderr}");
+
+    // Should NOT mention "auto-sampled" — dataset is small
+    assert!(
+        !stderr.contains("auto-sampled"),
+        "Should not auto-sample small data: {stderr}"
+    );
+
+    // Should show sample info from --sample flag
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(!stdout.is_empty(), "Expected JSON output");
+}

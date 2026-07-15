@@ -127,6 +127,10 @@ pub struct Cli {
     /// Show schema catalog of files in a directory (columns, row counts, format per file).
     #[arg(long = "catalog")]
     pub catalog: bool,
+
+    /// Disable automatic row limit for directory mode (load all rows regardless of size).
+    #[arg(long = "no-limit")]
+    pub no_limit: bool,
 }
 
 #[derive(Subcommand, Debug, PartialEq, Clone)]

@@ -3,6 +3,8 @@
 //! Scans a directory for data files, validates schema compatibility,
 //! concatenates rows, and injects a `_source` column with each file's stem.
 
+#[cfg(test)]
+mod auto_sample_tests;
 pub mod catalog;
 #[cfg(test)]
 mod catalog_tests;
@@ -24,6 +26,9 @@ use self::scanner::{ScanOptions, scan_directory};
 /// Row count threshold above which a large dataset warning is emitted.
 pub const LARGE_DATASET_THRESHOLD: usize = 100_000;
 
+/// Maximum combined rows before auto-sampling kicks in for directory mode.
+pub const MAX_COMBINED_ROWS: usize = 1_000_000;
+
 /// Returns a warning message if the row count exceeds the threshold.
 pub fn large_dataset_warning(row_count: usize) -> Option<String> {
     if row_count > LARGE_DATASET_THRESHOLD {
@@ -33,6 +38,38 @@ pub fn large_dataset_warning(row_count: usize) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Auto-sample combined data if it exceeds the row limit.
+///
+/// Returns the (possibly sampled) data and an optional warning message.
+/// Uses systematic (every-Nth) sampling to preserve distribution.
+/// If `no_limit` is true, bypasses sampling entirely.
+pub fn auto_sample_combined(
+    mut data: crate::loader::LoadedData,
+    max_rows: usize,
+    no_limit: bool,
+) -> (crate::loader::LoadedData, Option<String>) {
+    if no_limit || data.rows.len() <= max_rows {
+        return (data, None);
+    }
+
+    let total = data.rows.len();
+    let step = total as f64 / max_rows as f64;
+    let sampled: Vec<Vec<String>> = (0..max_rows)
+        .map(|i| {
+            let idx = (i as f64 * step).floor() as usize;
+            data.rows[idx.min(total - 1)].clone()
+        })
+        .collect();
+
+    let warning = format!(
+        "warning: dataset exceeded {} rows, auto-sampled to {} rows",
+        max_rows,
+        sampled.len()
+    );
+    data.rows = sampled;
+    (data, Some(warning))
 }
 
 /// Run directory mode: scan, combine, and render data from a directory.
@@ -51,27 +88,34 @@ pub fn run_directory(cli: &Cli, dir: &Path) -> Result<()> {
 
     let result = combine_files(&entries, cli.no_header)?;
 
-    // Emit large dataset warning if needed
-    if let Some(warning) = large_dataset_warning(result.data.rows.len()) {
-        eprintln!("{warning}");
+    // Auto-sample if row count exceeds limit (unless --no-limit)
+    let (data, auto_sample_warning) =
+        auto_sample_combined(result.data, MAX_COMBINED_ROWS, cli.no_limit);
+
+    // Emit large dataset warning only if auto-sampling did NOT fire
+    if auto_sample_warning.is_none() {
+        if let Some(warning) = large_dataset_warning(data.rows.len()) {
+            eprintln!("{warning}");
+        }
     }
 
     // Print summary to stderr
     let summary = if result.skipped.is_empty() {
-        format!(
-            "{} files, {} rows",
-            result.file_count,
-            result.data.rows.len()
-        )
+        format!("{} files, {} rows", result.file_count, data.rows.len())
     } else {
         format!(
             "{} files, {} rows ({} skipped)",
             result.file_count,
-            result.data.rows.len(),
+            data.rows.len(),
             result.skipped.len()
         )
     };
     eprintln!("info: {summary}");
+
+    // Print auto-sampling warning after summary
+    if let Some(ref warning) = auto_sample_warning {
+        eprintln!("{warning}");
+    }
 
     // Print skip warnings to stderr
     for skip in &result.skipped {
@@ -79,5 +123,5 @@ pub fn run_directory(cli: &Cli, dir: &Path) -> Result<()> {
     }
 
     // Feed combined data into the standard render pipeline
-    crate::render_data(cli, result.data, dir)
+    crate::render_data(cli, data, dir)
 }
