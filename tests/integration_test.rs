@@ -3430,3 +3430,121 @@ fn test_directory_recurse_with_glob() {
     // Only deep_a.csv and deep_b.csv match the glob at any level
     assert!(stderr.contains("2 files"), "stderr: {stderr}");
 }
+
+// === Catalog mode integration tests ===
+
+#[test]
+fn test_catalog_flag_basic() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/same_schema/", "--catalog"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("date"), "stdout: {stdout}");
+    assert!(stdout.contains("city"), "stdout: {stdout}");
+    assert!(stdout.contains("revenue"), "stdout: {stdout}");
+    assert!(stdout.contains("sales_2024-01"), "stdout: {stdout}");
+    assert!(stdout.contains("3 files"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_catalog_json_output() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/mixed_schema/", "--catalog", "--json"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Failed to parse catalog JSON");
+    assert_eq!(parsed["version"], 1);
+    assert!(parsed["groups"].is_array());
+    assert_eq!(parsed["groups"].as_array().unwrap().len(), 2);
+}
+
+#[test]
+fn test_catalog_with_recurse() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/nested/", "--catalog", "-R"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // Should contain relative paths with /
+    assert!(
+        stdout.contains("sub1/") || stdout.contains("sub2/"),
+        "recursive catalog should show relative paths: {stdout}"
+    );
+}
+
+#[test]
+fn test_catalog_on_file_errors() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--catalog"])
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("directory"),
+        "should mention directory requirement: {stderr}"
+    );
+}
+
+#[test]
+fn test_catalog_with_glob_filter() {
+    let output = vz_binary()
+        .args([
+            "fixtures/dir_test/same_schema/",
+            "--catalog",
+            "--glob",
+            "sales_2024-01*",
+        ])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("sales_2024-01"), "stdout: {stdout}");
+    assert!(
+        !stdout.contains("sales_2024-02"),
+        "should not include non-matching files: {stdout}"
+    );
+    assert!(stdout.contains("1 file"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_catalog_empty_directory_errors() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/empty/", "--catalog"])
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("no data files"),
+        "should report no data files: {stderr}"
+    );
+}

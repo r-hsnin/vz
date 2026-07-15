@@ -123,6 +123,10 @@ pub struct Cli {
     /// Recursively scan subdirectories in directory mode (excludes hidden directories).
     #[arg(short = 'R', long = "recurse")]
     pub recurse: bool,
+
+    /// Show schema catalog of files in a directory (columns, row counts, format per file).
+    #[arg(long = "catalog")]
+    pub catalog: bool,
 }
 
 #[derive(Subcommand, Debug, PartialEq, Clone)]

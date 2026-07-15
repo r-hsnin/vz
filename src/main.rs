@@ -261,6 +261,10 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
         return directory::run_directory(cli, file);
     }
 
+    if cli.catalog {
+        anyhow::bail!("--catalog requires a directory argument, not a file");
+    }
+
     if cli.bins == Some(0) {
         anyhow::bail!("--bins must be at least 1");
     }

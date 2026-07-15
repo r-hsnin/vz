@@ -3,6 +3,9 @@
 //! Scans a directory for data files, validates schema compatibility,
 //! concatenates rows, and injects a `_source` column with each file's stem.
 
+pub mod catalog;
+#[cfg(test)]
+mod catalog_tests;
 pub mod combiner;
 pub mod date_extract;
 pub mod scanner;
@@ -40,6 +43,12 @@ pub fn run_directory(cli: &Cli, dir: &Path) -> Result<()> {
     };
 
     let entries = scan_directory(dir, &opts)?;
+
+    // Catalog mode: show schema inventory without combining
+    if cli.catalog {
+        return catalog::run_catalog(cli, &entries);
+    }
+
     let result = combine_files(&entries, cli.no_header)?;
 
     // Emit large dataset warning if needed

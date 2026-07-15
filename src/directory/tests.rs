@@ -687,3 +687,5 @@ fn test_combine_file_date_all_rows_same_per_file() {
         }
     }
 }
+
+// Catalog tests are in catalog_tests.rs
