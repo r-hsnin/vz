@@ -115,6 +115,10 @@ pub struct Cli {
     /// Number of bins for histogram charts (default: 10).
     #[arg(long = "bins", value_name = "N")]
     pub bins: Option<usize>,
+
+    /// Glob pattern to filter files in directory mode (e.g. "sales_*.csv").
+    #[arg(long = "glob", value_name = "PATTERN")]
+    pub glob: Option<String>,
 }
 
 #[derive(Subcommand, Debug, PartialEq, Clone)]

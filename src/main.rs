@@ -1,6 +1,7 @@
 pub mod chart;
 pub mod cli;
 pub mod diagnostics;
+pub mod directory;
 pub mod explore;
 pub mod filter;
 mod helpers;
