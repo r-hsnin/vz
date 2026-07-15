@@ -247,6 +247,10 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
 
 /// Single render pass: load → infer → render. Used by both normal and watch modes.
 fn render_once(cli: &Cli, file: &Path) -> Result<()> {
+    if file.is_dir() {
+        return directory::run_directory(cli, file);
+    }
+
     if cli.bins == Some(0) {
         anyhow::bail!("--bins must be at least 1");
     }
@@ -258,6 +262,12 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
     }
 
     let data = loader::load_data_full(file, cli.no_header, format_override(cli))?;
+    render_data(cli, data, file)
+}
+
+/// Shared post-load pipeline: filter → sample → validate → infer → render.
+/// Used by both single-file and directory modes.
+pub(crate) fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
     let pre_filter_count = data.rows.len();
     let data = apply_filters(data, &cli.filter)?;
     let data = if let Some(max_rows) = cli.sample {
