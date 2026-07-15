@@ -119,6 +119,10 @@ pub struct Cli {
     /// Glob pattern to filter files in directory mode (e.g. "sales_*.csv").
     #[arg(long = "glob", value_name = "PATTERN")]
     pub glob: Option<String>,
+
+    /// Recursively scan subdirectories in directory mode (excludes hidden directories).
+    #[arg(short = 'R', long = "recurse")]
+    pub recurse: bool,
 }
 
 #[derive(Subcommand, Debug, PartialEq, Clone)]

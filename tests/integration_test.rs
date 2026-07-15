@@ -3335,3 +3335,98 @@ fn test_directory_single_file() {
     assert!(output.status.success(), "stderr: {stderr}");
     assert!(stderr.contains("1 files, 3 rows"), "stderr: {stderr}");
 }
+
+// === --recurse flag integration tests (Cycle 1) ===
+
+#[test]
+fn test_directory_recurse_finds_nested_files() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/nested/", "--recurse", "--spark"])
+        .output()
+        .expect("Failed to run vz");
+
+    let _stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(output.status.success(), "stderr: {stderr}");
+    // Should find 5 files (top_a, top_b, sub1/deep_a, sub1/sub1_inner/bottom, sub2/deep_b)
+    assert!(stderr.contains("5 files"), "stderr: {stderr}");
+}
+
+#[test]
+fn test_directory_recurse_short_flag() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/nested/", "-R", "--spark"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(stderr.contains("5 files"), "stderr: {stderr}");
+}
+
+#[test]
+fn test_directory_recurse_source_shows_relative_path() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/nested/", "-R", "--json"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success());
+    // _source should contain relative path entries in JSON output
+    assert!(
+        stdout.contains("sub1/deep_a"),
+        "stdout should contain relative path 'sub1/deep_a' in _source: {stdout}"
+    );
+    assert!(
+        stdout.contains("sub2/deep_b"),
+        "stdout should contain relative path 'sub2/deep_b' in _source: {stdout}"
+    );
+}
+
+#[test]
+fn test_directory_recurse_excludes_hidden_dirs() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/nested/", "-R", "--spark"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {stderr}");
+    // 5 files total (hidden dir excluded), total rows = 3+3+3+2+3 = 14
+    assert!(stderr.contains("14 rows"), "stderr: {stderr}");
+}
+
+#[test]
+fn test_directory_no_recurse_only_top_level() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/nested/", "--spark"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {stderr}");
+    // Without --recurse, only top-level files: top_a + top_b = 2 files, 6 rows
+    assert!(stderr.contains("2 files"), "stderr: {stderr}");
+    assert!(stderr.contains("6 rows"), "stderr: {stderr}");
+}
+
+#[test]
+fn test_directory_recurse_with_glob() {
+    let output = vz_binary()
+        .args([
+            "fixtures/dir_test/nested/",
+            "-R",
+            "--glob",
+            "deep_*",
+            "--spark",
+        ])
+        .output()
+        .expect("Failed to run vz");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {stderr}");
+    // Only deep_a.csv and deep_b.csv match the glob at any level
+    assert!(stderr.contains("2 files"), "stderr: {stderr}");
+}

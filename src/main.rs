@@ -176,7 +176,10 @@ fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Some(Command::Explore { file, filter }) => {
             let data = if file.is_dir() {
-                let opts = directory::scanner::ScanOptions { glob_pattern: None };
+                let opts = directory::scanner::ScanOptions {
+                    glob_pattern: None,
+                    recurse: false,
+                };
                 let entries = directory::scanner::scan_directory(file, &opts)?;
                 let result = directory::combiner::combine_files(&entries, false)?;
                 result.data

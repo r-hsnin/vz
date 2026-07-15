@@ -35,6 +35,7 @@ pub fn large_dataset_warning(row_count: usize) -> Option<String> {
 pub fn run_directory(cli: &Cli, dir: &Path) -> Result<()> {
     let opts = ScanOptions {
         glob_pattern: cli.glob.clone(),
+        recurse: cli.recurse,
     };
 
     let entries = scan_directory(dir, &opts)?;

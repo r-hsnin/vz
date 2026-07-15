@@ -5,12 +5,16 @@ use std::path::Path;
 use super::scanner::{ScanOptions, glob_matches, scan_directory};
 
 fn default_opts() -> ScanOptions {
-    ScanOptions { glob_pattern: None }
+    ScanOptions {
+        glob_pattern: None,
+        recurse: false,
+    }
 }
 
 fn glob_opts(pattern: &str) -> ScanOptions {
     ScanOptions {
         glob_pattern: Some(pattern.to_string()),
+        recurse: false,
     }
 }
 
@@ -452,4 +456,92 @@ fn test_explore_directory_schema_inferred() {
     let schema = infer::infer_schema(&headers, &rows);
     // Schema should have 4 columns (date, city, revenue, _source)
     assert_eq!(schema.columns.len(), 4);
+}
+
+// === Recursive scanning tests (Cycle 1: --recurse) ===
+
+fn recurse_opts() -> ScanOptions {
+    ScanOptions {
+        glob_pattern: None,
+        recurse: true,
+    }
+}
+
+#[test]
+fn test_scan_recursive_finds_files_in_subdirs() {
+    let result = scan_directory(&fixture("nested"), &recurse_opts()).unwrap();
+    // Should find: top_a, top_b, sub1/deep_a, sub1/sub1_inner/bottom, sub2/deep_b
+    assert_eq!(result.len(), 5);
+}
+
+#[test]
+fn test_scan_recursive_excludes_hidden_directories() {
+    let result = scan_directory(&fixture("nested"), &recurse_opts()).unwrap();
+    // .hidden_dir/secret.csv must NOT be included
+    let stems: Vec<&str> = result.iter().map(|e| e.stem.as_str()).collect();
+    for stem in &stems {
+        assert!(
+            !stem.contains("secret") && !stem.contains("hidden"),
+            "hidden dir file found: {stem}"
+        );
+    }
+}
+
+#[test]
+fn test_scan_recursive_source_uses_relative_path() {
+    let result = scan_directory(&fixture("nested"), &recurse_opts()).unwrap();
+    let stems: Vec<&str> = result.iter().map(|e| e.stem.as_str()).collect();
+    // Files in subdirs should have path-style stems
+    assert!(stems.contains(&"sub1/deep_a"));
+    assert!(stems.contains(&"sub1/sub1_inner/bottom"));
+    assert!(stems.contains(&"sub2/deep_b"));
+}
+
+#[test]
+fn test_scan_recursive_top_level_files_have_filename_stem() {
+    let result = scan_directory(&fixture("nested"), &recurse_opts()).unwrap();
+    let stems: Vec<&str> = result.iter().map(|e| e.stem.as_str()).collect();
+    // Top-level files should just be filename stems (no path prefix)
+    assert!(stems.contains(&"top_a"));
+    assert!(stems.contains(&"top_b"));
+}
+
+#[test]
+fn test_scan_recursive_empty_subdirs_ignored() {
+    // empty_sub/ has only .gitkeep — should not cause error
+    let result = scan_directory(&fixture("nested"), &recurse_opts()).unwrap();
+    assert_eq!(result.len(), 5); // still finds all 5 files
+}
+
+#[test]
+fn test_scan_recursive_sorted_by_relative_path() {
+    let result = scan_directory(&fixture("nested"), &recurse_opts()).unwrap();
+    let stems: Vec<&str> = result.iter().map(|e| e.stem.as_str()).collect();
+    let mut sorted = stems.clone();
+    sorted.sort();
+    assert_eq!(stems, sorted);
+}
+
+#[test]
+fn test_scan_non_recursive_ignores_subdirs() {
+    // Default (recurse=false) should only find top-level files
+    let result = scan_directory(&fixture("nested"), &default_opts()).unwrap();
+    assert_eq!(result.len(), 2);
+    let stems: Vec<&str> = result.iter().map(|e| e.stem.as_str()).collect();
+    assert!(stems.contains(&"top_a"));
+    assert!(stems.contains(&"top_b"));
+}
+
+#[test]
+fn test_scan_recursive_with_glob_filters_all_levels() {
+    let opts = ScanOptions {
+        glob_pattern: Some("deep_*".to_string()),
+        recurse: true,
+    };
+    let result = scan_directory(&fixture("nested"), &opts).unwrap();
+    // Should find: sub1/deep_a.csv, sub2/deep_b.csv
+    assert_eq!(result.len(), 2);
+    let stems: Vec<&str> = result.iter().map(|e| e.stem.as_str()).collect();
+    assert!(stems.contains(&"sub1/deep_a"));
+    assert!(stems.contains(&"sub2/deep_b"));
 }

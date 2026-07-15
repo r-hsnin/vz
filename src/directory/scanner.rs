@@ -8,6 +8,8 @@ use anyhow::{Context, Result, bail};
 pub struct ScanOptions {
     /// Glob pattern to filter filenames (e.g. "sales_*.csv").
     pub glob_pattern: Option<String>,
+    /// Recursively scan subdirectories (excludes hidden directories).
+    pub recurse: bool,
 }
 
 /// A discovered data file entry.
@@ -25,14 +27,32 @@ const DATA_EXTENSIONS: &[&str] = &["csv", "tsv", "json", "ndjson", "jsonl", "tab
 
 /// Scan a directory for data files.
 ///
-/// Returns entries sorted lexicographically by filename.
+/// Returns entries sorted lexicographically by filename (flat mode) or relative path (recursive mode).
 /// Skips hidden files (starting with '.').
-/// Only scans one level deep (no recursion).
+/// When `opts.recurse` is true, recursively traverses subdirectories (excluding hidden ones).
 pub fn scan_directory(dir: &Path, opts: &ScanOptions) -> Result<Vec<FileEntry>> {
+    let mut files: Vec<FileEntry> = Vec::new();
+    collect_files(dir, dir, opts, &mut files)?;
+
+    // Sort by stem (relative path for recursive, filename for flat) for determinism
+    files.sort_by(|a, b| a.stem.cmp(&b.stem));
+
+    if files.is_empty() {
+        bail!("no data files found in {}", dir.display());
+    }
+
+    Ok(files)
+}
+
+/// Recursively collect data files from a directory tree.
+fn collect_files(
+    root: &Path,
+    dir: &Path,
+    opts: &ScanOptions,
+    files: &mut Vec<FileEntry>,
+) -> Result<()> {
     let entries = std::fs::read_dir(dir)
         .with_context(|| format!("cannot read directory: {}", dir.display()))?;
-
-    let mut files: Vec<FileEntry> = Vec::new();
 
     for entry in entries {
         let entry = match entry {
@@ -42,19 +62,36 @@ pub fn scan_directory(dir: &Path, opts: &ScanOptions) -> Result<Vec<FileEntry>> 
 
         let path = entry.path();
 
-        // Only process regular files (follows symlinks)
-        let is_file = path.metadata().map(|m| m.is_file()).unwrap_or(false);
-        if !is_file {
-            continue;
-        }
-
         let filename = match path.file_name().and_then(|n| n.to_str()) {
             Some(name) => name.to_string(),
             None => continue, // skip non-UTF8 filenames
         };
 
-        // Exclude hidden files
+        // Skip hidden entries (files and directories)
         if filename.starts_with('.') {
+            continue;
+        }
+
+        // Check if directory — use symlink_metadata to avoid following symlinked dirs
+        let meta = match path.symlink_metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        if meta.is_dir() {
+            if opts.recurse {
+                collect_files(root, &path, opts, files)?;
+            }
+            continue;
+        }
+
+        // For files: follow symlinks to check if regular file
+        let is_file = if meta.is_symlink() {
+            path.metadata().map(|m| m.is_file()).unwrap_or(false)
+        } else {
+            meta.is_file()
+        };
+        if !is_file {
             continue;
         }
 
@@ -64,34 +101,30 @@ pub fn scan_directory(dir: &Path, opts: &ScanOptions) -> Result<Vec<FileEntry>> 
             continue;
         }
 
-        // Apply glob pattern if specified
+        // Apply glob pattern if specified (matches against filename only)
         if let Some(ref pattern) = opts.glob_pattern {
             if !glob_matches(pattern, &filename) {
                 continue;
             }
         }
 
-        let stem = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unknown")
-            .to_string();
+        // Compute stem: relative path from root (without extension) for recursive,
+        // or just filename stem for flat mode.
+        let stem = if opts.recurse {
+            let rel = path.strip_prefix(root).unwrap_or(&path);
+            let rel_no_ext = rel.with_extension("");
+            rel_no_ext.to_string_lossy().replace('\\', "/")
+        } else {
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string()
+        };
 
         files.push(FileEntry { path, stem });
     }
 
-    // Sort lexicographically by filename
-    files.sort_by(|a, b| {
-        let name_a = a.path.file_name().unwrap_or_default();
-        let name_b = b.path.file_name().unwrap_or_default();
-        name_a.cmp(name_b)
-    });
-
-    if files.is_empty() {
-        bail!("no data files found in {}", dir.display());
-    }
-
-    Ok(files)
+    Ok(())
 }
 
 /// Match a filename against a glob pattern supporting `*` and `?`.
