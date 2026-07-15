@@ -169,9 +169,10 @@ fn test_combine_same_schema_all_rows_and_source() {
 
     // 3 files × 3 rows = 9 rows
     assert_eq!(result.data.rows.len(), 9);
-    // Headers: date, city, revenue, _source
-    assert_eq!(result.data.headers.len(), 4);
+    // Headers: date, city, revenue, _source, _file_date
+    assert_eq!(result.data.headers.len(), 5);
     assert_eq!(result.data.headers[3], "_source");
+    assert_eq!(result.data.headers[4], "_file_date");
     assert_eq!(result.file_count, 3);
     assert!(result.skipped.is_empty());
 }
@@ -200,7 +201,7 @@ fn test_combine_headers_are_original_plus_source() {
 
     assert_eq!(
         result.data.headers,
-        vec!["date", "city", "revenue", "_source"]
+        vec!["date", "city", "revenue", "_source", "_file_date"]
     );
 }
 
@@ -278,7 +279,10 @@ fn test_combine_single_file_works() {
 
     assert_eq!(result.file_count, 1);
     assert_eq!(result.data.rows.len(), 3);
-    assert_eq!(result.data.headers, vec!["date", "value", "_source"]);
+    assert_eq!(
+        result.data.headers,
+        vec!["date", "value", "_source", "_file_date"]
+    );
     // All rows should have _source = "only"
     for row in &result.data.rows {
         assert_eq!(row[2], "only");
@@ -377,7 +381,7 @@ fn test_combine_reordered_uses_first_file_column_order() {
     let result = combine_files(&entries, false).unwrap();
     assert_eq!(
         result.data.headers,
-        vec!["date", "city", "revenue", "_source"]
+        vec!["date", "city", "revenue", "_source", "_file_date"]
     );
 }
 
@@ -454,8 +458,8 @@ fn test_explore_directory_schema_inferred() {
         .map(|r| r.iter().map(|s| s.as_str()).collect())
         .collect();
     let schema = infer::infer_schema(&headers, &rows);
-    // Schema should have 4 columns (date, city, revenue, _source)
-    assert_eq!(schema.columns.len(), 4);
+    // Schema should have 5 columns (date, city, revenue, _source, _file_date)
+    assert_eq!(schema.columns.len(), 5);
 }
 
 // === Recursive scanning tests (Cycle 1: --recurse) ===
@@ -544,4 +548,142 @@ fn test_scan_recursive_with_glob_filters_all_levels() {
     let stems: Vec<&str> = result.iter().map(|e| e.stem.as_str()).collect();
     assert!(stems.contains(&"sub1/deep_a"));
     assert!(stems.contains(&"sub2/deep_b"));
+}
+
+// === _file_date extraction integration tests (Cycle 2) ===
+
+#[test]
+fn test_combine_dated_adds_file_date_column() {
+    let entries = scan_directory(&fixture("dated"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    assert!(result.data.headers.contains(&"_file_date".to_string()));
+}
+
+#[test]
+fn test_combine_dated_file_date_is_last_column() {
+    let entries = scan_directory(&fixture("dated"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    let len = result.data.headers.len();
+    assert_eq!(result.data.headers[len - 2], "_source");
+    assert_eq!(result.data.headers[len - 1], "_file_date");
+}
+
+#[test]
+fn test_combine_dated_extracts_yyyy_mm_dd() {
+    let entries = scan_directory(&fixture("dated"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    let date_idx = result.data.headers.len() - 1;
+    let source_idx = result.data.headers.len() - 2;
+    // Find rows from sales_2024-01-15
+    let dates: Vec<&str> = result
+        .data
+        .rows
+        .iter()
+        .filter(|r| r[source_idx] == "sales_2024-01-15")
+        .map(|r| r[date_idx].as_str())
+        .collect();
+    assert!(!dates.is_empty());
+    for d in dates {
+        assert_eq!(d, "2024-01-15");
+    }
+}
+
+#[test]
+fn test_combine_dated_extracts_yyyymmdd() {
+    let entries = scan_directory(&fixture("dated"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    let date_idx = result.data.headers.len() - 1;
+    let source_idx = result.data.headers.len() - 2;
+    // Find rows from report_20240301
+    let dates: Vec<&str> = result
+        .data
+        .rows
+        .iter()
+        .filter(|r| r[source_idx] == "report_20240301")
+        .map(|r| r[date_idx].as_str())
+        .collect();
+    assert!(!dates.is_empty());
+    for d in dates {
+        assert_eq!(d, "2024-03-01");
+    }
+}
+
+#[test]
+fn test_combine_dated_extracts_yyyy_underscore_mm_dd() {
+    let entries = scan_directory(&fixture("dated"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    let date_idx = result.data.headers.len() - 1;
+    let source_idx = result.data.headers.len() - 2;
+    // Find rows from data_2024_06_15
+    let dates: Vec<&str> = result
+        .data
+        .rows
+        .iter()
+        .filter(|r| r[source_idx] == "data_2024_06_15")
+        .map(|r| r[date_idx].as_str())
+        .collect();
+    assert!(!dates.is_empty());
+    for d in dates {
+        assert_eq!(d, "2024-06-15");
+    }
+}
+
+#[test]
+fn test_combine_dated_no_date_gives_empty_string() {
+    let entries = scan_directory(&fixture("dated"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    let date_idx = result.data.headers.len() - 1;
+    let source_idx = result.data.headers.len() - 2;
+    // Find rows from summary (no date in filename)
+    let dates: Vec<&str> = result
+        .data
+        .rows
+        .iter()
+        .filter(|r| r[source_idx] == "summary")
+        .map(|r| r[date_idx].as_str())
+        .collect();
+    assert!(!dates.is_empty());
+    for d in dates {
+        assert_eq!(d, "");
+    }
+}
+
+#[test]
+fn test_combine_dated_row_count_correct() {
+    let entries = scan_directory(&fixture("dated"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    // 4 files × 2 rows each = 8 rows
+    assert_eq!(result.data.rows.len(), 8);
+    assert_eq!(result.file_count, 4);
+}
+
+#[test]
+fn test_combine_same_schema_file_date_empty_for_partial_dates() {
+    // same_schema has sales_2024-01, sales_2024-02, sales_2024-03
+    // These are year-month only (no day), so _file_date should be empty
+    let entries = scan_directory(&fixture("same_schema"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    let date_idx = result.data.headers.len() - 1;
+    for row in &result.data.rows {
+        assert_eq!(row[date_idx], "", "partial date should not be extracted");
+    }
+}
+
+#[test]
+fn test_combine_file_date_all_rows_same_per_file() {
+    let entries = scan_directory(&fixture("dated"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    let date_idx = result.data.headers.len() - 1;
+    let source_idx = result.data.headers.len() - 2;
+    // Group by source and verify all dates within a file are the same
+    let mut seen: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+    for row in &result.data.rows {
+        let source = row[source_idx].as_str();
+        let date = row[date_idx].as_str();
+        if let Some(&prev_date) = seen.get(source) {
+            assert_eq!(prev_date, date, "inconsistent _file_date for {source}");
+        } else {
+            seen.insert(source, date);
+        }
+    }
 }

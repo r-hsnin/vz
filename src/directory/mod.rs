@@ -4,6 +4,7 @@
 //! concatenates rows, and injects a `_source` column with each file's stem.
 
 pub mod combiner;
+pub mod date_extract;
 pub mod scanner;
 #[cfg(test)]
 mod tests;

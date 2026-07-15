@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 
+use super::date_extract::extract_file_date;
+
 /// Options controlling file discovery in a directory.
 pub struct ScanOptions {
     /// Glob pattern to filter filenames (e.g. "sales_*.csv").
@@ -19,6 +21,8 @@ pub struct FileEntry {
     pub path: PathBuf,
     /// Filename stem (without extension), used for `_source` column.
     pub stem: String,
+    /// Extracted date from filename (YYYY-MM-DD) or empty string.
+    pub file_date: String,
 }
 
 /// Supported data file extensions.
@@ -121,7 +125,15 @@ fn collect_files(
                 .to_string()
         };
 
-        files.push(FileEntry { path, stem });
+        // Extract date from the leaf filename (not from path components)
+        let leaf_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        let file_date = extract_file_date(leaf_stem);
+
+        files.push(FileEntry {
+            path,
+            stem,
+            file_date,
+        });
     }
 
     Ok(())

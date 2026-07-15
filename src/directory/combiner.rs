@@ -59,7 +59,7 @@ fn build_reorder_map(reference: &[String], incoming: &[String]) -> Option<Vec<us
 ///
 /// Uses the first file's schema (column names + order) as the reference.
 /// Headers are compared case-insensitively with whitespace trimming.
-/// Appends `_source` column (filename stem) to each row.
+/// Appends `_source` and `_file_date` columns to each row.
 /// Skips files with mismatched schemas or zero data rows.
 pub fn combine_files(entries: &[FileEntry], no_header: bool) -> Result<CombineResult> {
     if entries.is_empty() {
@@ -129,12 +129,14 @@ pub fn combine_files(entries: &[FileEntry], no_header: bool) -> Result<CombineRe
                                 let mut reordered: Vec<String> =
                                     map.iter().map(|&i| row[i].clone()).collect();
                                 reordered.push(entry.stem.clone());
+                                reordered.push(entry.file_date.clone());
                                 combined_rows.push(reordered);
                             }
                         } else {
                             // Columns already in correct order
                             for mut row in data.rows {
                                 row.push(entry.stem.clone());
+                                row.push(entry.file_date.clone());
                                 combined_rows.push(row);
                             }
                         }
@@ -145,9 +147,10 @@ pub fn combine_files(entries: &[FileEntry], no_header: bool) -> Result<CombineRe
             }
         }
 
-        // First file: append rows with _source column (no reordering needed)
+        // First file: append rows with _source and _file_date columns (no reordering needed)
         for mut row in data.rows {
             row.push(entry.stem.clone());
+            row.push(entry.file_date.clone());
             combined_rows.push(row);
         }
         file_count += 1;
@@ -156,6 +159,7 @@ pub fn combine_files(entries: &[FileEntry], no_header: bool) -> Result<CombineRe
     let headers = match reference_headers {
         Some(mut h) => {
             h.push("_source".to_string());
+            h.push("_file_date".to_string());
             h
         }
         None => bail!("no files with data rows found"),
