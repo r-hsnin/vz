@@ -26,9 +26,30 @@ pub struct CombineResult {
     pub skipped: Vec<SkipReason>,
 }
 
+/// Normalize a header name for case-insensitive comparison.
+///
+/// Trims whitespace and converts to lowercase. Does not modify the original.
+fn normalize_header(h: &str) -> String {
+    h.trim().to_lowercase()
+}
+
+/// Check if two header sets match case-insensitively (with whitespace trimming).
+///
+/// Returns `true` if both have the same length and each normalized header matches.
+fn headers_match_normalized(reference: &[String], incoming: &[String]) -> bool {
+    if reference.len() != incoming.len() {
+        return false;
+    }
+    reference
+        .iter()
+        .zip(incoming.iter())
+        .all(|(r, i)| normalize_header(r) == normalize_header(i))
+}
+
 /// Combine data from multiple file entries.
 ///
 /// Uses the first file's schema (column names + order) as the reference.
+/// Headers are compared case-insensitively with whitespace trimming.
 /// Appends `_source` column (filename stem) to each row.
 /// Skips files with mismatched schemas or zero data rows.
 pub fn combine_files(entries: &[FileEntry], no_header: bool) -> Result<CombineResult> {
@@ -70,14 +91,14 @@ pub fn combine_files(entries: &[FileEntry], no_header: bool) -> Result<CombineRe
             continue;
         }
 
-        // Schema comparison
+        // Schema comparison (case-insensitive, whitespace-trimmed)
         match &reference_headers {
             None => {
                 // First valid file sets the reference schema
                 reference_headers = Some(data.headers.clone());
             }
             Some(ref_headers) => {
-                if data.headers != *ref_headers {
+                if !headers_match_normalized(ref_headers, &data.headers) {
                     skipped.push(SkipReason {
                         file: entry.stem.clone(),
                         reason: format!(

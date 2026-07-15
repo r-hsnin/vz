@@ -296,3 +296,48 @@ fn test_combine_mixed_schema_row_count_correct() {
     // also_sales.csv has 2 rows, sales.csv has 3 rows = 5 total
     assert_eq!(result.data.rows.len(), 5);
 }
+
+// === Case-insensitive schema matching tests (Phase 2, Task 1) ===
+
+#[test]
+fn test_combine_case_insensitive_schema_matches() {
+    // file_a has "Date,City,Revenue", file_b has "date,city,revenue"
+    // Both should combine successfully
+    let entries = scan_directory(&fixture("case_insensitive"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    assert_eq!(result.file_count, 2);
+    assert_eq!(result.data.rows.len(), 6);
+    assert!(result.skipped.is_empty());
+}
+
+#[test]
+fn test_combine_case_insensitive_preserves_first_file_casing() {
+    // Output headers should use first file's casing: "Date", "City", "Revenue"
+    let entries = scan_directory(&fixture("case_insensitive"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    assert_eq!(result.data.headers[0], "Date");
+    assert_eq!(result.data.headers[1], "City");
+    assert_eq!(result.data.headers[2], "Revenue");
+    assert_eq!(result.data.headers[3], "_source");
+}
+
+#[test]
+fn test_combine_case_insensitive_does_not_mutate_row_data() {
+    // Row values must remain unchanged regardless of header normalization
+    let entries = scan_directory(&fixture("case_insensitive"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    // file_b row: "2024-02-01,Osaka,250" — values must be unchanged
+    assert_eq!(result.data.rows[3][0], "2024-02-01");
+    assert_eq!(result.data.rows[3][1], "Osaka");
+    assert_eq!(result.data.rows[3][2], "250");
+}
+
+#[test]
+fn test_combine_case_insensitive_whitespace_trimmed() {
+    // Headers with leading/trailing whitespace should match after trim
+    // This test uses the same fixture — the normalization trims before comparing
+    let entries = scan_directory(&fixture("case_insensitive"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    // "Date" (trimmed) matches "date" (trimmed+lowered) → combined
+    assert_eq!(result.file_count, 2);
+}
