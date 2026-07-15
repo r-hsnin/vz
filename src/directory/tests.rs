@@ -386,3 +386,39 @@ fn test_combine_reordered_source_column_correct() {
     // Rows from second.csv have _source = "second"
     assert_eq!(result.data.rows[3][3], "second");
 }
+
+// === Large dataset warning tests (Phase 2, Task 3) ===
+
+use super::LARGE_DATASET_THRESHOLD;
+
+#[test]
+fn test_large_dataset_threshold_is_100_000() {
+    assert_eq!(LARGE_DATASET_THRESHOLD, 100_000);
+}
+
+#[test]
+fn test_large_dataset_warning_message_format() {
+    // Verify the warning message format matches spec
+    let row_count = 150_000;
+    let msg = super::large_dataset_warning(row_count);
+    assert_eq!(
+        msg,
+        Some(
+            "warning: large dataset (150000 rows). Consider --sample for faster rendering."
+                .to_string()
+        )
+    );
+}
+
+#[test]
+fn test_large_dataset_no_warning_at_threshold() {
+    // Exactly 100,000 rows → no warning
+    let msg = super::large_dataset_warning(100_000);
+    assert_eq!(msg, None);
+}
+
+#[test]
+fn test_large_dataset_no_warning_below_threshold() {
+    let msg = super::large_dataset_warning(99_999);
+    assert_eq!(msg, None);
+}

@@ -17,6 +17,20 @@ use crate::cli::Cli;
 use self::combiner::combine_files;
 use self::scanner::{ScanOptions, scan_directory};
 
+/// Row count threshold above which a large dataset warning is emitted.
+pub const LARGE_DATASET_THRESHOLD: usize = 100_000;
+
+/// Returns a warning message if the row count exceeds the threshold.
+pub fn large_dataset_warning(row_count: usize) -> Option<String> {
+    if row_count > LARGE_DATASET_THRESHOLD {
+        Some(format!(
+            "warning: large dataset ({row_count} rows). Consider --sample for faster rendering."
+        ))
+    } else {
+        None
+    }
+}
+
 /// Run directory mode: scan, combine, and render data from a directory.
 pub fn run_directory(cli: &Cli, dir: &Path) -> Result<()> {
     let opts = ScanOptions {
@@ -25,6 +39,11 @@ pub fn run_directory(cli: &Cli, dir: &Path) -> Result<()> {
 
     let entries = scan_directory(dir, &opts)?;
     let result = combine_files(&entries, cli.no_header)?;
+
+    // Emit large dataset warning if needed
+    if let Some(warning) = large_dataset_warning(result.data.rows.len()) {
+        eprintln!("{warning}");
+    }
 
     // Print summary to stderr
     let summary = if result.skipped.is_empty() {
