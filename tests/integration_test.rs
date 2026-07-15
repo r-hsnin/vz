@@ -3172,3 +3172,128 @@ fn test_spark_output_shows_column_context() {
         stdout
     );
 }
+
+// === Directory mode integration tests ===
+
+#[test]
+fn test_directory_same_schema_renders_chart() {
+    let output = vz_binary()
+        .arg("fixtures/dir_test/same_schema/")
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(stderr.contains("3 files, 9 rows"), "stderr: {stderr}");
+    assert!(stdout.contains("revenue"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_directory_with_color_source() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/same_schema/", "-c", "_source", "--spark"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(stdout.contains("sales_2024-01"), "stdout: {stdout}");
+    assert!(stdout.contains("sales_2024-02"), "stdout: {stdout}");
+    assert!(stdout.contains("sales_2024-03"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_directory_info_shows_columns() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/same_schema/", "--info"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success());
+    assert!(stdout.contains("_source"));
+    assert!(stdout.contains("date"));
+    assert!(stdout.contains("revenue"));
+    assert!(stdout.contains("Rows: 9"));
+}
+
+#[test]
+fn test_directory_mixed_schema_skips_mismatch() {
+    let output = vz_binary()
+        .arg("fixtures/dir_test/mixed_schema/")
+        .output()
+        .expect("Failed to run vz");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(output.status.success());
+    assert!(stderr.contains("1 skipped"), "stderr: {stderr}");
+    assert!(stderr.contains("schema mismatch"), "stderr: {stderr}");
+}
+
+#[test]
+fn test_directory_empty_fails_with_error() {
+    let output = vz_binary()
+        .arg("fixtures/dir_test/empty/")
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.to_lowercase().contains("no data files"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn test_directory_glob_filters_files() {
+    let output = vz_binary()
+        .args([
+            "fixtures/dir_test/same_schema/",
+            "--glob",
+            "sales_2024-01*",
+            "--spark",
+        ])
+        .output()
+        .expect("Failed to run vz");
+
+    let _stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(stderr.contains("1 files"), "stderr: {stderr}");
+}
+
+#[test]
+fn test_directory_json_output() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/same_schema/", "--json"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success());
+    // JSON output should be parseable
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Failed to parse JSON output");
+    assert!(parsed.is_object());
+}
+
+#[test]
+fn test_directory_single_file() {
+    let output = vz_binary()
+        .args(["fixtures/dir_test/single_file/", "--spark"])
+        .output()
+        .expect("Failed to run vz");
+
+    let _stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(stderr.contains("1 files, 3 rows"), "stderr: {stderr}");
+}
