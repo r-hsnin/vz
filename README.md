@@ -316,6 +316,7 @@ Navigate: `←`/`→` or `h`/`l` or `Space`/`Enter`/`Backspace`, jump: `g`/`G`/`
 - TSV (tab-separated, auto-detected by `.tsv`/`.tab` extension or content)
 - JSON (array of objects, auto-detected by `.json` extension or `[` prefix)
 - NDJSON (newline-delimited JSON, auto-detected by `.ndjson`/`.jsonl` extension or `{` prefix)
+- Fixed-width (space-aligned, auto-detected from content or forced with `-f space`)
 - Stdin pipe (`-`), with optional `-f` to force format
 
 ## License
