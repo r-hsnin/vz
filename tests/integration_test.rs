@@ -4087,6 +4087,145 @@ fn test_diff_nonexistent_file_error() {
     assert!(!output.status.success());
 }
 
+// --- Temporal diff tests ---
+
+#[test]
+fn test_diff_temporal_renders_line_chart() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stderr: {}", stderr);
+    // Summary line should be on stderr with "Line" prefix
+    assert!(
+        stderr.contains("Line"),
+        "Missing Line in summary: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("x=date"),
+        "Missing x=date in summary: {}",
+        stderr
+    );
+    // Should NOT contain bar chart markers
+    assert!(
+        !stdout.contains("▲"),
+        "Should not contain ▲ (bar diff marker): {}",
+        stdout
+    );
+    assert!(
+        !stdout.contains("▼"),
+        "Should not contain ▼ (bar diff marker): {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_diff_temporal_summary_format() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success());
+    // Verify summary format: Line │ x=date │ ... vs ... │ Δ ... │ ... rows
+    assert!(stderr.contains("Line │ x=date │ ts_daily_before vs ts_daily_after │ Δ +13% │ 6 rows"));
+}
+
+#[test]
+fn test_diff_temporal_spark_output() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+            "--spark",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success());
+    assert!(
+        stdout.contains("ts_daily_before"),
+        "Missing before name in spark: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("ts_daily_after"),
+        "Missing after name in spark: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_diff_temporal_json_output() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+            "--json",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success());
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["mode"], "diff");
+    assert_eq!(json["chart_type"], "line");
+    assert_eq!(json["x_column"], "date");
+    assert_eq!(json["y_column"], "revenue");
+    assert!(json["dates"].is_array());
+    assert!(json["before"]["series"].is_array());
+    assert!(json["after"]["series"].is_array());
+}
+
+#[test]
+fn test_diff_temporal_with_width_height() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+            "-W",
+            "100",
+            "-H",
+            "30",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn test_diff_categorical_still_uses_bar() {
+    // Regression guard: categorical X should still produce bar diff
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success());
+    assert!(
+        stdout.contains("Diff"),
+        "Should contain Diff for categorical: {}",
+        stdout
+    );
+    assert!(stdout.contains("▲"), "Should contain ▲ for categorical");
+}
+
 // --- HTML output tests ---
 
 #[test]

@@ -33,6 +33,24 @@ pub struct DiffResult {
     pub overall_pct: Option<f64>,
 }
 
+/// Result of computing a temporal diff between two time-series datasets.
+/// Holds ordered (x_index, y_value) pairs for before/after, aligned by date.
+#[derive(Debug, Clone)]
+pub struct DiffTimeSeries {
+    /// Before series as (x_index, y_value) pairs, ordered by date.
+    pub before: Vec<(f64, f64)>,
+    /// After series as (x_index, y_value) pairs, ordered by date.
+    pub after: Vec<(f64, f64)>,
+    /// Original date labels (union of both files), sorted chronologically.
+    pub x_labels: Vec<String>,
+    pub x_column: String,
+    pub y_column: String,
+    pub before_rows: usize,
+    pub after_rows: usize,
+    /// Overall percentage change (sum of after / sum of before - 1) * 100.
+    pub overall_pct: Option<f64>,
+}
+
 /// Run diff mode: load both files, validate schemas, compute and render diff.
 pub fn run_diff(cli: &Cli, before_path: &Path, after_path: &Path) -> Result<()> {
     let before = loader::load_data_full(before_path, cli.no_header, format_override(cli))?;
@@ -44,9 +62,19 @@ pub fn run_diff(cli: &Cli, before_path: &Path, after_path: &Path) -> Result<()> 
     let x_col = resolve_x_column(cli, &before, &schema)?;
     let y_col = resolve_y_column(cli, &before, &schema, &x_col)?;
 
-    let diff = compute_diff(&before, &after, &x_col, &y_col)?;
+    // Check if X column is temporal → use line chart overlay
+    let x_is_temporal = schema
+        .find_column(&x_col)
+        .map(|c| c.data_type == crate::infer::types::DataType::Temporal)
+        .unwrap_or(false);
 
-    render::render_diff(cli, &diff, before_path, after_path)
+    if x_is_temporal {
+        let ts = compute_diff_temporal(&before, &after, &x_col, &y_col)?;
+        render::render_diff_line(cli, &ts, before_path, after_path)
+    } else {
+        let diff = compute_diff(&before, &after, &x_col, &y_col)?;
+        render::render_diff(cli, &diff, before_path, after_path)
+    }
 }
 
 /// Validate that two datasets have compatible schemas (same column names, case-insensitive).
@@ -162,6 +190,77 @@ fn resolve_y_column(
         x_col,
         data.headers.join(", ")
     )
+}
+
+/// Compute a temporal diff between two time-series datasets.
+/// Aligns both datasets on a sorted union of X (date) labels, aggregating duplicates by sum.
+pub fn compute_diff_temporal(
+    before: &LoadedData,
+    after: &LoadedData,
+    x_col: &str,
+    y_col: &str,
+) -> Result<DiffTimeSeries> {
+    let before_x_idx = col_index(&before.headers, x_col)
+        .ok_or_else(|| anyhow::anyhow!("Column '{}' not found in before file", x_col))?;
+    let before_y_idx = col_index(&before.headers, y_col)
+        .ok_or_else(|| anyhow::anyhow!("Column '{}' not found in before file", y_col))?;
+    let after_x_idx = col_index(&after.headers, x_col)
+        .ok_or_else(|| anyhow::anyhow!("Column '{}' not found in after file", x_col))?;
+    let after_y_idx = col_index(&after.headers, y_col)
+        .ok_or_else(|| anyhow::anyhow!("Column '{}' not found in after file", y_col))?;
+
+    // Aggregate by date (sum duplicates)
+    let before_agg = aggregate_by_category(&before.rows, before_x_idx, before_y_idx);
+    let after_agg = aggregate_by_category(&after.rows, after_x_idx, after_y_idx);
+
+    // Build sorted union of all date labels (string sort works for ISO dates)
+    let mut all_labels: Vec<String> = Vec::new();
+    for (label, _) in &before_agg {
+        if !all_labels.contains(label) {
+            all_labels.push(label.clone());
+        }
+    }
+    for (label, _) in &after_agg {
+        if !all_labels.contains(label) {
+            all_labels.push(label.clone());
+        }
+    }
+    all_labels.sort();
+
+    // Build series: each point at (x_index, y_value)
+    let mut before_series = Vec::new();
+    let mut after_series = Vec::new();
+    let mut total_before = 0.0_f64;
+    let mut total_after = 0.0_f64;
+
+    for (i, label) in all_labels.iter().enumerate() {
+        let x = i as f64;
+        if let Some((_, v)) = before_agg.iter().find(|(l, _)| l == label) {
+            before_series.push((x, *v));
+            total_before += *v;
+        }
+        if let Some((_, v)) = after_agg.iter().find(|(l, _)| l == label) {
+            after_series.push((x, *v));
+            total_after += *v;
+        }
+    }
+
+    let overall_pct = if total_before.abs() > f64::EPSILON {
+        Some((total_after - total_before) / total_before * 100.0)
+    } else {
+        None
+    };
+
+    Ok(DiffTimeSeries {
+        before: before_series,
+        after: after_series,
+        x_labels: all_labels,
+        x_column: x_col.to_string(),
+        y_column: y_col.to_string(),
+        before_rows: before.rows.len(),
+        after_rows: after.rows.len(),
+        overall_pct,
+    })
 }
 
 /// Compute the diff between two datasets on the given X/Y columns.
@@ -464,5 +563,120 @@ mod tests {
     fn test_diff_pair_single_file_no_diff() {
         let cli = Cli::try_parse_from(["vz", "a.csv"]).unwrap();
         assert_eq!(cli.diff_pair(), None);
+    }
+
+    // --- compute_diff_temporal tests ---
+
+    #[test]
+    fn test_compute_diff_temporal_basic() {
+        let before = make_data(
+            &["date", "revenue"],
+            &[
+                &["2024-01-01", "100"],
+                &["2024-01-02", "120"],
+                &["2024-01-03", "140"],
+            ],
+        );
+        let after = make_data(
+            &["date", "revenue"],
+            &[
+                &["2024-01-01", "110"],
+                &["2024-01-02", "130"],
+                &["2024-01-03", "150"],
+            ],
+        );
+        let ts = compute_diff_temporal(&before, &after, "date", "revenue").unwrap();
+        assert_eq!(ts.before.len(), 3);
+        assert_eq!(ts.after.len(), 3);
+        assert_eq!(ts.x_labels.len(), 3);
+        assert_eq!(ts.x_labels[0], "2024-01-01");
+        assert_eq!(ts.before[0], (0.0, 100.0));
+        assert_eq!(ts.after[0], (0.0, 110.0));
+        assert_eq!(ts.before[2], (2.0, 140.0));
+        assert_eq!(ts.after[2], (2.0, 150.0));
+    }
+
+    #[test]
+    fn test_compute_diff_temporal_sorted_dates() {
+        // Verify dates are sorted even if input is unordered
+        let before = make_data(
+            &["date", "revenue"],
+            &[&["2024-01-03", "140"], &["2024-01-01", "100"]],
+        );
+        let after = make_data(
+            &["date", "revenue"],
+            &[&["2024-01-02", "130"], &["2024-01-01", "110"]],
+        );
+        let ts = compute_diff_temporal(&before, &after, "date", "revenue").unwrap();
+        assert_eq!(ts.x_labels, vec!["2024-01-01", "2024-01-02", "2024-01-03"]);
+    }
+
+    #[test]
+    fn test_compute_diff_temporal_non_overlapping() {
+        // Before has dates not in after, and vice versa
+        let before = make_data(
+            &["date", "revenue"],
+            &[&["2024-01-01", "100"], &["2024-01-02", "120"]],
+        );
+        let after = make_data(
+            &["date", "revenue"],
+            &[&["2024-01-02", "130"], &["2024-01-03", "150"]],
+        );
+        let ts = compute_diff_temporal(&before, &after, "date", "revenue").unwrap();
+        // Union: 01, 02, 03
+        assert_eq!(ts.x_labels.len(), 3);
+        // Before has points at index 0 and 1
+        assert_eq!(ts.before.len(), 2);
+        assert_eq!(ts.before[0], (0.0, 100.0)); // 2024-01-01
+        assert_eq!(ts.before[1], (1.0, 120.0)); // 2024-01-02
+        // After has points at index 1 and 2
+        assert_eq!(ts.after.len(), 2);
+        assert_eq!(ts.after[0], (1.0, 130.0)); // 2024-01-02
+        assert_eq!(ts.after[1], (2.0, 150.0)); // 2024-01-03
+    }
+
+    #[test]
+    fn test_compute_diff_temporal_aggregates_duplicates() {
+        let before = make_data(
+            &["date", "revenue"],
+            &[
+                &["2024-01-01", "50"],
+                &["2024-01-01", "50"],
+                &["2024-01-02", "120"],
+            ],
+        );
+        let after = make_data(
+            &["date", "revenue"],
+            &[&["2024-01-01", "110"], &["2024-01-02", "130"]],
+        );
+        let ts = compute_diff_temporal(&before, &after, "date", "revenue").unwrap();
+        assert_eq!(ts.before[0], (0.0, 100.0)); // 50+50
+        assert_eq!(ts.after[0], (0.0, 110.0));
+    }
+
+    #[test]
+    fn test_compute_diff_temporal_overall_pct() {
+        let before = make_data(
+            &["date", "revenue"],
+            &[&["2024-01-01", "100"], &["2024-01-02", "200"]],
+        );
+        let after = make_data(
+            &["date", "revenue"],
+            &[&["2024-01-01", "120"], &["2024-01-02", "240"]],
+        );
+        let ts = compute_diff_temporal(&before, &after, "date", "revenue").unwrap();
+        // Before sum: 300, After sum: 360 → +20%
+        assert!((ts.overall_pct.unwrap() - 20.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_compute_diff_temporal_single_point() {
+        let before = make_data(&["date", "revenue"], &[&["2024-01-01", "100"]]);
+        let after = make_data(&["date", "revenue"], &[&["2024-01-01", "200"]]);
+        let ts = compute_diff_temporal(&before, &after, "date", "revenue").unwrap();
+        assert_eq!(ts.before.len(), 1);
+        assert_eq!(ts.after.len(), 1);
+        assert_eq!(ts.x_labels, vec!["2024-01-01"]);
+        assert!((ts.overall_pct.unwrap() - 100.0).abs() < 0.01);
     }
 }
