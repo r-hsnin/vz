@@ -323,6 +323,7 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
     let mut top = None;
     let mut bins = None;
     let mut height = None;
+    let mut diff = None;
 
     for line in lines {
         if let Some((key, value)) = line.split_once(':') {
@@ -371,6 +372,7 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
                 "height" => {
                     height = value.parse::<u16>().ok();
                 }
+                "diff" => diff = Some(value),
                 _ => {}
             }
         }
@@ -389,6 +391,7 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
         top,
         bins,
         height,
+        diff,
     }
 }
 

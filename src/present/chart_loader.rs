@@ -23,12 +23,197 @@ fn resolve_chart_source_path(source: &str, base_dir: &Path) -> PathBuf {
     }
 }
 
+/// Load diff chart data: compare two files and produce a bar or line chart.
+fn load_diff_chart_data(
+    block: &ChartBlock,
+    diff_source: &str,
+    base_dir: &Path,
+    theme: &crate::theme::Theme,
+) -> Result<crate::render::ChartData> {
+    use crate::diff::{compute_diff, compute_diff_temporal, validate_schema};
+    use crate::infer::types::DataType;
+    use crate::render::{Axis, ChartConfig, ChartData, Series};
+
+    let before_path = resolve_chart_source_path(&block.source, base_dir);
+    let after_path = resolve_chart_source_path(diff_source, base_dir);
+
+    let before = crate::loader::load_data(&before_path).with_context(|| {
+        format!(
+            "Diff source (before) not found: {} (tried: {})",
+            block.source,
+            before_path.display()
+        )
+    })?;
+    let after = crate::loader::load_data(&after_path).with_context(|| {
+        format!(
+            "Diff source (after) not found: {} (tried: {})",
+            diff_source,
+            after_path.display()
+        )
+    })?;
+
+    validate_schema(&before, &after, &before_path, &after_path)?;
+
+    // Infer schema to resolve x/y columns and detect temporal vs categorical.
+    let schema = crate::pipeline::infer_from_data(&before);
+
+    // Resolve X column: explicit from block, or auto-detect first categorical/temporal.
+    let x_col = if let Some(ref x) = block.x_col {
+        x.clone()
+    } else {
+        schema
+            .columns
+            .iter()
+            .find(|c| c.data_type == DataType::Categorical || c.data_type == DataType::Temporal)
+            .map(|c| c.name.clone())
+            .unwrap_or_else(|| before.headers.first().cloned().unwrap_or_default())
+    };
+
+    // Resolve Y column: explicit from block, or auto-detect first quantitative (not x).
+    let y_col = if let Some(ref y) = block.y_col {
+        y.clone()
+    } else {
+        schema
+            .columns
+            .iter()
+            .find(|c| c.data_type == DataType::Quantitative && c.name != x_col)
+            .map(|c| c.name.clone())
+            .ok_or_else(|| anyhow::anyhow!("No quantitative column found for Y axis"))?
+    };
+
+    // Determine if X is temporal.
+    let x_is_temporal = schema
+        .find_column(&x_col)
+        .map(|c| c.data_type == DataType::Temporal)
+        .unwrap_or(false);
+
+    if x_is_temporal {
+        // Temporal diff → 2-series line chart overlay.
+        let ts = compute_diff_temporal(&before, &after, &x_col, &y_col)?;
+
+        let all_y: Vec<f64> = ts
+            .before
+            .iter()
+            .chain(ts.after.iter())
+            .map(|(_, y)| *y)
+            .collect();
+        let x_axis = Axis {
+            label: x_col,
+            min: 0.0,
+            max: (ts.x_labels.len().saturating_sub(1)) as f64,
+        };
+        let y_axis = Axis::from_data(&y_col, &all_y);
+
+        let mut config = ChartConfig {
+            title: block
+                .title
+                .clone()
+                .or_else(|| Some(format!("Diff: {} vs {}", block.source, diff_source))),
+            x_axis,
+            y_axis,
+            series: vec![
+                Series {
+                    name: "before".to_string(),
+                    data: ts.before,
+                },
+                Series {
+                    name: "after".to_string(),
+                    data: ts.after,
+                },
+            ],
+            x_labels: Some(ts.x_labels),
+            series_colors: vec![ratatui::style::Color::DarkGray, ratatui::style::Color::Cyan],
+            axis_color: Some(theme.axis_color),
+            label_color: Some(theme.label_color),
+        };
+        config
+            .series_colors
+            .extend(theme.series_colors.iter().skip(2));
+        Ok(ChartData::Line(config))
+    } else {
+        // Categorical diff → bar chart with after values and annotated labels.
+        let mut diff = compute_diff(&before, &after, &x_col, &y_col)?;
+
+        // Apply sort/top from chart block.
+        if let Some(sort) = block.sort {
+            match sort {
+                crate::cli::SortOrder::Desc => {
+                    diff.entries.sort_by(|a, b| {
+                        b.delta
+                            .partial_cmp(&a.delta)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                }
+                crate::cli::SortOrder::Asc => {
+                    diff.entries.sort_by(|a, b| {
+                        a.delta
+                            .partial_cmp(&b.delta)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                }
+                _ => {}
+            }
+        } else if block.top.is_some() {
+            // Imply desc sort when top is specified.
+            diff.entries.sort_by(|a, b| {
+                b.delta
+                    .abs()
+                    .partial_cmp(&a.delta.abs())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
+        if let Some(n) = block.top {
+            diff.entries.truncate(n);
+        }
+
+        // Build bar chart: labels annotated with direction, values = after.
+        let labels: Vec<String> = diff
+            .entries
+            .iter()
+            .map(|e| {
+                let arrow = if e.delta > 0.0 {
+                    "▲"
+                } else if e.delta < 0.0 {
+                    "▼"
+                } else {
+                    "="
+                };
+                let pct = e
+                    .pct_change
+                    .map(|p| format!("{:+.0}%", p))
+                    .unwrap_or_default();
+                format!("{} {}{}", e.label, arrow, pct)
+            })
+            .collect();
+        let values: Vec<f64> = diff.entries.iter().map(|e| e.after).collect();
+
+        let bar_data = crate::render::BarChartData {
+            title: block
+                .title
+                .clone()
+                .or_else(|| Some(format!("Diff: {} vs {}", block.source, diff_source))),
+            labels,
+            values,
+            y_label: y_col,
+            show_labels: false,
+            series_colors: theme.series_colors.clone(),
+            axis_color: Some(theme.axis_color),
+        };
+        Ok(ChartData::Bar(bar_data))
+    }
+}
+
 /// Load chart data from a chart block definition and base directory.
 pub fn load_chart_data(
     block: &ChartBlock,
     base_dir: &Path,
     theme: &crate::theme::Theme,
 ) -> Result<crate::render::ChartData> {
+    // If diff mode is specified, branch into diff-specific loading.
+    if let Some(ref diff_source) = block.diff {
+        return load_diff_chart_data(block, diff_source, base_dir, theme);
+    }
+
     let path = resolve_chart_source_path(&block.source, base_dir);
 
     let mut data = crate::loader::load_data(&path).with_context(|| {
@@ -206,6 +391,7 @@ mod tests {
             top: None,
             bins: None,
             height: None,
+            diff: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Line);
@@ -232,6 +418,7 @@ mod tests {
             top: None,
             bins: None,
             height: None,
+            diff: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Bar);
@@ -258,6 +445,7 @@ mod tests {
             top: None,
             bins: None,
             height: None,
+            diff: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Scatter);
@@ -295,6 +483,7 @@ mod tests {
             top: None,
             bins: None,
             height: None,
+            diff: None,
         };
         let ct = infer_chart_type_from_data(&headers, &rows, &block);
         assert_eq!(ct, ChartType::Bar);

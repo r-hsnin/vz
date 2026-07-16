@@ -64,6 +64,8 @@ pub struct ChartBlock {
     pub bins: Option<usize>,
     /// Chart height in terminal rows (defaults to flexible sizing).
     pub height: Option<u16>,
+    /// Optional "after" file for diff mode (source becomes "before").
+    pub diff: Option<String>,
 }
 
 /// A parsed presentation.

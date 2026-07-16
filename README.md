@@ -306,6 +306,7 @@ Supported chart block parameters:
 | `top` | Show only top N categories |
 | `bins` | Number of histogram bins |
 | `height` | Chart height in rows |
+| `diff` | "After" file for diff comparison (`source` becomes "before") |
 
 Navigate: `←`/`→` or `h`/`l` or `Space`/`Enter`/`Backspace`, jump: `g`/`G`/`Home`/`End` or type slide number + `Enter`, quit: `q`/`Esc`
 

@@ -28,6 +28,7 @@ fn test_element_constraint_chart() {
         top: None,
         bins: None,
         height: None,
+        diff: None,
     });
     assert_eq!(element_constraint(&el), Constraint::Min(10));
 }

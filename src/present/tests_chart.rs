@@ -15,6 +15,7 @@ fn test_load_chart_data_with_color_column() {
         top: None,
         bins: None,
         height: None,
+        diff: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -71,6 +72,7 @@ fn test_load_chart_data_json_source() {
         top: None,
         bins: None,
         height: None,
+        diff: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -105,6 +107,7 @@ fn test_load_chart_data_infers_type_when_not_specified() {
         top: None,
         bins: None,
         height: None,
+        diff: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -132,6 +135,7 @@ fn test_load_chart_data_infers_line_for_temporal() {
         top: None,
         bins: None,
         height: None,
+        diff: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");

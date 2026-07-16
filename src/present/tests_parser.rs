@@ -232,6 +232,7 @@ fn test_load_chart_data_relative_to_base_dir() {
         top: None,
         bins: None,
         height: None,
+        diff: None,
     };
 
     // Use the fixtures directory as base_dir (where demo.md lives)
@@ -259,6 +260,7 @@ fn test_load_chart_data_with_filter() {
         top: None,
         bins: None,
         height: None,
+        diff: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
@@ -285,9 +287,157 @@ fn test_load_chart_data_nonexistent_source() {
         top: None,
         bins: None,
         height: None,
+        diff: None,
     };
 
     let base_dir = std::path::Path::new("fixtures");
     let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
     assert!(result.is_err());
+}
+
+#[test]
+fn test_parse_chart_block_diff_key() {
+    let content = r#"# Diff Slide
+
+```chart
+source: sales_before.csv
+diff: sales_after.csv
+x: city
+y: revenue
+```
+"#;
+    let pres = parse_presentation(content);
+    assert_eq!(pres.slides.len(), 1);
+    if let SlideElement::Chart(block) = &pres.slides[0].content[0] {
+        assert_eq!(block.source, "sales_before.csv");
+        assert_eq!(block.diff.as_deref(), Some("sales_after.csv"));
+        assert_eq!(block.x_col.as_deref(), Some("city"));
+        assert_eq!(block.y_col.as_deref(), Some("revenue"));
+    } else {
+        panic!("Expected Chart element");
+    }
+}
+
+#[test]
+fn test_parse_chart_block_diff_absent() {
+    let content = r#"# Normal Slide
+
+```chart
+source: data.csv
+type: line
+```
+"#;
+    let pres = parse_presentation(content);
+    if let SlideElement::Chart(block) = &pres.slides[0].content[0] {
+        assert_eq!(block.diff, None);
+    } else {
+        panic!("Expected Chart element");
+    }
+}
+
+#[test]
+fn test_load_diff_chart_data_categorical() {
+    let block = ChartBlock {
+        source: "diff/sales_before.csv".to_string(),
+        chart_type: None,
+        x_col: None,
+        y_col: None,
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
+        bins: None,
+        height: None,
+        diff: Some("diff/sales_after.csv".to_string()),
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
+    assert!(
+        result.is_ok(),
+        "diff categorical should produce bar chart: {:?}",
+        result.err()
+    );
+    if let Ok(crate::render::ChartData::Bar(bar)) = result {
+        assert!(!bar.labels.is_empty());
+        assert!(!bar.values.is_empty());
+        // Labels should contain diff annotations (▲ or ▼)
+        let has_annotation = bar
+            .labels
+            .iter()
+            .any(|l| l.contains('▲') || l.contains('▼') || l.contains('='));
+        assert!(
+            has_annotation,
+            "Labels should have diff annotations: {:?}",
+            bar.labels
+        );
+    } else {
+        panic!("Expected Bar chart data for categorical diff");
+    }
+}
+
+#[test]
+fn test_load_diff_chart_data_temporal() {
+    let block = ChartBlock {
+        source: "diff/ts_daily_before.csv".to_string(),
+        chart_type: None,
+        x_col: None,
+        y_col: None,
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
+        bins: None,
+        height: None,
+        diff: Some("diff/ts_daily_after.csv".to_string()),
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
+    assert!(
+        result.is_ok(),
+        "diff temporal should produce line chart: {:?}",
+        result.err()
+    );
+    if let Ok(crate::render::ChartData::Line(config)) = result {
+        assert_eq!(config.series.len(), 2);
+        assert_eq!(config.series[0].name, "before");
+        assert_eq!(config.series[1].name, "after");
+        assert!(config.x_labels.is_some());
+    } else {
+        panic!("Expected Line chart data for temporal diff");
+    }
+}
+
+#[test]
+fn test_load_diff_chart_data_schema_mismatch() {
+    let block = ChartBlock {
+        source: "diff/sales_before.csv".to_string(),
+        chart_type: None,
+        x_col: None,
+        y_col: None,
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
+        bins: None,
+        height: None,
+        diff: Some("diff/schema_mismatch.csv".to_string()),
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
+    assert!(result.is_err(), "Schema mismatch should return error");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("Schema mismatch"),
+        "Error should mention schema mismatch: {}",
+        err_msg
+    );
 }
