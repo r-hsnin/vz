@@ -14,10 +14,13 @@ use crate::cli::SortOrder;
 pub use ansi::print_buffer;
 
 /// Default chart height in terminal rows.
-const DEFAULT_HEIGHT: u16 = 24;
+pub(crate) const DEFAULT_HEIGHT: u16 = 24;
 
 /// Minimum width for chart rendering.
 const MIN_WIDTH: u16 = 40;
+
+/// Default terminal width when width cannot be determined.
+pub(crate) const DEFAULT_TERMINAL_WIDTH: u16 = 80;
 
 /// Render a chart to stdout as a one-shot output (no TUI interaction).
 /// Options for oneshot rendering.
@@ -248,11 +251,11 @@ fn build_histogram_chart(
 /// When stdout is piped (not a TTY), always returns 80 for deterministic output.
 pub fn terminal_width() -> u16 {
     if !std::io::IsTerminal::is_terminal(&std::io::stdout()) {
-        return 80;
+        return DEFAULT_TERMINAL_WIDTH;
     }
     crossterm::terminal::size()
         .map(|(w, _)| w.max(MIN_WIDTH))
-        .unwrap_or(80)
+        .unwrap_or(DEFAULT_TERMINAL_WIDTH)
 }
 
 /// Choose chart height adaptively based on data density.

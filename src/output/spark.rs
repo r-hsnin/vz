@@ -47,7 +47,7 @@ pub fn print_spark(
                 println!("{}", recommendation.x_column);
                 return;
             }
-            let bin_count = params.bins.unwrap_or(10);
+            let bin_count = params.bins.unwrap_or(data_builder::DEFAULT_BINS);
             let bins = crate::render::compute_bins(&values, bin_count);
             let counts: Vec<f64> = bins.iter().map(|(_, _, c)| *c as f64).collect();
             let spark = make_sparkline(&counts);

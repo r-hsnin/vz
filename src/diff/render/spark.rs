@@ -4,6 +4,7 @@ use std::path::Path;
 
 use crate::diff::{DiffResult, DiffTimeSeries};
 use crate::sparkline;
+use crate::util::path_label;
 
 /// Print categorical diff as sparkline: `Δ revenue  ▁▃▅▇  (+45%)`
 pub(super) fn print_diff_spark(diff: &DiffResult) {
@@ -22,14 +23,8 @@ pub(super) fn print_diff_spark(diff: &DiffResult) {
 
 /// Print temporal diff as sparkline.
 pub(super) fn print_diff_line_spark(ts: &DiffTimeSeries, before_path: &Path, after_path: &Path) {
-    let before_name = before_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("before");
-    let after_name = after_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("after");
+    let before_name = path_label(before_path);
+    let after_name = path_label(after_path);
 
     let before_values: Vec<f64> = ts.before.iter().map(|(_, y)| *y).collect();
     let after_values: Vec<f64> = ts.after.iter().map(|(_, y)| *y).collect();

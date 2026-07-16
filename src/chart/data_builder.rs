@@ -9,6 +9,9 @@ use crate::render::{Axis, BarChartData, ChartConfig, HistogramData, Series};
 /// Beyond this threshold, rows are systematically sampled.
 pub const MAX_CHART_POINTS: usize = 5000;
 
+/// Default number of bins for histogram charts.
+pub(crate) const DEFAULT_BINS: usize = 10;
+
 /// Pick `count` evenly spaced items from a slice of strings.
 /// Returns all items if the slice is empty or `count >= items.len()`.
 pub fn pick_evenly(items: &[String], count: usize) -> Vec<String> {
@@ -333,7 +336,7 @@ pub fn build_histogram(
     HistogramData {
         title,
         values,
-        bin_count: bin_count.unwrap_or(10),
+        bin_count: bin_count.unwrap_or(DEFAULT_BINS),
         x_label,
         axis_color: None,
     }

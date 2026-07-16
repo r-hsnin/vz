@@ -5,19 +5,17 @@ use std::path::Path;
 use crate::cli::Cli;
 use crate::diff::DiffResult;
 use crate::render::format_number;
+use crate::util::path_label;
 
 use super::apply_sort_and_limit;
 
+/// Default chart width for diff bar rendering when terminal width is unavailable.
+const DEFAULT_DIFF_BAR_WIDTH: usize = 60;
+
 /// Print the diff summary line: `Diff │ x=col │ y=col │ before vs after │ Δ net +N% │ N entries`
 pub(super) fn print_diff_summary(diff: &DiffResult, before_path: &Path, after_path: &Path) {
-    let before_name = before_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("before");
-    let after_name = after_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("after");
+    let before_name = path_label(before_path);
+    let after_name = path_label(after_path);
 
     let overall = match diff.overall_pct {
         Some(pct) if pct > 0.0 => format!(" │ Δ net +{:.0}%", pct),
@@ -55,7 +53,7 @@ pub(super) fn print_diff_bar(cli: &Cli, diff: &DiffResult) {
     let bar_width: usize = cli
         .width
         .map(|w| w as usize)
-        .unwrap_or(60)
+        .unwrap_or(DEFAULT_DIFF_BAR_WIDTH)
         .saturating_sub(label_width + 40);
     let bar_width = bar_width.max(10);
 

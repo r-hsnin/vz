@@ -208,7 +208,7 @@ fn summary_max_width() -> usize {
     }
     crossterm::terminal::size()
         .map(|(w, _)| w as usize)
-        .unwrap_or(80)
+        .unwrap_or(super::DEFAULT_TERMINAL_WIDTH as usize)
 }
 
 /// Truncate a string to fit within max_width characters, adding "…" if truncated.

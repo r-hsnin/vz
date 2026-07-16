@@ -10,6 +10,7 @@ use crate::helpers::resolve_theme;
 use crate::oneshot::{self, fit_labels_to_width};
 use crate::output;
 use crate::render::{self, Axis, BarChartData, ChartConfig, ChartData, Series};
+use crate::util::path_label;
 
 use super::apply_sort_and_limit;
 
@@ -17,21 +18,15 @@ use super::apply_sort_and_limit;
 ///
 /// Bars are colored green (increase) or red (decrease) based on delta direction.
 pub(super) fn print_diff_html(cli: &Cli, diff: &DiffResult, before_path: &Path, after_path: &Path) {
-    let before_name = before_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("before");
-    let after_name = after_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("after");
+    let before_name = path_label(before_path);
+    let after_name = path_label(after_path);
 
     let entries = apply_sort_and_limit(cli, &diff.entries);
 
     let theme = resolve_theme(cli);
     let bg = theme.svg_background();
     let width = cli.width.unwrap_or_else(oneshot::terminal_width);
-    let height = cli.height.unwrap_or(24);
+    let height = cli.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
 
     // Color each bar by delta direction: green=increase, red=decrease, gray=unchanged
     let colors: Vec<Color> = entries
@@ -78,19 +73,13 @@ pub(super) fn print_diff_line_html(
     before_path: &Path,
     after_path: &Path,
 ) {
-    let before_name = before_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("before");
-    let after_name = after_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("after");
+    let before_name = path_label(before_path);
+    let after_name = path_label(after_path);
 
     let theme = resolve_theme(cli);
     let bg = theme.svg_background();
     let width = cli.width.unwrap_or_else(oneshot::terminal_width);
-    let height = cli.height.unwrap_or(24);
+    let height = cli.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
 
     // Build Y axis from all values in both series
     let all_y: Vec<f64> = ts

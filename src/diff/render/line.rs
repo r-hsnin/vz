@@ -10,17 +10,12 @@ use crate::cli::Cli;
 use crate::diff::DiffTimeSeries;
 use crate::oneshot::{self, fit_labels_to_width};
 use crate::render::{self, Axis, ChartConfig, ChartData, Series};
+use crate::util::path_label;
 
 /// Print temporal diff summary: `Line │ x=date │ before vs after │ Δ +N% │ 6 rows`
 pub(super) fn print_diff_line_summary(ts: &DiffTimeSeries, before_path: &Path, after_path: &Path) {
-    let before_name = before_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("before");
-    let after_name = after_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("after");
+    let before_name = path_label(before_path);
+    let after_name = path_label(after_path);
 
     let overall = match ts.overall_pct {
         Some(pct) if pct > 0.0 => format!("Δ +{:.0}%", pct),
@@ -43,14 +38,8 @@ pub(super) fn print_diff_line_chart(
     before_path: &Path,
     after_path: &Path,
 ) -> Result<()> {
-    let before_name = before_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("before");
-    let after_name = after_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("after");
+    let before_name = path_label(before_path);
+    let after_name = path_label(after_path);
 
     // Build Y axis from all values in both series
     let all_y: Vec<f64> = ts
@@ -74,7 +63,7 @@ pub(super) fn print_diff_line_chart(
     };
 
     let width = cli.width.unwrap_or_else(oneshot::terminal_width);
-    let height = cli.height.unwrap_or(24);
+    let height = cli.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
 
     // Fit labels to available width
     let fitted_labels = fit_labels_to_width(&ts.x_labels, width.saturating_sub(12) as usize);

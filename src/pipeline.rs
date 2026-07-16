@@ -229,7 +229,7 @@ fn print_svg(
 
     let width = opts.width.unwrap_or_else(oneshot::terminal_width);
     let chart_type = oneshot::resolve_chart_type(recommendation, opts.chart_type_override);
-    let height = opts.height.unwrap_or(24);
+    let height = opts.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
 
     let area = Rect::new(0, 0, width, height);
     let mut buf = Buffer::empty(area);
@@ -261,7 +261,7 @@ fn print_html(
 
     let width = opts.width.unwrap_or_else(oneshot::terminal_width);
     let chart_type = oneshot::resolve_chart_type(recommendation, opts.chart_type_override);
-    let height = opts.height.unwrap_or(24);
+    let height = opts.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
 
     let area = Rect::new(0, 0, width, height);
     let mut buf = Buffer::empty(area);
