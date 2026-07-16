@@ -3,6 +3,7 @@
 mod bar;
 mod json;
 mod line;
+mod markdown;
 mod spark;
 #[cfg(test)]
 #[path = "tests.rs"]
@@ -28,6 +29,9 @@ pub fn render_diff(
         Some(cli::OutputFormat::Json) => {
             json::print_diff_json(diff, before_path, after_path)?;
         }
+        Some(cli::OutputFormat::Markdown) => {
+            markdown::print_diff_markdown(cli, diff, before_path, after_path);
+        }
         _ => {
             bar::print_diff_summary(diff, before_path, after_path);
             bar::print_diff_bar(cli, diff);
@@ -49,6 +53,9 @@ pub fn render_diff_line(
         }
         Some(cli::OutputFormat::Json) => {
             json::print_diff_line_json(ts, before_path, after_path)?;
+        }
+        Some(cli::OutputFormat::Markdown) => {
+            markdown::print_diff_line_markdown(ts, before_path, after_path);
         }
         _ => {
             line::print_diff_line_summary(ts, before_path, after_path);

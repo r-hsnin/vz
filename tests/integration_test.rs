@@ -4226,6 +4226,132 @@ fn test_diff_categorical_still_uses_bar() {
     assert!(stdout.contains("▲"), "Should contain ▲ for categorical");
 }
 
+// --- Diff Markdown output tests ---
+
+#[test]
+fn test_diff_markdown_output() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "-o",
+            "markdown",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("|---|"),
+        "Missing table separator in: {}",
+        stdout
+    );
+    assert!(stdout.contains("| city |"), "Missing header in: {}", stdout);
+    assert!(stdout.contains("Tokyo"), "Missing Tokyo in: {}", stdout);
+    assert!(stdout.contains("Osaka"), "Missing Osaka in: {}", stdout);
+    assert!(stdout.contains("▲"), "Missing ▲ marker in: {}", stdout);
+    assert!(stdout.contains("▼"), "Missing ▼ marker in: {}", stdout);
+}
+
+#[test]
+fn test_diff_markdown_shorthand() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--markdown",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("|---|"),
+        "Missing table separator in: {}",
+        stdout
+    );
+    assert!(stdout.contains("| city |"), "Missing header in: {}", stdout);
+}
+
+#[test]
+fn test_diff_markdown_temporal() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+            "--markdown",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("|---|"),
+        "Missing table separator in: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("| date |"),
+        "Missing date header in: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("2024-01-01"),
+        "Missing first date in: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("2024-01-06"),
+        "Missing last date in: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_diff_markdown_with_sort_and_top() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--markdown",
+            "--sort",
+            "desc",
+            "--top",
+            "2",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // Header + separator + 2 data rows (+ optional overall line)
+    let data_lines: Vec<&str> = stdout
+        .lines()
+        .filter(|l| l.starts_with("| ") && !l.contains("city") && !l.starts_with("|---"))
+        .collect();
+    assert_eq!(
+        data_lines.len(),
+        2,
+        "Expected 2 data rows with --top 2, got: {:?}",
+        data_lines
+    );
+}
+
 // --- HTML output tests ---
 
 #[test]

@@ -7,6 +7,7 @@ use crate::diff::{DiffEntry, DiffResult, DiffTimeSeries};
 
 use super::apply_sort_and_limit;
 use super::json::print_diff_line_json;
+use super::markdown::{print_diff_line_markdown, print_diff_markdown};
 use super::spark::{print_diff_line_spark, print_diff_spark};
 
 fn sample_entries() -> Vec<DiffEntry> {
@@ -155,4 +156,72 @@ fn test_diff_line_chart_builds_two_series() {
     assert_eq!(config.series_colors, vec![Color::DarkGray, Color::Cyan]);
     assert_eq!(config.series[0].data.len(), 3);
     assert_eq!(config.series[1].data.len(), 3);
+}
+
+// --- Markdown output tests ---
+
+#[test]
+fn test_diff_markdown_categorical_basic() {
+    let diff = DiffResult {
+        entries: sample_entries(),
+        x_column: "city".into(),
+        y_column: "revenue".into(),
+        before_rows: 3,
+        after_rows: 3,
+        overall_pct: Some(6.06),
+    };
+    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "markdown"]).unwrap();
+    // Verify it doesn't panic and produces output
+    print_diff_markdown(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+}
+
+#[test]
+fn test_diff_markdown_categorical_with_sort() {
+    let diff = DiffResult {
+        entries: sample_entries(),
+        x_column: "city".into(),
+        y_column: "revenue".into(),
+        before_rows: 3,
+        after_rows: 3,
+        overall_pct: Some(6.06),
+    };
+    let cli =
+        Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "markdown", "--sort", "desc"]).unwrap();
+    print_diff_markdown(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+}
+
+#[test]
+fn test_diff_markdown_categorical_with_top() {
+    let diff = DiffResult {
+        entries: sample_entries(),
+        x_column: "city".into(),
+        y_column: "revenue".into(),
+        before_rows: 3,
+        after_rows: 3,
+        overall_pct: Some(6.06),
+    };
+    let cli =
+        Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "markdown", "--top", "2"]).unwrap();
+    print_diff_markdown(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+}
+
+#[test]
+fn test_diff_markdown_temporal_basic() {
+    let ts = sample_ts();
+    // Verify it doesn't panic
+    print_diff_line_markdown(&ts, Path::new("before.csv"), Path::new("after.csv"));
+}
+
+#[test]
+fn test_diff_markdown_no_overall_pct() {
+    let diff = DiffResult {
+        entries: sample_entries(),
+        x_column: "city".into(),
+        y_column: "revenue".into(),
+        before_rows: 3,
+        after_rows: 3,
+        overall_pct: None,
+    };
+    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "markdown"]).unwrap();
+    print_diff_markdown(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
 }
