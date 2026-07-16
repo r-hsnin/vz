@@ -150,8 +150,8 @@ let parts = build_summary_parts(&SummaryContext {
 assert_eq!(parts[0], "Line");
 assert_eq!(parts[1], "x=date");
 assert!(parts[2].starts_with("y=revenue"));
-assert!(parts[2].contains("1.0k"));
-assert!(parts[2].contains("2.0k"));
+assert!(parts[2].contains("1k"));
+assert!(parts[2].contains("2k"));
 assert!(parts.iter().any(|p| p.contains("2 rows")));
 }
 

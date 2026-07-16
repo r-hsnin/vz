@@ -6,7 +6,9 @@ use crate::chart::data_builder;
 use crate::chart::selector::{ChartRecommendation, ChartType};
 use crate::cli::{AggFunction, SortOrder};
 use crate::oneshot;
+use crate::render::format_number;
 use crate::sparkline;
+use crate::util;
 
 /// Parameters for spark output (avoids passing full Cli struct).
 pub struct SparkParams {
@@ -15,6 +17,7 @@ pub struct SparkParams {
     pub sort: Option<SortOrder>,
     pub limit: Option<usize>,
     pub color_col: Option<String>,
+    pub bins: Option<usize>,
 }
 
 /// Print sparkline output: single-line, grouped, or aggregated for bar charts.
@@ -30,12 +33,39 @@ pub fn print_spark(
         .as_ref()
         .and_then(|y| data_builder::column_index(headers, y));
     let y_name = recommendation.y_column.as_deref().unwrap_or("value");
+
+    let chart_type = oneshot::resolve_chart_type(recommendation, params.chart_type_override);
+
+    // Histogram with no Y column: bin the X column values and sparkline the counts
+    if y_idx.is_none() && chart_type == ChartType::Histogram {
+        if let Some(xi) = x_idx {
+            let values: Vec<f64> = rows
+                .iter()
+                .filter_map(|r| r.get(xi)?.parse::<f64>().ok())
+                .collect();
+            if values.is_empty() {
+                println!("{}", recommendation.x_column);
+                return;
+            }
+            let bin_count = params.bins.unwrap_or(10);
+            let bins = crate::render::compute_bins(&values, bin_count);
+            let counts: Vec<f64> = bins.iter().map(|(_, _, c)| *c as f64).collect();
+            let spark = make_sparkline(&counts);
+            let range = util::min_max(&values)
+                .map(|(min, max)| format!("({}–{})", format_number(min), format_number(max)))
+                .unwrap_or_default();
+            let x_name = &recommendation.x_column;
+            println!("{x_name}  {spark}  {range} {} rows", values.len());
+            return;
+        }
+        println!("▄");
+        return;
+    }
+
     let Some(yi) = y_idx else {
         println!("▄");
         return;
     };
-
-    let chart_type = oneshot::resolve_chart_type(recommendation, params.chart_type_override);
 
     // For bar charts, aggregate values by category then sparkline
     if chart_type == ChartType::Bar
@@ -49,7 +79,8 @@ pub fn print_spark(
             bar_data.values.truncate(n);
         }
         let spark = make_sparkline(&bar_data.values);
-        println!("{y_name}  {spark}");
+        let suffix = stats_suffix(&bar_data.values);
+        println!("{y_name}  {spark}{suffix}");
         return;
     }
 
@@ -66,7 +97,9 @@ pub fn print_spark(
             }
         }
         for (name, values) in &groups {
-            println!("{}  {}", name, make_sparkline(values));
+            let spark = make_sparkline(values);
+            let suffix = stats_suffix(values);
+            println!("{name}  {spark}{suffix}");
         }
         return;
     }
@@ -77,12 +110,48 @@ pub fn print_spark(
         .filter_map(|r| r.get(yi)?.parse::<f64>().ok())
         .collect();
     let spark = make_sparkline(&values);
-    println!("{y_name}  {spark}");
+    let suffix = stats_suffix(&values);
+    println!("{y_name}  {spark}{suffix}");
 }
 
 /// Generate a sparkline string from values.
 fn make_sparkline(values: &[f64]) -> String {
     sparkline::sparkline_from_values(values)
+}
+
+/// Generate a stats suffix with range and trend annotation.
+/// Format: `(min–max) ↑ +N%` or `(min–max) → stable`
+fn stats_suffix(values: &[f64]) -> String {
+    let range_part = util::min_max(values)
+        .map(|(min, max)| format!("({}–{})", format_number(min), format_number(max)));
+    let trend_part = trend_from_values(values);
+    match (range_part, trend_part) {
+        (Some(r), Some(t)) => format!("  {} {}", r, t),
+        (Some(r), None) => format!("  {}", r),
+        (None, Some(t)) => format!("  {}", t),
+        (None, None) => String::new(),
+    }
+}
+
+/// Compute trend annotation from a slice of values.
+/// Returns arrow + percentage change from first to last value.
+fn trend_from_values(values: &[f64]) -> Option<String> {
+    if values.len() < 2 {
+        return None;
+    }
+    let first = values[0];
+    let last = *values.last()?;
+    if first.abs() < f64::EPSILON {
+        return None;
+    }
+    let pct = ((last - first) / first) * 100.0;
+    if pct > 5.0 {
+        Some(format!("↑ {:+.0}%", pct))
+    } else if pct < -5.0 {
+        Some(format!("↓ {:+.0}%", pct))
+    } else {
+        Some("→ stable".to_string())
+    }
 }
 
 #[cfg(test)]
@@ -106,6 +175,7 @@ mod tests {
             sort: None,
             limit: None,
             color_col: None,
+            bins: None,
         }
     }
 
@@ -169,5 +239,75 @@ mod tests {
         ];
         // Should not panic
         print_spark(&rec, &headers, &rows, &default_params());
+    }
+
+    #[test]
+    fn test_stats_suffix_ascending() {
+        let values = vec![100.0, 200.0, 300.0, 400.0, 500.0];
+        let suffix = stats_suffix(&values);
+        assert!(suffix.contains("100"));
+        assert!(suffix.contains("500"));
+        assert!(suffix.contains("↑"));
+    }
+
+    #[test]
+    fn test_stats_suffix_descending() {
+        let values = vec![1000.0, 800.0, 400.0, 200.0];
+        let suffix = stats_suffix(&values);
+        assert!(suffix.contains("200"));
+        assert!(suffix.contains("1"));
+        assert!(suffix.contains("↓"));
+    }
+
+    #[test]
+    fn test_stats_suffix_stable() {
+        let values = vec![100.0, 101.0, 99.0, 100.5];
+        let suffix = stats_suffix(&values);
+        assert!(suffix.contains("→ stable"));
+    }
+
+    #[test]
+    fn test_stats_suffix_empty() {
+        let suffix = stats_suffix(&[]);
+        assert!(suffix.is_empty());
+    }
+
+    #[test]
+    fn test_stats_suffix_single_value() {
+        let suffix = stats_suffix(&[42.0]);
+        // Should have range but no trend (need 2+ values)
+        assert!(suffix.contains("42"));
+        assert!(!suffix.contains("↑"));
+        assert!(!suffix.contains("↓"));
+    }
+
+    #[test]
+    fn test_trend_from_values_growth() {
+        let trend = trend_from_values(&[100.0, 200.0]);
+        assert_eq!(trend, Some("↑ +100%".to_string()));
+    }
+
+    #[test]
+    fn test_trend_from_values_decline() {
+        let trend = trend_from_values(&[100.0, 50.0]);
+        assert_eq!(trend, Some("↓ -50%".to_string()));
+    }
+
+    #[test]
+    fn test_trend_from_values_stable() {
+        let trend = trend_from_values(&[100.0, 103.0]);
+        assert_eq!(trend, Some("→ stable".to_string()));
+    }
+
+    #[test]
+    fn test_trend_from_values_too_few() {
+        assert_eq!(trend_from_values(&[100.0]), None);
+        assert_eq!(trend_from_values(&[]), None);
+    }
+
+    #[test]
+    fn test_trend_from_values_zero_start() {
+        // Division by zero guard
+        assert_eq!(trend_from_values(&[0.0, 100.0]), None);
     }
 }

@@ -1,7 +1,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     widgets::Widget,
 };
 
@@ -18,17 +18,14 @@ impl<'a> HeatmapChart<'a> {
     }
 }
 
-/// Map a count value to a color intensity (darker = higher count).
+/// Map a count value to a color intensity using a perceptually uniform gradient.
+/// Palette: dark teal (low) → cyan (mid) → yellow (high).
 fn count_to_color(count: usize, max_count: usize) -> Color {
     if max_count == 0 || count == 0 {
         return Color::DarkGray;
     }
-    let ratio = count as f64 / max_count as f64;
-    // Gradient from dark blue (low) through cyan to white (high)
-    let r = (ratio * 255.0) as u8;
-    let g = (ratio * 255.0) as u8;
-    let b = 128 + (ratio * 127.0) as u8;
-    Color::Rgb(r, g, b)
+    let t = count as f64 / max_count as f64;
+    super::gradient_color(t)
 }
 
 /// Format a count for display in a cell.
@@ -93,7 +90,13 @@ impl Widget for HeatmapChart<'_> {
 
         if let Some(ref title) = data.title {
             let title_str: String = title.chars().take(area.width as usize).collect();
-            buf.set_string(area.x, area.y, &title_str, Style::default());
+            let title_x = area.x + (area.width.saturating_sub(title_str.len() as u16)) / 2;
+            buf.set_string(
+                title_x,
+                area.y,
+                &title_str,
+                Style::default().add_modifier(Modifier::BOLD),
+            );
         }
 
         render_legend(data.max_count, area, buf);
@@ -198,7 +201,8 @@ mod tests {
     #[test]
     fn test_count_to_color_max() {
         let color = count_to_color(10, 10);
-        assert_eq!(color, Color::Rgb(255, 255, 255));
+        // At t=1.0: r=255, g=255, b=0 (yellow)
+        assert_eq!(color, Color::Rgb(255, 255, 0));
     }
 
     #[test]
@@ -225,8 +229,9 @@ mod tests {
         let mut buf = Buffer::empty(area);
         HeatmapChart::new(&data).render(area, &mut buf);
 
-        // Check title rendered
-        let first_line: String = (0..4)
+        // Check title rendered (centered: x = (40 - 4) / 2 = 18)
+        let title_x = (40u16 - 4) / 2;
+        let first_line: String = (title_x..title_x + 4)
             .map(|x| buf.cell((x, 0)).unwrap().symbol().to_string())
             .collect();
         assert_eq!(first_line.trim(), "Test");

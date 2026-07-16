@@ -91,7 +91,7 @@ fn unique_values(values: &[&str]) -> usize {
 fn is_temporal(value: &str) -> bool {
     use std::sync::LazyLock;
 
-    static TEMPORAL_PATTERNS: LazyLock<[regex::Regex; 4]> = LazyLock::new(|| {
+    static TEMPORAL_PATTERNS: LazyLock<[regex::Regex; 5]> = LazyLock::new(|| {
         [
             // YYYY-MM-DD (with optional time)
             regex::Regex::new(r"^\d{4}-\d{2}-\d{2}").expect("valid temporal regex"),
@@ -101,6 +101,8 @@ fn is_temporal(value: &str) -> bool {
             regex::Regex::new(r"^\d{2}/\d{2}/\d{4}").expect("valid temporal regex"),
             // DD-Mon-YYYY
             regex::Regex::new(r"^\d{2}-[A-Za-z]{3}-\d{4}").expect("valid temporal regex"),
+            // YYYY-MM (year-month only)
+            regex::Regex::new(r"^\d{4}-\d{2}$").expect("valid temporal regex"),
         ]
     });
 
@@ -242,5 +244,40 @@ mod tests {
             .map(|i| Box::leak(format!("val_{i}").into_boxed_str()) as &str)
             .collect();
         assert_eq!(classify_by_cardinality(&values), DataType::Nominal);
+    }
+
+    #[test]
+    fn test_detect_year_month() {
+        assert_eq!(detect_value_type("2024-01"), DataType::Temporal);
+        assert_eq!(detect_value_type("2023-12"), DataType::Temporal);
+        assert_eq!(detect_value_type("1999-06"), DataType::Temporal);
+    }
+
+    #[test]
+    fn test_detect_year_month_single_digit_not_temporal() {
+        // Single-digit month should not match YYYY-MM
+        assert_eq!(detect_value_type("2024-1"), DataType::Nominal);
+    }
+
+    #[test]
+    fn test_infer_year_month_column() {
+        let values = vec!["2024-01", "2024-02", "2024-03", "2024-04", "2024-05"];
+        assert_eq!(infer_column_type(&values), DataType::Temporal);
+    }
+
+    #[test]
+    fn test_detect_percentage_string_is_nominal() {
+        // "45%" contains non-numeric char '%', should NOT be quantitative
+        assert_eq!(detect_value_type("45%"), DataType::Nominal);
+        assert_eq!(detect_value_type("100%"), DataType::Nominal);
+        assert_eq!(detect_value_type("0.5%"), DataType::Nominal);
+    }
+
+    #[test]
+    fn test_detect_currency_string_is_nominal() {
+        // "$100" and "€50" contain currency symbols, should NOT be quantitative
+        assert_eq!(detect_value_type("$100"), DataType::Nominal);
+        assert_eq!(detect_value_type("€50"), DataType::Nominal);
+        assert_eq!(detect_value_type("¥1000"), DataType::Nominal);
     }
 }

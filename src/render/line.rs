@@ -1,8 +1,9 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     symbols::Marker,
+    text::{Line as TextLine, Span},
     widgets::{Axis as RatatuiAxis, Block, Borders, Chart, Dataset, GraphType, Widget},
 };
 
@@ -13,7 +14,7 @@ use super::{ChartConfig, SERIES_COLORS};
 pub enum XYMode {
     /// Line chart: multi-point uses Braille+Line, single-point uses Dot+Scatter.
     Line,
-    /// Scatter plot: always uses Dot+Scatter.
+    /// Scatter plot: multi-point uses Braille+Scatter, single-point uses Dot+Scatter.
     Scatter,
 }
 
@@ -27,10 +28,19 @@ struct DatasetSpec {
 /// Determine marker and graph type based on mode and series length.
 fn dataset_spec(mode: XYMode, series_len: usize) -> DatasetSpec {
     match mode {
-        XYMode::Scatter => DatasetSpec {
-            marker: Marker::Dot,
-            graph_type: GraphType::Scatter,
-        },
+        XYMode::Scatter => {
+            if series_len <= 1 {
+                DatasetSpec {
+                    marker: Marker::Dot,
+                    graph_type: GraphType::Scatter,
+                }
+            } else {
+                DatasetSpec {
+                    marker: Marker::Braille,
+                    graph_type: GraphType::Scatter,
+                }
+            }
+        }
         XYMode::Line => {
             if series_len <= 1 {
                 DatasetSpec {
@@ -78,7 +88,7 @@ impl<'a> Widget for XYChart<'a> {
             .map(|(i, series)| {
                 let spec = dataset_spec(self.mode, series.data.len());
                 Dataset::default()
-                    .name(series.name.clone())
+                    .name(series.name.as_str())
                     .marker(spec.marker)
                     .graph_type(spec.graph_type)
                     .style(Style::default().fg(self.color_at(i)))
@@ -93,33 +103,102 @@ impl<'a> Widget for XYChart<'a> {
         let title = self
             .config
             .title
-            .clone()
-            .unwrap_or_else(|| default_title.to_string());
+            .as_deref()
+            .unwrap_or(default_title)
+            .to_string();
+
+        let axis_style = Style::default().fg(self.config.axis_color.unwrap_or(Color::DarkGray));
 
         let x_axis = RatatuiAxis::default()
-            .title(self.config.x_axis.label.clone())
+            .title(self.config.x_axis.label.as_str())
             .bounds([self.config.x_axis.min, self.config.x_axis.max])
             .labels(
                 self.config
                     .x_labels
                     .clone()
                     .unwrap_or_else(|| self.config.x_axis.tick_labels(5)),
-            );
-
-        let axis_style = Style::default().fg(self.config.axis_color.unwrap_or(Color::DarkGray));
+            )
+            .style(axis_style);
 
         let y_axis = RatatuiAxis::default()
-            .title(self.config.y_axis.label.clone())
+            .title(self.config.y_axis.label.as_str())
             .bounds([self.config.y_axis.min, self.config.y_axis.max])
             .labels(self.config.y_axis.tick_labels(5))
             .style(axis_style);
 
         let chart = Chart::new(datasets)
-            .block(Block::default().title(title).borders(Borders::ALL))
+            .block(
+                Block::default()
+                    .title(
+                        TextLine::from(Span::styled(
+                            title,
+                            Style::default().add_modifier(Modifier::BOLD),
+                        ))
+                        .centered(),
+                    )
+                    .borders(Borders::ALL),
+            )
             .x_axis(x_axis)
             .y_axis(y_axis);
 
         chart.render(area, buf);
+
+        // Render in-chart legend for multi-series charts
+        if self.config.series.len() > 1 {
+            render_legend(self.config, area, buf, |idx| self.color_at(idx));
+        }
+    }
+}
+
+/// Render a compact legend overlay in the top-right corner of the chart area.
+/// Only called for multi-series charts (line/scatter).
+fn render_legend(
+    config: &ChartConfig,
+    area: Rect,
+    buf: &mut Buffer,
+    color_fn: impl Fn(usize) -> Color,
+) {
+    // Need at least space for border + 1 legend entry
+    if area.width < 20 || area.height < 5 {
+        return;
+    }
+
+    let max_name_len = config
+        .series
+        .iter()
+        .map(|s| s.name.len())
+        .max()
+        .unwrap_or(0)
+        .min(16); // Truncate long names to 16 chars
+
+    // Legend width: "█ " (2) + name + 1 padding on each side
+    let legend_entry_width = (2 + max_name_len) as u16;
+    // Available height inside chart border (top border + title row eaten, bottom border)
+    let available_height = area.height.saturating_sub(4);
+    let entries_to_show = (config.series.len() as u16).min(available_height);
+
+    if entries_to_show == 0 {
+        return;
+    }
+
+    // Position: top-right, inside the block border, with 1 char padding from right border
+    let legend_x = area.x + area.width.saturating_sub(legend_entry_width + 2);
+    let legend_y = area.y + 2; // Below top border + title
+
+    for (i, series) in config
+        .series
+        .iter()
+        .enumerate()
+        .take(entries_to_show as usize)
+    {
+        let y = legend_y + i as u16;
+        if y >= area.y + area.height.saturating_sub(2) {
+            break;
+        }
+        let color = color_fn(i);
+        buf.set_string(legend_x, y, "█ ", Style::default().fg(color));
+        let name: String = series.name.chars().take(max_name_len).collect();
+        buf.set_string(legend_x + 2, y, &name, Style::default());
     }
 }
 
@@ -162,299 +241,5 @@ impl<'a> Widget for ScatterPlot<'a> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::render::{Axis, Series};
-
-    #[test]
-    fn test_line_chart_renders_without_panic() {
-        let config = ChartConfig {
-            title: Some("Revenue Over Time".to_string()),
-            x_axis: Axis {
-                label: "Month".to_string(),
-                min: 0.0,
-                max: 12.0,
-            },
-            y_axis: Axis {
-                label: "Revenue".to_string(),
-                min: 0.0,
-                max: 1000.0,
-            },
-            series: vec![Series {
-                name: "Sales".to_string(),
-                data: vec![(1.0, 100.0), (2.0, 200.0), (3.0, 350.0)],
-            }],
-            x_labels: None,
-            series_colors: vec![],
-            axis_color: None,
-            label_color: None,
-        };
-
-        let chart = XYChart::new(&config, XYMode::Line);
-        let area = Rect::new(0, 0, 80, 24);
-        let mut buf = Buffer::empty(area);
-        chart.render(area, &mut buf);
-
-        let content: String = buf
-            .content()
-            .iter()
-            .map(|c| c.symbol().chars().next().unwrap_or(' '))
-            .collect();
-        assert!(!content.trim().is_empty());
-    }
-
-    #[test]
-    fn test_scatter_renders_without_panic() {
-        let config = ChartConfig {
-            title: Some("Height vs Weight".to_string()),
-            x_axis: Axis {
-                label: "Height (cm)".to_string(),
-                min: 150.0,
-                max: 200.0,
-            },
-            y_axis: Axis {
-                label: "Weight (kg)".to_string(),
-                min: 40.0,
-                max: 120.0,
-            },
-            series: vec![Series {
-                name: "People".to_string(),
-                data: vec![
-                    (165.0, 60.0),
-                    (170.0, 65.0),
-                    (175.0, 72.0),
-                    (180.0, 80.0),
-                    (185.0, 85.0),
-                ],
-            }],
-            x_labels: None,
-            series_colors: vec![],
-            axis_color: None,
-            label_color: None,
-        };
-
-        let chart = ScatterPlot::new(&config);
-        let area = Rect::new(0, 0, 80, 24);
-        let mut buf = Buffer::empty(area);
-        chart.render(area, &mut buf);
-
-        let content: String = buf
-            .content()
-            .iter()
-            .map(|c| c.symbol().chars().next().unwrap_or(' '))
-            .collect();
-        assert!(!content.trim().is_empty());
-    }
-
-    #[test]
-    fn test_line_chart_multiple_series() {
-        let config = ChartConfig {
-            title: None,
-            x_axis: Axis {
-                label: "X".to_string(),
-                min: 0.0,
-                max: 5.0,
-            },
-            y_axis: Axis {
-                label: "Y".to_string(),
-                min: 0.0,
-                max: 100.0,
-            },
-            series: vec![
-                Series {
-                    name: "A".to_string(),
-                    data: vec![(0.0, 10.0), (1.0, 50.0)],
-                },
-                Series {
-                    name: "B".to_string(),
-                    data: vec![(0.0, 30.0), (1.0, 80.0)],
-                },
-            ],
-            x_labels: None,
-            series_colors: vec![],
-            axis_color: None,
-            label_color: None,
-        };
-
-        let chart = XYChart::new(&config, XYMode::Line);
-        let area = Rect::new(0, 0, 80, 24);
-        let mut buf = Buffer::empty(area);
-        chart.render(area, &mut buf);
-    }
-
-    #[test]
-    fn test_single_point_series_uses_dot_marker() {
-        let single = dataset_spec(XYMode::Line, 1);
-        assert_eq!(single.marker, Marker::Dot);
-        assert_eq!(single.graph_type, GraphType::Scatter);
-
-        let multi = dataset_spec(XYMode::Line, 3);
-        assert_eq!(multi.marker, Marker::Braille);
-        assert_eq!(multi.graph_type, GraphType::Line);
-
-        let empty = dataset_spec(XYMode::Line, 0);
-        assert_eq!(empty.marker, Marker::Dot);
-        assert_eq!(empty.graph_type, GraphType::Scatter);
-    }
-
-    #[test]
-    fn test_scatter_always_uses_dot_marker() {
-        let single = dataset_spec(XYMode::Scatter, 1);
-        assert_eq!(single.marker, Marker::Dot);
-        assert_eq!(single.graph_type, GraphType::Scatter);
-
-        let multi = dataset_spec(XYMode::Scatter, 3);
-        assert_eq!(multi.marker, Marker::Dot);
-        assert_eq!(multi.graph_type, GraphType::Scatter);
-    }
-
-    #[test]
-    fn test_scatter_empty_data() {
-        let config = ChartConfig {
-            title: None,
-            x_axis: Axis {
-                label: "X".to_string(),
-                min: 0.0,
-                max: 1.0,
-            },
-            y_axis: Axis {
-                label: "Y".to_string(),
-                min: 0.0,
-                max: 1.0,
-            },
-            series: vec![Series {
-                name: "Empty".to_string(),
-                data: vec![],
-            }],
-            x_labels: None,
-            series_colors: vec![],
-            axis_color: None,
-            label_color: None,
-        };
-
-        let chart = ScatterPlot::new(&config);
-        let area = Rect::new(0, 0, 80, 24);
-        let mut buf = Buffer::empty(area);
-        chart.render(area, &mut buf);
-    }
-
-    #[test]
-    fn test_single_point_line_renders_without_panic() {
-        let config = ChartConfig {
-            title: Some("Test".to_string()),
-            x_axis: Axis {
-                label: "X".to_string(),
-                min: 0.0,
-                max: 10.0,
-            },
-            y_axis: Axis {
-                label: "Y".to_string(),
-                min: 0.0,
-                max: 100.0,
-            },
-            series: vec![
-                Series {
-                    name: "Multi".to_string(),
-                    data: vec![(1.0, 20.0), (5.0, 60.0), (9.0, 80.0)],
-                },
-                Series {
-                    name: "Single".to_string(),
-                    data: vec![(3.0, 50.0)],
-                },
-            ],
-            x_labels: None,
-            series_colors: vec![],
-            axis_color: None,
-            label_color: None,
-        };
-
-        let chart = XYChart::new(&config, XYMode::Line);
-        let area = Rect::new(0, 0, 80, 24);
-        let mut buf = Buffer::empty(area);
-        chart.render(area, &mut buf);
-    }
-
-    #[test]
-    fn test_scatter_multi_series() {
-        let config = ChartConfig {
-            title: Some("Multi-Series Scatter".to_string()),
-            x_axis: Axis {
-                label: "X".to_string(),
-                min: 0.0,
-                max: 100.0,
-            },
-            y_axis: Axis {
-                label: "Y".to_string(),
-                min: 0.0,
-                max: 100.0,
-            },
-            series: vec![
-                Series {
-                    name: "Group A".to_string(),
-                    data: vec![(10.0, 20.0), (30.0, 40.0), (50.0, 60.0)],
-                },
-                Series {
-                    name: "Group B".to_string(),
-                    data: vec![(15.0, 80.0), (45.0, 10.0), (70.0, 50.0)],
-                },
-            ],
-            x_labels: None,
-            series_colors: vec![],
-            axis_color: None,
-            label_color: None,
-        };
-
-        let chart = ScatterPlot::new(&config);
-        let area = Rect::new(0, 0, 80, 24);
-        let mut buf = Buffer::empty(area);
-        chart.render(area, &mut buf);
-
-        let content: String = buf
-            .content()
-            .iter()
-            .map(|c| c.symbol().chars().next().unwrap_or(' '))
-            .collect();
-        // Verify chart rendered something (not blank)
-        assert!(!content.trim().is_empty());
-        // Verify title is rendered
-        assert!(content.contains("Multi-Series"));
-    }
-
-    #[test]
-    fn test_scatter_negative_coordinates() {
-        let config = ChartConfig {
-            title: None,
-            x_axis: Axis {
-                label: "X".to_string(),
-                min: -50.0,
-                max: 50.0,
-            },
-            y_axis: Axis {
-                label: "Y".to_string(),
-                min: -100.0,
-                max: 100.0,
-            },
-            series: vec![Series {
-                name: "Negatives".to_string(),
-                data: vec![(-30.0, -50.0), (0.0, 0.0), (30.0, 50.0)],
-            }],
-            x_labels: None,
-            series_colors: vec![],
-            axis_color: None,
-            label_color: None,
-        };
-
-        let chart = ScatterPlot::new(&config);
-        let area = Rect::new(0, 0, 60, 16);
-        let mut buf = Buffer::empty(area);
-        chart.render(area, &mut buf);
-
-        // Should render without panic and produce output
-        let content: String = buf
-            .content()
-            .iter()
-            .map(|c| c.symbol().chars().next().unwrap_or(' '))
-            .collect();
-        assert!(!content.trim().is_empty());
-    }
-}
+#[path = "line_tests.rs"]
+mod tests;

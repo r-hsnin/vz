@@ -2,7 +2,7 @@
 
 use crate::chart::selector::{ChartRecommendation, ChartType};
 use crate::cli::AggFunction;
-use crate::render::format_number_pub;
+use crate::render::format_number;
 
 use super::ansi;
 
@@ -27,7 +27,7 @@ pub fn print_summary(ctx: &SummaryContext<'_>) {
 
 /// Build the summary parts vector (pure logic, no IO).
 pub fn build_summary_parts(ctx: &SummaryContext<'_>) -> Vec<String> {
-    let mut parts = vec![format!("{:?}", ctx.chart_type)];
+    let mut parts = vec![ctx.chart_type.to_string()];
     parts.push(format!("x={}", ctx.recommendation.x_column));
 
     if let Some(ref y) = ctx.recommendation.y_column {
@@ -60,9 +60,15 @@ pub fn build_summary_parts(ctx: &SummaryContext<'_>) -> Vec<String> {
         ));
     }
     parts.push(if ctx.skipped_rows > 0 {
-        format!("{} rows ({} skipped)", ctx.rows.len(), ctx.skipped_rows)
+        format!(
+            "{} {} ({} skipped)",
+            ctx.rows.len(),
+            if ctx.rows.len() == 1 { "row" } else { "rows" },
+            ctx.skipped_rows
+        )
     } else {
-        format!("{} rows", ctx.rows.len())
+        let n = ctx.rows.len();
+        format!("{} {}", n, if n == 1 { "row" } else { "rows" })
     });
 
     let extra_names: Vec<&str> = ctx
@@ -99,8 +105,8 @@ fn format_y_part(
             format!(
                 "y={} ({}–{})",
                 y_display,
-                format_number_pub(min),
-                format_number_pub(max)
+                format_number(min),
+                format_number(max)
             )
         } else {
             format!("y={}", y_display)

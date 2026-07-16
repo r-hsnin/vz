@@ -23,6 +23,7 @@ pub struct ChartJsonParams {
     pub limit: Option<usize>,
     pub extra_y_columns: Vec<(String, Option<String>)>,
     pub color_column: Option<String>,
+    pub bins: Option<usize>,
 }
 
 /// Print chart data as JSON (metadata + chart_data field).
@@ -70,7 +71,7 @@ fn build_chart_data(
 ) -> serde_json::Value {
     match params.chart_type {
         ChartType::Bar => build_bar_json(rows, x_idx, y_idx, params),
-        ChartType::Histogram => build_histogram_json(rows, y_idx),
+        ChartType::Histogram => build_histogram_json(rows, y_idx, params.bins),
         _ => build_series_json(headers, rows, x_idx, y_idx, params),
     }
 }
@@ -93,8 +94,12 @@ fn build_bar_json(
 }
 
 /// Build histogram JSON with bin ranges and counts.
-fn build_histogram_json(rows: &[Vec<String>], x_idx: usize) -> serde_json::Value {
-    let hist_data = data_builder::build_histogram(rows, x_idx, None, String::new(), None);
+fn build_histogram_json(
+    rows: &[Vec<String>],
+    x_idx: usize,
+    bins: Option<usize>,
+) -> serde_json::Value {
+    let hist_data = data_builder::build_histogram(rows, x_idx, None, String::new(), bins);
     let bins = render::compute_bins(&hist_data.values, hist_data.bin_count);
     let bin_data: Vec<serde_json::Value> = bins
         .iter()
@@ -150,7 +155,7 @@ fn build_series_json(
         series.push(json!({"name": name, "data": pts}));
     }
 
-    json!({ "type": format!("{:?}", params.chart_type).to_lowercase(), "series": series })
+    json!({ "type": params.chart_type.to_string().to_lowercase(), "series": series })
 }
 
 /// Build series JSON grouped by color column values.
@@ -181,7 +186,7 @@ fn build_grouped_series_json(
         .map(|(name, data)| json!({"name": name, "data": data}))
         .collect();
 
-    json!({ "type": format!("{:?}", params.chart_type).to_lowercase(), "series": series })
+    json!({ "type": params.chart_type.to_string().to_lowercase(), "series": series })
 }
 
 #[cfg(test)]
@@ -197,6 +202,7 @@ mod tests {
             limit: None,
             extra_y_columns: vec![],
             color_column: None,
+            bins: None,
         }
     }
 
@@ -233,6 +239,7 @@ mod tests {
             limit: Some(2),
             extra_y_columns: vec![],
             color_column: None,
+            bins: None,
         };
         let result = build_bar_json(&rows, 0, 1, &params);
         let categories = result["categories"].as_array().unwrap();
@@ -252,7 +259,7 @@ mod tests {
             vec!["40".into()],
             vec!["50".into()],
         ];
-        let result = build_histogram_json(&rows, 0);
+        let result = build_histogram_json(&rows, 0, None);
         assert_eq!(result["type"], "histogram");
         let bins = result["bins"].as_array().unwrap();
         assert!(!bins.is_empty());
@@ -294,6 +301,7 @@ mod tests {
             limit: None,
             extra_y_columns: vec![("profit".into(), None)],
             color_column: None,
+            bins: None,
         };
         let result = build_series_json(&headers, &rows, 0, 1, &params);
         let series = result["series"].as_array().unwrap();
@@ -335,6 +343,7 @@ mod tests {
             limit: None,
             extra_y_columns: vec![],
             color_column: Some("city".into()),
+            bins: None,
         };
         let result = build_series_json(&headers, &rows, 0, 1, &params);
         assert_eq!(result["type"], "scatter");

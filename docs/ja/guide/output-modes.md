@@ -78,6 +78,27 @@ vz data.csv --svg --theme light > chart-light.svg
 
 `--theme` に連動し、dark は暗い背景、light は白背景の SVG になる。
 
+## HTML
+
+自己完結型の HTML ページとしてエクスポートする。ブラウザで開けばインタラクティブなチャートが表示される。外部 CDN に依存しないので完全にオフラインで動作する。
+
+```bash
+# インタラクティブ HTML に保存
+vz data.csv --html > chart.html
+
+# ライトテーマ（白背景）
+vz data.csv --html --theme light > chart.html
+
+# タイトルとサイズ指定
+vz data.csv --html --title "Q2 売上" -W 100 -H 30 > report.html
+```
+
+HTML ファイルの内容:
+- SVG チャートをインラインで埋め込み（外部リンクなし）
+- レスポンシブレイアウトとテーマ背景色のインライン CSS
+- データポイントとバーのホバーツールチップ用インライン JavaScript
+- 外部スクリプト・スタイルシートなし — 単一ファイルでオフライン動作
+
 ## Markdown
 
 集計結果を GitHub Flavored Markdown テーブルで出力する。README や Issue に埋め込むのに便利。

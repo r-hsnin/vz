@@ -4,6 +4,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::Span,
 };
+use std::io::IsTerminal;
 use std::path::Path;
 
 use crate::chart::selector::ChartType;
@@ -33,6 +34,13 @@ pub enum SlideElement {
     Heading { level: u8, text: String },
     /// Numbered/ordered list.
     OrderedList(Vec<String>),
+    /// Markdown table (GFM-style).
+    Table {
+        headers: Vec<String>,
+        rows: Vec<Vec<String>>,
+    },
+    /// Blockquote (lines prefixed with `>`).
+    Blockquote(Vec<String>),
 }
 
 /// Configuration for a chart embedded in a slide.
@@ -46,6 +54,18 @@ pub struct ChartBlock {
     pub title: Option<String>,
     /// Optional filter expressions (same syntax as `--where`).
     pub filter: Vec<String>,
+    /// Sort order for bar charts.
+    pub sort: Option<crate::cli::SortOrder>,
+    /// Aggregation function for bar charts.
+    pub agg: Option<crate::cli::AggFunction>,
+    /// Limit bar chart to top N categories.
+    pub top: Option<usize>,
+    /// Number of bins for histogram charts.
+    pub bins: Option<usize>,
+    /// Chart height in terminal rows (defaults to flexible sizing).
+    pub height: Option<u16>,
+    /// Optional "after" file for diff mode (source becomes "before").
+    pub diff: Option<String>,
 }
 
 /// A parsed presentation.
@@ -235,11 +255,11 @@ pub fn parse_inline_spans(text: &str) -> Vec<Span<'static>> {
 /// Run the Present mode TUI.
 pub fn run_present(path: &Path, theme: crate::theme::Theme) -> Result<()> {
     let content = std::fs::read_to_string(path)
-        .with_context(|| format!("Failed to read presentation file: {:?}", path))?;
+        .with_context(|| format!("Failed to read presentation file: {}", path.display()))?;
     let presentation = parse_presentation(&content);
 
     if presentation.slides.is_empty() {
-        anyhow::bail!("No slides found in {:?}", path);
+        anyhow::bail!("No slides found in {}", path.display());
     }
 
     // Resolve the base directory for relative chart source paths
@@ -249,6 +269,13 @@ pub fn run_present(path: &Path, theme: crate::theme::Theme) -> Result<()> {
         .parent()
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+    if !std::io::stdout().is_terminal() {
+        anyhow::bail!(
+            "Present mode requires an interactive terminal. \
+             Cannot run in a pipe or non-TTY environment."
+        );
+    }
 
     let mut terminal = ratatui::init();
     let mut app = PresentApp::new(presentation, base_dir, theme);
