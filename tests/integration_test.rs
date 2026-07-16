@@ -4756,3 +4756,81 @@ fn test_diff_html_with_sort_and_top() {
     );
     assert!(stdout.contains("<svg"), "Missing <svg> in HTML output");
 }
+
+#[test]
+fn test_bom_csv_file_renders_correctly() {
+    let output = vz_binary()
+        .arg("fixtures/bom_sales.csv")
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(
+        output.status.success(),
+        "BOM CSV should render. stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.lines().count() >= 5, "Chart output too short");
+}
+
+#[test]
+fn test_bom_csv_x_flag_matches_first_column() {
+    let output = vz_binary()
+        .args(["fixtures/bom_sales.csv", "-x", "date", "-y", "revenue"])
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(
+        output.status.success(),
+        "BOM should not prevent -x from matching first column. stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn test_bom_csv_info_shows_clean_column_names() {
+    let output = vz_binary()
+        .args(["fixtures/bom_sales.csv", "--info"])
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("date"),
+        "First column should be 'date' without BOM prefix"
+    );
+    assert!(
+        !stdout.contains('\u{feff}'),
+        "BOM character leaked into --info output"
+    );
+}
+
+#[test]
+fn test_bom_stdin_pipe() {
+    use std::process::Stdio;
+
+    let mut child = vz_binary()
+        .arg("-")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn vz");
+
+    {
+        let stdin = child.stdin.as_mut().unwrap();
+        stdin
+            .write_all(
+                b"\xEF\xBB\xBFdate,city,revenue\n2024-01-01,Tokyo,1000\n2024-02-01,Osaka,1500\n",
+            )
+            .unwrap();
+    }
+
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "BOM in stdin should be handled. stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}

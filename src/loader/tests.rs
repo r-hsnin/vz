@@ -347,3 +347,47 @@ fn test_apply_sampling_preserves_headers() {
     assert_eq!(result.headers, vec!["name", "value"]);
     assert_eq!(result.rows.len(), 5);
 }
+
+#[test]
+fn test_bom_csv_headers_clean() {
+    let content = "\u{feff}date,city,revenue\n2024-01-01,Tokyo,1000\n2024-02-01,Osaka,1500\n";
+    let data = load_from_content(content, InputFormat::Csv, false).unwrap();
+    assert_eq!(data.headers[0], "date");
+    assert_eq!(data.headers[1], "city");
+    assert_eq!(data.headers[2], "revenue");
+    assert_eq!(data.rows.len(), 2);
+}
+
+#[test]
+fn test_bom_tsv_headers_clean() {
+    let content = "\u{feff}name\tscore\nAlice\t85\nBob\t92\n";
+    let data = load_from_content(content, InputFormat::Tsv, false).unwrap();
+    assert_eq!(data.headers[0], "name");
+    assert_eq!(data.headers[1], "score");
+    assert_eq!(data.rows.len(), 2);
+}
+
+#[test]
+fn test_bom_json_parsed() {
+    let content = "\u{feff}[{\"x\": 1, \"y\": 2}]";
+    let data = load_from_content(content, InputFormat::Json, false).unwrap();
+    assert!(data.headers.contains(&"x".to_string()));
+    assert!(data.headers.contains(&"y".to_string()));
+    assert_eq!(data.rows.len(), 1);
+}
+
+#[test]
+fn test_no_bom_csv_unchanged() {
+    let content = "date,city,revenue\n2024-01-01,Tokyo,1000\n";
+    let data = load_from_content(content, InputFormat::Csv, false).unwrap();
+    assert_eq!(data.headers[0], "date");
+}
+
+#[test]
+fn test_bom_no_header_mode() {
+    let content = "\u{feff}1,10\n2,20\n3,30\n";
+    let data = load_from_content(content, InputFormat::Csv, false).unwrap();
+    // All-numeric headers → auto-detect as headerless → synthetic headers
+    assert_eq!(data.headers[0], "col1");
+    assert_eq!(data.rows.len(), 3);
+}

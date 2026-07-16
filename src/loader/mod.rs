@@ -64,6 +64,11 @@ pub fn detect_format(path: &Path, content: &str) -> InputFormat {
     InputFormat::Csv
 }
 
+/// Strip UTF-8 BOM (U+FEFF) from the beginning of content if present.
+fn strip_bom(content: &str) -> &str {
+    content.strip_prefix('\u{feff}').unwrap_or(content)
+}
+
 /// Load data from a file path (or stdin if "-").
 /// Auto-detects format: CSV, TSV, JSON, or NDJSON.
 pub fn load_data(path: &Path) -> Result<LoadedData> {
@@ -84,6 +89,7 @@ pub fn load_from_content(
     format: InputFormat,
     no_header: bool,
 ) -> Result<LoadedData> {
+    let content = strip_bom(content);
     match format {
         InputFormat::Csv => load_delimited(content, b',', no_header),
         InputFormat::Tsv => load_delimited(content, b'\t', no_header),
@@ -106,6 +112,12 @@ pub fn load_data_full(
     } else {
         std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read file: {}", path.display()))?
+    };
+
+    // Strip UTF-8 BOM (U+FEFF) if present at the start of file/stdin content
+    let content = match content.strip_prefix('\u{feff}') {
+        Some(stripped) => stripped.to_string(),
+        None => content,
     };
 
     let format = format_override.unwrap_or_else(|| detect_format(path, &content));
