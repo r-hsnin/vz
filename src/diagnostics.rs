@@ -19,7 +19,7 @@ pub fn error_hint(err: &anyhow::Error, cli: &Cli) -> Option<String> {
     let msg = format!("{:#}", err);
     // File not found: suggest similar files in the same directory
     if msg.contains("No such file")
-        && let Some(ref file) = cli.file
+        && let Some(file) = cli.primary_file()
     {
         let parent = file.parent().unwrap_or(Path::new("."));
         let stem = file.file_name()?.to_str()?;

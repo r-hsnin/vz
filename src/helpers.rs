@@ -69,8 +69,8 @@ pub(crate) fn resolve_theme(cli: &Cli) -> theme::Theme {
 }
 
 pub(crate) fn resolve_input_file(cli: &Cli) -> Result<PathBuf> {
-    match cli.file.as_ref() {
-        Some(f) => Ok(f.clone()),
+    match cli.primary_file() {
+        Some(f) => Ok(f.to_path_buf()),
         None => {
             if !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
                 Ok(PathBuf::from("-"))

@@ -3838,3 +3838,251 @@ fn test_fixed_width_separator_lines_handled() {
     assert!(stdout.contains("Name"), "stdout: {stdout}");
     assert!(stdout.contains("Score"), "stdout: {stdout}");
 }
+
+// === Diff mode integration tests ===
+
+#[test]
+fn test_diff_two_positional_files_bar() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("Diff"),
+        "Missing Diff header in: {}",
+        stdout
+    );
+    assert!(stdout.contains("▲"), "Missing ▲ marker in: {}", stdout);
+    assert!(stdout.contains("▼"), "Missing ▼ marker in: {}", stdout);
+}
+
+#[test]
+fn test_diff_flag_syntax() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "--diff",
+            "fixtures/diff/sales_after.csv",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("Diff"), "Missing Diff header");
+    assert!(stdout.contains("▲"), "Missing ▲ marker");
+}
+
+#[test]
+fn test_diff_spark_output() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--spark",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("Δ"),
+        "Missing Δ prefix in spark: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("revenue"),
+        "Missing y column name: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_diff_json_output() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--json",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["mode"], "diff");
+    assert_eq!(json["version"], 1);
+    assert!(json["categories"].as_array().unwrap().len() == 4);
+}
+
+#[test]
+fn test_diff_schema_mismatch_error() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/schema_mismatch.csv",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Schema mismatch")
+            || String::from_utf8_lossy(&output.stdout).contains("Schema mismatch"),
+        "Expected schema mismatch error, got: stderr={}, stdout={}",
+        stderr,
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+fn test_diff_identical_files() {
+    let output = vz_binary()
+        .args(["fixtures/diff/identical.csv", "fixtures/diff/identical.csv"])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("0%"),
+        "Expected 0% for identical files: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_diff_timeseries() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/timeseries_before.csv",
+            "fixtures/diff/timeseries_after.csv",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("Diff"), "Missing Diff header");
+    assert!(stdout.contains("date"), "Missing x=date column");
+}
+
+#[test]
+fn test_diff_with_x_y_override() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("x=city"), "Missing x=city in: {}", stdout);
+    assert!(
+        stdout.contains("y=revenue"),
+        "Missing y=revenue in: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_diff_with_sort_desc() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--sort",
+            "desc",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // First entry should be highest delta (Tokyo +200)
+    let lines: Vec<&str> = stdout.lines().collect();
+    let data_lines: Vec<&&str> = lines
+        .iter()
+        .filter(|l| l.contains("▲") || l.contains("▼") || l.contains("─"))
+        .collect();
+    assert!(!data_lines.is_empty());
+    assert!(
+        data_lines[0].contains("Tokyo"),
+        "Highest delta should be first: {}",
+        data_lines[0]
+    );
+}
+
+#[test]
+fn test_diff_with_top_limit() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--top",
+            "2",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // Only 2 entries should be shown (plus summary line)
+    let data_lines: Vec<&str> = stdout.lines().filter(|l| l.starts_with("  ")).collect();
+    assert_eq!(
+        data_lines.len(),
+        2,
+        "Expected 2 entries with --top 2, got: {:?}",
+        data_lines
+    );
+}
+
+#[test]
+fn test_diff_nonexistent_file_error() {
+    let output = vz_binary()
+        .args(["fixtures/diff/sales_before.csv", "nonexistent.csv"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+}

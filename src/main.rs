@@ -1,6 +1,7 @@
 pub mod chart;
 pub mod cli;
 pub mod diagnostics;
+pub mod diff;
 pub mod directory;
 pub mod explore;
 pub mod filter;
@@ -101,6 +102,11 @@ fn run(cli: &Cli) -> Result<()> {
 
 /// Run the oneshot (default) mode: load data, infer types, render chart.
 fn run_oneshot(cli: &Cli) -> Result<()> {
+    // Diff mode: two files provided
+    if let Some((before, after)) = cli.diff_pair() {
+        return diff::run_diff(cli, &before, &after);
+    }
+
     let file = resolve_input_file(cli)?;
 
     // If --watch is set, enter the file-watching loop

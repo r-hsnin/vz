@@ -8,9 +8,13 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
 
-    /// Input file (CSV, TSV, JSON, NDJSON). Use "-" for stdin.
-    #[arg(value_name = "FILE")]
-    pub file: Option<PathBuf>,
+    /// Input file(s) (CSV, TSV, JSON, NDJSON). Use "-" for stdin. Provide two files for diff mode.
+    #[arg(value_name = "FILE", num_args = 0..=2)]
+    pub file: Vec<PathBuf>,
+
+    /// Second file for comparison (diff mode). Alternative to `vz <file1> <file2>`.
+    #[arg(long = "diff", value_name = "FILE2")]
+    pub diff_file: Option<PathBuf>,
 
     /// Column to use for X axis.
     #[arg(short = 'x', long = "x-col")]
@@ -270,6 +274,24 @@ impl Cli {
         }
         None
     }
+
+    /// Resolve diff file pair: returns (before, after) if diff mode is active.
+    pub fn diff_pair(&self) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+        if self.file.len() == 2 {
+            Some((self.file[0].clone(), self.file[1].clone()))
+        } else if self.file.len() == 1 {
+            self.diff_file
+                .as_ref()
+                .map(|d| (self.file[0].clone(), d.clone()))
+        } else {
+            None
+        }
+    }
+
+    /// Get the primary input file (first positional argument).
+    pub fn primary_file(&self) -> Option<&std::path::Path> {
+        self.file.first().map(|p| p.as_path())
+    }
 }
 
 /// Parse a column spec that may include a label override.
@@ -343,7 +365,7 @@ mod tests {
     #[test]
     fn test_cli_parse_default() {
         let cli = Cli::try_parse_from(["vz", "data.csv"]).unwrap();
-        assert_eq!(cli.file, Some(PathBuf::from("data.csv")));
+        assert_eq!(cli.file, vec![PathBuf::from("data.csv")]);
         assert_eq!(cli.command, None);
     }
 
