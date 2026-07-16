@@ -9,6 +9,7 @@
 
 .github/
 .gitignore
+benches/
 CONTRIBUTING.md
 Cargo.lock
 Cargo.toml
