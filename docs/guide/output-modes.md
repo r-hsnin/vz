@@ -89,6 +89,27 @@ vz data.csv --svg --theme light > chart-light.svg
 
 SVG output respects the `--theme` flag — dark produces a dark background, light produces white.
 
+## HTML
+
+Export as a self-contained HTML page with an interactive chart. Opens in any browser, works fully offline — no external CDN dependencies.
+
+```bash
+# Save as interactive HTML
+vz data.csv --html > chart.html
+
+# Light theme for white backgrounds
+vz data.csv --html --theme light > chart.html
+
+# Custom title and dimensions
+vz data.csv --html --title "Q2 Revenue" -W 100 -H 30 > report.html
+```
+
+The HTML file includes:
+- Embedded SVG chart (inline, not linked)
+- Inline CSS for responsive layout and theme background
+- Inline JavaScript for hover tooltips on data points and bars
+- No external scripts or stylesheets — single file, works offline
+
 ## Markdown
 
 Export aggregated data as GitHub Flavored Markdown (GFM) tables. Perfect for README files, issues, and documentation.
