@@ -18,6 +18,10 @@ CLI BI tool with smart visualization and terminal presentation.
 - **Multi-series** — Auto-groups data by color column with legend
 - **Explore mode** — Interactive TUI with vim-style navigation
 - **Present mode** — Terminal slides with embedded charts from Markdown
+- **Diff mode** — Compare two files side-by-side with ▲/▼ annotations
+- **HTML export** — Self-contained interactive HTML with hover tooltips
+- **Directory mode** — Auto-combine files with matching schemas
+- **Fixed-width input** — Parse space-aligned output (kubectl, df, ps)
 - **Zero-config** — Just `vz data.csv` and you're done
 
 ## Install
@@ -76,6 +80,12 @@ vz sales.csv --info
 # Export chart as SVG image
 vz sales.csv --svg > chart.svg
 
+# Export as interactive HTML
+vz data.csv --html > chart.html
+
+# Compare two files (diff mode)
+vz before.csv after.csv
+
 # Custom chart dimensions
 vz sales.csv -W 80 -H 20
 
@@ -124,7 +134,7 @@ vz present slides.md
 | `-H` | `--height` | Chart height in rows (default: 24) |
 | `-I` | `--info` | Show column metadata without rendering a chart |
 | `-w` | `--where` | Filter rows: `col=value`, `col!=value`, `col>value`, `col>=value`, `col<value`, `col<=value` (repeatable) |
-| `-o` | `--output` | Output format: `text`, `json`, `table`, `spark`, `svg`, `markdown` |
+| `-o` | `--output` | Output format: `text`, `json`, `table`, `spark`, `svg`, `html`, `markdown` |
 | `-Y` | `--all-y` | Plot all quantitative columns as multi-series overlay |
 | | `--no-header` | Treat first row as data (auto-detected if all-numeric) |
 | | `--sort` | Sort bar chart values: `desc`, `asc`, `none` |
@@ -141,6 +151,8 @@ vz present slides.md
 | | `--spark` | Shorthand for `--output spark` |
 | | `--svg` | Shorthand for `--output svg` |
 | | `--markdown` | Shorthand for `--output markdown` |
+| | `--html` | Shorthand for `--output html` |
+| | `--diff` | Compare with a second file |
 | `-h` | `--help` | Print help |
 | `-V` | `--version` | Print version |
 | `-R` | `--recurse` | Include subdirectories recursively in directory mode |
