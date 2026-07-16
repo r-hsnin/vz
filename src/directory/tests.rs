@@ -395,6 +395,41 @@ fn test_combine_reordered_source_column_correct() {
     assert_eq!(result.data.rows[3][3], "second");
 }
 
+// === Ragged CSV tests (Cycle 25) ===
+
+#[test]
+fn test_combine_ragged_csv_does_not_panic() {
+    // second.csv has reordered columns AND rows with fewer fields than the header.
+    // The reorder path must not panic on short rows.
+    let entries = scan_directory(&fixture("ragged"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    assert_eq!(result.file_count, 2);
+    // first.csv: 3 rows, second.csv: 3 rows (even though some are short)
+    assert_eq!(result.data.rows.len(), 6);
+}
+
+#[test]
+fn test_combine_ragged_csv_fills_missing_with_empty() {
+    let entries = scan_directory(&fixture("ragged"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    // second.csv row "600,2024-04-02" → remapped: date=2024-04-02, city="", revenue=600
+    let row = &result.data.rows[4];
+    assert_eq!(row[0], "2024-04-02"); // date (index 1 in second.csv)
+    assert_eq!(row[1], ""); // city (index 2 in second.csv — missing)
+    assert_eq!(row[2], "600"); // revenue (index 0 in second.csv)
+}
+
+#[test]
+fn test_combine_ragged_csv_all_fields_missing() {
+    let entries = scan_directory(&fixture("ragged"), &default_opts()).unwrap();
+    let result = combine_files(&entries, false).unwrap();
+    // second.csv row "700" → remapped: date="", city="", revenue=700
+    let row = &result.data.rows[5];
+    assert_eq!(row[0], ""); // date (index 1 — missing)
+    assert_eq!(row[1], ""); // city (index 2 — missing)
+    assert_eq!(row[2], "700"); // revenue (index 0)
+}
+
 // === Large dataset warning tests (Phase 2, Task 3) ===
 
 use super::LARGE_DATASET_THRESHOLD;

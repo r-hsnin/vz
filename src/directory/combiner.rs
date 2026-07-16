@@ -126,8 +126,10 @@ pub fn combine_files(entries: &[FileEntry], no_header: bool) -> Result<CombineRe
                         if needs_reorder {
                             // Append rows with columns remapped to reference order
                             for row in &data.rows {
-                                let mut reordered: Vec<String> =
-                                    map.iter().map(|&i| row[i].clone()).collect();
+                                let mut reordered: Vec<String> = map
+                                    .iter()
+                                    .map(|&i| row.get(i).cloned().unwrap_or_default())
+                                    .collect();
                                 reordered.push(entry.stem.clone());
                                 reordered.push(entry.file_date.clone());
                                 combined_rows.push(reordered);

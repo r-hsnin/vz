@@ -3305,6 +3305,29 @@ fn test_directory_mixed_schema_skips_mismatch() {
 }
 
 #[test]
+fn test_directory_ragged_csv_does_not_panic() {
+    // Directory with reordered columns AND ragged rows (fewer fields than header).
+    // Must not panic — should combine gracefully with empty strings for missing fields.
+    let output = vz_binary()
+        .args(["fixtures/dir_test/ragged/", "--json"])
+        .output()
+        .expect("Failed to run vz");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "Should handle ragged CSV without panic. stderr: {stderr}"
+    );
+    // Should combine both files (2 files, 6 rows total)
+    assert!(stderr.contains("2 files"), "stderr: {stderr}");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Failed to parse JSON output");
+    assert!(parsed.is_object(), "stdout: {stdout}");
+}
+
+#[test]
 fn test_directory_empty_fails_with_error() {
     let output = vz_binary()
         .arg("fixtures/dir_test/empty/")
