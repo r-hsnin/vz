@@ -63,6 +63,10 @@ cat data.csv | vz -
 # Force input format for stdin pipes
 kubectl top pods | vz - -f tsv
 
+# Fixed-width / space-aligned input (auto-detected from content)
+kubectl top pods | vz - -f space
+df -h | vz - -f space -x Mounted -y Use%
+
 # TSV files (auto-detected by extension or content)
 vz data.tsv
 
@@ -115,7 +119,7 @@ vz present slides.md
 | `-y` | `--y-col` | Column(s) for Y axis. Comma-separated, supports `col:Label` override |
 | `-t` | `--type` | Override chart type: `line`, `bar`, `scatter`, `histogram`, `heatmap` |
 | `-c` | `--color` | Color/group-by column for multi-series |
-| `-f` | `--format` | Force input format: `csv`, `tsv`, `json`, `ndjson` |
+| `-f` | `--format` | Force input format: `csv`, `tsv`, `json`, `ndjson`, `space` |
 | `-W` | `--width` | Chart width in columns (default: terminal width) |
 | `-H` | `--height` | Chart height in rows (default: 24) |
 | `-I` | `--info` | Show column metadata without rendering a chart |
@@ -139,6 +143,10 @@ vz present slides.md
 | | `--markdown` | Shorthand for `--output markdown` |
 | `-h` | `--help` | Print help |
 | `-V` | `--version` | Print version |
+| `-R` | `--recurse` | Include subdirectories recursively in directory mode |
+| | `--catalog` | Show schema catalog (columns, row counts, format per file) |
+| | `--glob` | Glob pattern to filter files in directory mode (e.g. `"sales_*.csv"`) |
+| | `--no-limit` | Bypass auto-sampling row limit in directory mode |
 
 ### Subcommands
 
@@ -149,6 +157,34 @@ vz present slides.md
 | `vz completions <SHELL>` | Generate shell completion scripts |
 
 <!-- /AUTO-GENERATED -->
+
+## Directory Mode
+
+Pass a directory path to automatically combine all compatible files:
+
+```bash
+# Auto-combine all CSV/TSV/JSON files in a directory
+vz logs/
+
+# Include subdirectories recursively
+vz data/ --recurse
+
+# Show schema catalog (columns, row counts, format per file)
+vz data/ --catalog
+
+# Color by source file (auto-added _source column)
+vz data/ -c _source
+
+# Filter files with glob pattern
+vz data/ --glob "sales_*.csv"
+
+# Bypass auto-sampling row limit (default: 1M rows)
+vz data/ --no-limit
+```
+
+Files with matching schemas (same columns, case-insensitive) are automatically merged.
+A `_source` column is added to identify each file's origin, useful for `--color` grouping.
+Large directories trigger automatic systematic sampling with a warning; use `--no-limit` to override.
 
 ## Output Format
 
