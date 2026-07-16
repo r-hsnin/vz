@@ -25,19 +25,7 @@ fn count_to_color(count: usize, max_count: usize) -> Color {
         return Color::DarkGray;
     }
     let t = count as f64 / max_count as f64;
-    // 3-stop sequential gradient optimized for dark terminals
-    let (r, g, b) = if t < 0.5 {
-        let s = t * 2.0;
-        (
-            (20.0 + s * 10.0) as u8,
-            (60.0 + s * 195.0) as u8,
-            (120.0 + s * 135.0) as u8,
-        )
-    } else {
-        let s = (t - 0.5) * 2.0;
-        ((30.0 + s * 225.0) as u8, 255, (255.0 - s * 255.0) as u8)
-    };
-    Color::Rgb(r, g, b)
+    super::gradient_color(t)
 }
 
 /// Format a count for display in a cell.

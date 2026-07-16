@@ -177,6 +177,25 @@ fn format_with_suffix(val: f64, suffix: &str) -> String {
     format!("{trimmed}{suffix}")
 }
 
+/// Map a normalized value t ∈ [0.0, 1.0] to a sequential gradient color.
+/// Palette: dark teal (low) → cyan (mid) → yellow (high).
+/// Values outside [0.0, 1.0] are clamped.
+pub fn gradient_color(t: f64) -> Color {
+    let t = t.clamp(0.0, 1.0);
+    let (r, g, b) = if t < 0.5 {
+        let s = t * 2.0;
+        (
+            (20.0 + s * 10.0) as u8,
+            (60.0 + s * 195.0) as u8,
+            (120.0 + s * 135.0) as u8,
+        )
+    } else {
+        let s = (t - 0.5) * 2.0;
+        ((30.0 + s * 225.0) as u8, 255, (255.0 - s * 255.0) as u8)
+    };
+    Color::Rgb(r, g, b)
+}
+
 /// Compute histogram bins from raw values.
 pub fn compute_bins(values: &[f64], bin_count: usize) -> Vec<(f64, f64, usize)> {
     if values.is_empty() || bin_count == 0 {

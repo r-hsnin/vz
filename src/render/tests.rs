@@ -270,3 +270,36 @@ fn test_render_y_axis_frame_tight_removes_excess_headroom() {
         "Tight mode should show 4k as top tick"
     );
 }
+
+#[test]
+fn test_gradient_color_at_zero() {
+    // t=0.0 should be dark teal: Rgb(20, 60, 120)
+    let color = gradient_color(0.0);
+    assert_eq!(color, Color::Rgb(20, 60, 120));
+}
+
+#[test]
+fn test_gradient_color_at_mid() {
+    // t=0.5 should be cyan: Rgb(30, 255, 255)
+    let color = gradient_color(0.5);
+    assert_eq!(color, Color::Rgb(30, 255, 255));
+}
+
+#[test]
+fn test_gradient_color_at_max() {
+    // t=1.0 should be yellow: Rgb(255, 255, 0)
+    let color = gradient_color(1.0);
+    assert_eq!(color, Color::Rgb(255, 255, 0));
+}
+
+#[test]
+fn test_gradient_color_clamps_negative() {
+    // Negative values should clamp to 0.0
+    assert_eq!(gradient_color(-0.5), gradient_color(0.0));
+}
+
+#[test]
+fn test_gradient_color_clamps_above_one() {
+    // Values > 1.0 should clamp to 1.0
+    assert_eq!(gradient_color(1.5), gradient_color(1.0));
+}
