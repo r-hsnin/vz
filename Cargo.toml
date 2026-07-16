@@ -1,8 +1,8 @@
 [package]
 name = "vz"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 description = "CLI BI tool with smart visualization and terminal presentation"
 license = "MIT"
 readme = "README.md"
@@ -10,7 +10,7 @@ repository = "https://github.com/r-hsnin/vz"
 homepage = "https://r-hsnin.github.io/vz/"
 keywords = ["cli", "visualization", "csv", "chart", "terminal"]
 categories = ["command-line-utilities", "visualization"]
-exclude = ["fixtures/", "tests/", "docs/", ".github/", "demo/"]
+exclude = ["fixtures/", "tests/", "docs/", ".github/", "demo/", "scripts/", "release-manifest.txt"]
 
 [dependencies]
 # CLI
@@ -35,7 +35,12 @@ anyhow = "1"
 notify = "7"
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
 insta = "1.48.0"
 pretty_assertions = "1"
 serde_json = "1"
 tempfile = "3"
+
+[[bench]]
+name = "loading"
+harness = false

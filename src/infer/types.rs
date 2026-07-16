@@ -11,6 +11,17 @@ pub enum DataType {
     Nominal,
 }
 
+impl std::fmt::Display for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DataType::Temporal => write!(f, "Date/Time"),
+            DataType::Quantitative => write!(f, "Numeric"),
+            DataType::Categorical => write!(f, "Categorical"),
+            DataType::Nominal => write!(f, "Text"),
+        }
+    }
+}
+
 /// Metadata about a single column after inference.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnMeta {

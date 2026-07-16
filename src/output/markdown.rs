@@ -5,6 +5,7 @@ use anyhow::Result;
 use crate::chart;
 use crate::chart::data_builder;
 use crate::cli;
+use crate::infer::types::Schema;
 use crate::oneshot;
 
 /// Print data as a Markdown table, respecting chart type for aggregation.
@@ -13,6 +14,7 @@ pub fn print_markdown(
     headers: &[String],
     rows: &[Vec<String>],
     cli: &cli::Cli,
+    schema: &Schema,
 ) -> Result<()> {
     let x_idx = data_builder::column_index(headers, &recommendation.x_column);
     let y_idx = recommendation
@@ -26,11 +28,12 @@ pub fn print_markdown(
     if chart_type == chart::selector::ChartType::Bar
         && let (Some(xi), Some(yi)) = (x_idx, y_idx)
     {
-        let agg = cli.agg.unwrap_or(cli::AggFunction::Sum);
+        let agg = crate::helpers::effective_agg(cli, recommendation, schema);
         let y_label = recommendation.y_column.as_deref().unwrap_or("value");
         let (mut bar_data, _) =
             data_builder::aggregate_bar(rows, xi, yi, None, y_label.to_string(), agg);
-        crate::oneshot::builders::sort_bar_data(&mut bar_data, cli.sort);
+        crate::oneshot::builders::sort_bar_data(&mut bar_data, cli.effective_sort());
+        crate::oneshot::builders::truncate_bar_data(&mut bar_data, cli.top.or(cli.tail));
         print_markdown_two_col(
             &recommendation.x_column,
             y_label,

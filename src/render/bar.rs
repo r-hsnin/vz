@@ -1,12 +1,12 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Style},
-    text::Line,
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Bar, BarChart as RatatuiBarChart, BarGroup, Block, Borders, Widget},
 };
 
-use super::{BarChartData, SERIES_COLORS, format_number_pub};
+use super::{BarChartData, format_number};
 
 /// Bar chart widget wrapping ratatui's BarChart with Y-axis tick labels.
 pub struct BarChart<'a> {
@@ -44,13 +44,20 @@ impl<'a> Widget for BarChart<'a> {
             max_val,
             self.data.show_labels,
             &self.data.series_colors,
+            bar_width,
         );
         let group = BarGroup::default().bars(&bars);
 
         let chart = RatatuiBarChart::default()
             .block(
                 Block::default()
-                    .title(title)
+                    .title(
+                        Line::from(Span::styled(
+                            title,
+                            Style::default().add_modifier(Modifier::BOLD),
+                        ))
+                        .centered(),
+                    )
                     .borders(Borders::TOP | Borders::RIGHT | Borders::BOTTOM),
             )
             .bar_width(bar_width)
@@ -71,6 +78,29 @@ fn compute_bar_width(chart_width: u16, bar_count: usize) -> u16 {
     max_width.saturating_sub(1).clamp(3, 20) as u16
 }
 
+/// Truncate a label to fit within max_width columns, adding "…" if needed.
+fn truncate_label(label: &str, max_width: u16) -> String {
+    let max = max_width as usize;
+    if label.chars().count() <= max {
+        return label.to_string();
+    }
+    if max <= 1 {
+        return "…".to_string();
+    }
+    let truncated: String = label.chars().take(max - 1).collect();
+    format!("{truncated}…")
+}
+
+/// Map a bar value to a color using a sequential gradient (matching histogram palette).
+/// Palette: dark teal (low) → cyan (mid) → yellow (high).
+fn value_to_bar_color(value: f64, max_val: f64) -> Color {
+    if max_val <= 0.0 || value <= 0.0 {
+        return Color::DarkGray;
+    }
+    let t = (value / max_val).clamp(0.0, 1.0);
+    super::gradient_color(t)
+}
+
 /// Build ratatui Bar widgets from labels and values, scaling floats to u64.
 fn build_bars<'a>(
     labels: &'a [String],
@@ -78,6 +108,7 @@ fn build_bars<'a>(
     max_val: f64,
     show_labels: bool,
     series_colors: &[Color],
+    bar_width: u16,
 ) -> Vec<Bar<'a>> {
     let scale_factor = if max_val > 0.0 {
         10000.0 / max_val
@@ -97,19 +128,19 @@ fn build_bars<'a>(
         .enumerate()
         .map(|(i, (label, &value))| {
             let color = if series_colors.is_empty() {
-                SERIES_COLORS[i % SERIES_COLORS.len()]
+                value_to_bar_color(value, max_val)
             } else {
                 series_colors[i % series_colors.len()]
             };
             let scaled = (value * scale_factor).round() as u64;
             let text = if show_labels && total > 0.0 {
                 let pct = (value / total * 100.0).round() as u32;
-                format!("{} ({}%)", format_number_pub(value), pct)
+                format!("{} ({}%)", format_number(value), pct)
             } else {
-                format_number_pub(value)
+                format_number(value)
             };
             Bar::default()
-                .label(Line::from(label.clone()))
+                .label(Line::from(truncate_label(label, bar_width)))
                 .value(scaled)
                 .text_value(text)
                 .style(Style::default().fg(color))
@@ -259,5 +290,15 @@ mod tests {
         // Normal case
         let w = compute_bar_width(80, 5);
         assert!((3..=20).contains(&w));
+    }
+
+    #[test]
+    fn test_truncate_label() {
+        assert_eq!(truncate_label("Tokyo", 10), "Tokyo");
+        assert_eq!(truncate_label("Tokyo", 5), "Tokyo");
+        assert_eq!(truncate_label("San Francisco", 5), "San …");
+        assert_eq!(truncate_label("Philadelphia", 3), "Ph…");
+        assert_eq!(truncate_label("AB", 1), "…");
+        assert_eq!(truncate_label("X", 1), "X");
     }
 }

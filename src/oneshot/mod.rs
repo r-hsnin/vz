@@ -63,7 +63,12 @@ pub fn render_oneshot(
         None
     };
 
-    let skipped_rows = count_skipped_y_rows(recommendation, headers, rows);
+    let skipped_rows =
+        if chart_type == ChartType::Heatmap || opts.agg == crate::cli::AggFunction::Count {
+            0 // Heatmap Y is categorical; Count uses all rows regardless of parseability
+        } else {
+            count_skipped_y_rows(recommendation, headers, rows)
+        };
 
     summary::print_summary(&summary::SummaryContext {
         recommendation,
@@ -99,30 +104,39 @@ fn warn_incompatible_flags(chart_type: ChartType, opts: &RenderOptions<'_>) {
     if opts.sort_order.is_some()
         && opts.sort_order != Some(SortOrder::None)
         && !matches!(chart_type, ChartType::Bar)
+        && opts.limit.is_none()
+    // Don't warn about sort when it was implied by --top/--tail
     {
         eprintln!(
-            "warning: --sort has no effect on {:?} charts (only applies to bar charts)",
+            "warning: --sort has no effect on {} charts (only applies to bar charts)",
             chart_type
         );
     }
 
     if opts.agg != AggFunction::Sum && !matches!(chart_type, ChartType::Bar) {
         eprintln!(
-            "warning: --agg has no effect on {:?} charts (only applies to bar charts)",
+            "warning: --agg has no effect on {} charts (only applies to bar charts)",
             chart_type
         );
     }
 
     if opts.labels && !matches!(chart_type, ChartType::Bar) {
         eprintln!(
-            "warning: --labels has no effect on {:?} charts (only applies to bar charts)",
+            "warning: --labels has no effect on {} charts (only applies to bar charts)",
             chart_type
         );
     }
 
     if opts.bins.is_some() && !matches!(chart_type, ChartType::Histogram) {
         eprintln!(
-            "warning: --bins has no effect on {:?} charts (only applies to histogram charts)",
+            "warning: --bins has no effect on {} charts (only applies to histogram charts)",
+            chart_type
+        );
+    }
+
+    if opts.limit.is_some() && !matches!(chart_type, ChartType::Bar) {
+        eprintln!(
+            "warning: --top/--tail has no effect on {} charts (only applies to bar charts)",
             chart_type
         );
     }
@@ -289,18 +303,7 @@ pub(crate) fn fit_labels_to_width(labels: &[String], available_width: usize) -> 
     if labels.len() <= labels_that_fit {
         return labels.to_vec();
     }
-    pick_evenly(labels, labels_that_fit)
-}
-
-/// Pick n items evenly spaced from a slice, always including first and last.
-fn pick_evenly(items: &[String], n: usize) -> Vec<String> {
-    if n >= items.len() {
-        return items.to_vec();
-    }
-    let step = (items.len() - 1) as f64 / (n - 1) as f64;
-    (0..n)
-        .map(|i| items[(i as f64 * step).round() as usize].clone())
-        .collect()
+    data_builder::pick_evenly(labels, labels_that_fit)
 }
 
 /// Resolve the chart type: use override if given, otherwise use the recommended type.

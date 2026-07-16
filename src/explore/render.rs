@@ -2,13 +2,15 @@
 
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout},
+    layout::{Alignment, Constraint, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
 use crate::chart::selector::ChartType;
+use crate::cli::{AggFunction, SortOrder};
+use crate::infer::types::DataType;
 
 use super::{ExploreApp, ViewMode};
 
@@ -53,6 +55,42 @@ fn render_chart(frame: &mut Frame, app: &ExploreApp, area: ratatui::layout::Rect
     frame.render_widget(ChartWidget(&chart_data), area);
 }
 
+/// Compute content-aware column widths based on header names and visible data.
+/// Samples visible rows and caps each column between 4 and 40 characters.
+/// If total exceeds available width, proportionally shrinks wider columns.
+fn compute_column_widths(
+    columns: &[crate::infer::types::ColumnMeta],
+    visible_data: &[Vec<String>],
+    available_width: u16,
+) -> Vec<Constraint> {
+    if columns.is_empty() {
+        return vec![];
+    }
+    let col_count = columns.len();
+    let mut col_widths: Vec<u16> = (0..col_count)
+        .map(|ci| {
+            let header_len = columns[ci].name.len() as u16;
+            let max_data_len = visible_data
+                .iter()
+                .map(|row| row.get(ci).map(|v| v.len() as u16).unwrap_or(0))
+                .max()
+                .unwrap_or(0);
+            header_len.max(max_data_len).clamp(4, 40)
+        })
+        .collect();
+
+    // Add 1 char padding per column for separators
+    let total: u16 = col_widths.iter().sum::<u16>() + col_count.saturating_sub(1) as u16;
+    if total > available_width && available_width > 0 {
+        let ratio = available_width as f64 / total as f64;
+        for w in &mut col_widths {
+            *w = ((*w as f64 * ratio) as u16).max(4);
+        }
+    }
+
+    col_widths.into_iter().map(Constraint::Length).collect()
+}
+
 fn render_table(frame: &mut Frame, app: &ExploreApp, area: ratatui::layout::Rect) {
     let col_count = app.schema.columns.len();
     let header_cells: Vec<&str> = app.schema.columns.iter().map(|c| c.name.as_str()).collect();
@@ -75,31 +113,49 @@ fn render_table(frame: &mut Frame, app: &ExploreApp, area: ratatui::layout::Rect
     let end = (app.table_offset + visible_height).min(app.data.len());
     let visible_rows: Vec<Row> = app.data[app.table_offset..end]
         .iter()
-        .map(|row| {
-            let cells: Vec<String> = (0..col_count)
-                .map(|i| row.get(i).cloned().unwrap_or_default())
+        .enumerate()
+        .map(|(i, row)| {
+            let cells: Vec<Cell> = (0..col_count)
+                .map(|ci| {
+                    let value = row.get(ci).cloned().unwrap_or_default();
+                    let is_numeric = app
+                        .schema
+                        .columns
+                        .get(ci)
+                        .map(|c| c.data_type == DataType::Quantitative)
+                        .unwrap_or(false);
+                    if is_numeric {
+                        Cell::new(ratatui::text::Text::from(value).alignment(Alignment::Right))
+                    } else {
+                        Cell::new(value)
+                    }
+                })
                 .collect();
-            Row::new(cells)
+            let r = Row::new(cells);
+            if i == 0 {
+                r.style(Style::default().fg(Color::Yellow))
+            } else {
+                r
+            }
         })
         .collect();
 
-    let widths: Vec<Constraint> = (0..col_count)
-        .map(|_| Constraint::Percentage((100 / col_count.max(1)) as u16))
-        .collect();
+    let widths: Vec<Constraint> = compute_column_widths(
+        &app.schema.columns,
+        &app.data[app.table_offset..end],
+        area.width.saturating_sub(2), // subtract border width
+    );
 
-    let table = Table::new(visible_rows, widths)
-        .header(header_row)
-        .block(
-            Block::default()
-                .title(format!(
-                    " Data ({}-{} of {}) ",
-                    app.table_offset + 1,
-                    end,
-                    app.data.len()
-                ))
-                .borders(Borders::ALL),
-        )
-        .row_highlight_style(Style::default().fg(Color::Yellow));
+    let table = Table::new(visible_rows, widths).header(header_row).block(
+        Block::default()
+            .title(format!(
+                " Data ({}-{} of {}) ",
+                app.table_offset + 1,
+                end,
+                app.data.len()
+            ))
+            .borders(Borders::ALL),
+    );
 
     frame.render_widget(table, area);
 }
@@ -121,13 +177,13 @@ fn build_header(app: &ExploreApp) -> Paragraph<'static> {
         .schema
         .columns
         .get(app.selected_x)
-        .map(|c| format!("{:?}", c.data_type))
+        .map(|c| c.data_type.to_string())
         .unwrap_or_else(|| "?".to_string());
     let y_type = app
         .schema
         .columns
         .get(app.selected_y)
-        .map(|c| format!("{:?}", c.data_type))
+        .map(|c| c.data_type.to_string())
         .unwrap_or_else(|| "?".to_string());
     let chart_type = app.effective_chart_type();
     let row_count = app.data.len();
@@ -146,7 +202,7 @@ fn build_header(app: &ExploreApp) -> Paragraph<'static> {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw(format!(
-            "│ X: {} ({}) │ Y: {} ({}) │ {:?} │ {} rows{}",
+            "│ X: {} ({}) │ Y: {} ({}) │ {} │ {} rows{}",
             x_name, x_type, y_name, y_type, chart_type, row_count, color_info
         )),
     ]);
@@ -160,7 +216,7 @@ fn render_help_overlay(frame: &mut Frame) {
 
     let area = frame.area();
     let help_width = 44.min(area.width.saturating_sub(4));
-    let help_height = 15.min(area.height.saturating_sub(2));
+    let help_height = 18.min(area.height.saturating_sub(2));
     let x = (area.width.saturating_sub(help_width)) / 2;
     let y = (area.height.saturating_sub(help_height)) / 2;
     let popup = ratatui::layout::Rect::new(x, y, help_width, help_height);
@@ -176,8 +232,13 @@ fn render_help_overlay(frame: &mut Frame) {
         )),
         Line::raw(""),
         Line::raw(" h / l (←/→)   Change X axis column"),
-        Line::raw(" j / k (↑/↓)   Change Y axis column"),
+        Line::raw(" j / k (↑/↓)   Change Y / scroll table"),
+        Line::raw(" G / End        Jump to last row (table)"),
+        Line::raw(" g / Home       Jump to first row (table)"),
+        Line::raw(" PgDn / PgUp    Page scroll (table)"),
         Line::raw(" c              Cycle color/group column"),
+        Line::raw(" s              Cycle sort (desc/asc/off)"),
+        Line::raw(" a              Cycle aggregation function"),
         Line::raw(" y              Yank equivalent command"),
         Line::raw(" 1-4            Force chart type"),
         Line::raw("                (Line/Bar/Scatter/Hist)"),
@@ -234,10 +295,27 @@ fn build_binding_spans(app: &ExploreApp) -> Vec<Span<'static>> {
         None => "off".to_string(),
     };
 
+    let sort_label = match app.sort_order {
+        None | Some(SortOrder::None) => "off".to_string(),
+        Some(SortOrder::Desc) => "desc".to_string(),
+        Some(SortOrder::Asc) => "asc".to_string(),
+    };
+
+    let agg_label = match app.agg_function {
+        AggFunction::Sum => "sum",
+        AggFunction::Mean => "mean",
+        AggFunction::Count => "count",
+        AggFunction::Max => "max",
+        AggFunction::Min => "min",
+    }
+    .to_string();
+
     let bindings: &[(&str, String)] = &[
         ("h/l", "X".to_string()),
         ("j/k", "Y".to_string()),
         ("c", color_label),
+        ("s", sort_label),
+        ("a", agg_label),
         ("1-4", "type".to_string()),
         ("0", "auto".to_string()),
         ("d", "data".to_string()),

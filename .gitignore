@@ -3,5 +3,7 @@
 # Internal AI development docs (not for public release)
 AGENTS.md
 IMPROVE_LOOP.md
-PROGRESS.md
 TODO.md
+
+# Looper run logs
+run-logs/

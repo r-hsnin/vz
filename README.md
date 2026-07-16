@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/r-hsnin/vz/actions/workflows/ci.yml/badge.svg)](https://github.com/r-hsnin/vz/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-1.87%2B-orange.svg)](https://www.rust-lang.org/)
 
 CLI BI tool with smart visualization and terminal presentation.
 
@@ -18,6 +18,10 @@ CLI BI tool with smart visualization and terminal presentation.
 - **Multi-series** — Auto-groups data by color column with legend
 - **Explore mode** — Interactive TUI with vim-style navigation
 - **Present mode** — Terminal slides with embedded charts from Markdown
+- **Diff mode** — Compare two files side-by-side with ▲/▼ annotations
+- **HTML export** — Self-contained interactive HTML with hover tooltips
+- **Directory mode** — Auto-combine files with matching schemas
+- **Fixed-width input** — Parse space-aligned output (kubectl, df, ps)
 - **Zero-config** — Just `vz data.csv` and you're done
 
 ## Install
@@ -32,7 +36,7 @@ Or from a local clone:
 cargo install --path .
 ```
 
-Requires Rust 1.85+.
+Requires Rust 1.87+.
 
 ## Usage
 
@@ -63,6 +67,10 @@ cat data.csv | vz -
 # Force input format for stdin pipes
 kubectl top pods | vz - -f tsv
 
+# Fixed-width / space-aligned input (auto-detected from content)
+kubectl top pods | vz - -f space
+df -h | vz - -f space -x Mounted -y Use%
+
 # TSV files (auto-detected by extension or content)
 vz data.tsv
 
@@ -72,11 +80,35 @@ vz sales.csv --info
 # Export chart as SVG image
 vz sales.csv --svg > chart.svg
 
+# Export as interactive HTML
+vz data.csv --html > chart.html
+
+# Compare two files (diff mode)
+vz before.csv after.csv
+
 # Custom chart dimensions
 vz sales.csv -W 80 -H 20
 
 # Sort bar chart
 vz sales.csv -x city -y revenue -t bar --sort desc
+
+# Show top 5 categories
+vz sales.csv -x city -y revenue -t bar --top 5
+
+# Aggregation: mean instead of default sum
+vz sales.csv -x city -y revenue -t bar --agg mean
+
+# Count rows per category (auto-applies count aggregation)
+vz sales.csv -x city -t bar
+
+# Show value and percentage labels on bars
+vz sales.csv -x city -y revenue -t bar --labels
+
+# Custom histogram bins
+vz data.csv -y age -t histogram --bins 20
+
+# Filter rows
+vz sales.csv -x city -y revenue -w "revenue>=1000"
 
 # Headerless data
 vz raw_numbers.csv --no-header
@@ -97,12 +129,12 @@ vz present slides.md
 | `-y` | `--y-col` | Column(s) for Y axis. Comma-separated, supports `col:Label` override |
 | `-t` | `--type` | Override chart type: `line`, `bar`, `scatter`, `histogram`, `heatmap` |
 | `-c` | `--color` | Color/group-by column for multi-series |
-| `-f` | `--format` | Force input format: `csv`, `tsv`, `json`, `ndjson` |
+| `-f` | `--format` | Force input format: `csv`, `tsv`, `json`, `ndjson`, `space` |
 | `-W` | `--width` | Chart width in columns (default: terminal width) |
 | `-H` | `--height` | Chart height in rows (default: 24) |
 | `-I` | `--info` | Show column metadata without rendering a chart |
-| `-w` | `--where` | Filter rows: `col=value`, `col>value`, `col<value` (repeatable) |
-| `-o` | `--output` | Output format: `text`, `json`, `table`, `spark`, `svg`, `markdown` |
+| `-w` | `--where` | Filter rows: `col=value`, `col!=value`, `col>value`, `col>=value`, `col<value`, `col<=value` (repeatable) |
+| `-o` | `--output` | Output format: `text`, `json`, `table`, `spark`, `svg`, `html`, `markdown` |
 | `-Y` | `--all-y` | Plot all quantitative columns as multi-series overlay |
 | | `--no-header` | Treat first row as data (auto-detected if all-numeric) |
 | | `--sort` | Sort bar chart values: `desc`, `asc`, `none` |
@@ -119,8 +151,14 @@ vz present slides.md
 | | `--spark` | Shorthand for `--output spark` |
 | | `--svg` | Shorthand for `--output svg` |
 | | `--markdown` | Shorthand for `--output markdown` |
+| | `--html` | Shorthand for `--output html` |
+| | `--diff` | Compare with a second file |
 | `-h` | `--help` | Print help |
 | `-V` | `--version` | Print version |
+| `-R` | `--recurse` | Include subdirectories recursively in directory mode |
+| | `--catalog` | Show schema catalog (columns, row counts, format per file) |
+| | `--glob` | Glob pattern to filter files in directory mode (e.g. `"sales_*.csv"`) |
+| | `--no-limit` | Bypass auto-sampling row limit in directory mode |
 
 ### Subcommands
 
@@ -130,15 +168,84 @@ vz present slides.md
 | `vz present <FILE>` | Slide presentation with embedded charts |
 | `vz completions <SHELL>` | Generate shell completion scripts |
 
+Supported shells for completions: `bash`, `zsh`, `fish`, `elvish`, `powershell`. See the [Shell Completions guide](https://r-hsnin.github.io/vz/guide/shell-completions) for setup instructions.
+
 <!-- /AUTO-GENERATED -->
+
+## Directory Mode
+
+Pass a directory path to automatically combine all compatible files:
+
+```bash
+# Auto-combine all CSV/TSV/JSON files in a directory
+vz logs/
+
+# Include subdirectories recursively
+vz data/ --recurse
+
+# Show schema catalog (columns, row counts, format per file)
+vz data/ --catalog
+
+# Color by source file (auto-added _source column)
+vz data/ -c _source
+
+# Filter files with glob pattern
+vz data/ --glob "sales_*.csv"
+
+# Bypass auto-sampling row limit (default: 1M rows)
+vz data/ --no-limit
+```
+
+Files with matching schemas (same columns, case-insensitive) are automatically merged.
+A `_source` column is added to identify each file's origin, useful for `--color` grouping.
+Large directories trigger automatic systematic sampling with a warning; use `--no-limit` to override.
+
+## Diff Mode
+
+Compare two data files to visualize changes:
+
+```bash
+# Compare two files (bar chart with ▲/▼ annotations)
+vz before.csv after.csv
+
+# Sort by largest change
+vz q1.csv q2.csv --sort desc
+
+# Show only top 5 changes
+vz q1.csv q2.csv --sort desc --top 5
+
+# Sparkline diff output
+vz q1.csv q2.csv -o spark
+
+# JSON diff output
+vz q1.csv q2.csv -o json
+```
+
+Both files must have matching schemas (same column names, case-insensitive).
+Categorical X columns produce a bar chart with ▲/▼ annotations showing per-category change and percentage delta.
+Temporal X columns produce a line chart overlay with before (gray) and after (cyan) series.
 
 ## Output Format
 
 The default mode renders a chart to stdout with:
-1. A summary line: `Line │ x=date │ y=revenue │ color=city │ 6 rows`
+1. A summary line: `Line │ x=date │ y=revenue (100–500) ▁▃▅▇ │ ↑ +50% │ color=city [Tokyo=cyan, Osaka=yellow] │ 6 rows`
 2. A Braille/Unicode chart with title, axis tick labels, and legend
 
-Bar charts automatically aggregate (sum) values by category.
+Summary line components:
+- Chart type and axis assignments
+- Y-axis range `(min–max)` with inline sparkline (for line/scatter)
+- Trend annotation `↑ +N%` / `↓ -N%` / `→ stable` (for line/scatter)
+- Non-sum aggregation label: `y=mean(revenue)`
+- Color legend with series-color mapping
+- Row count with skip notation: `6 rows (2 skipped)`
+- Unused columns hint: `+1: profit (try -y revenue,profit or -c profit)`
+
+Bar charts automatically aggregate (sum) values by category. When only an X column is specified with no Y column, count aggregation is auto-applied.
+
+Spark output (`--output spark`) renders a single-line sparkline with statistics suffix:
+```
+revenue  ▁▂▃▅▇  (100–500) ↑ +400%
+```
 
 ## Chart Selection Rules
 
@@ -150,13 +257,19 @@ Bar charts automatically aggregate (sum) values by category.
 | Single Quantitative | — | Histogram |
 | Categorical | Categorical | Heatmap |
 
+When axes are specified in reverse order (e.g. Quantitative × Temporal), vz automatically assigns the correct chart type. Unmatched combinations default to Bar.
+
 ## Explore Mode Keybindings
 
 | Key | Action |
 |-----|--------|
 | `h`/`l` (←/→) | Change X axis column |
 | `j`/`k` (↑/↓) | Change Y axis column (chart) / Scroll rows (table) |
+| `G`/`g` | Jump to last/first row (table view) |
+| `PgDn`/`PgUp` | Page scroll (table view) |
 | `c` | Cycle color/group-by column |
+| `s` | Cycle sort order (desc/asc/none) |
+| `a` | Cycle aggregation (sum/mean/count/max/min) |
 | `y` | Show equivalent oneshot command |
 | `d` / `Tab` | Toggle between chart and data table view |
 | `1`-`4` | Force chart type (Line/Bar/Scatter/Histogram) |
@@ -177,7 +290,25 @@ type: line
 ```
 ````
 
-Navigate: `←`/`→` or `h`/`l`, jump: `g`/`G`, quit: `q`
+Supported chart block parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `source` | Data file path (required) |
+| `x` | X axis column |
+| `y` | Y axis column |
+| `type` | Chart type: `line`, `bar`, `scatter`, `histogram`, `heatmap` |
+| `color` | Color/group-by column |
+| `title` | Custom chart title |
+| `where` | Filter rows (repeatable): e.g. `where: revenue>1000` |
+| `sort` | Sort bar chart: `desc`, `asc` |
+| `agg` | Aggregation: `sum`, `mean`, `count`, `max`, `min` |
+| `top` | Show only top N categories |
+| `bins` | Number of histogram bins |
+| `height` | Chart height in rows |
+| `diff` | "After" file for diff comparison (`source` becomes "before") |
+
+Navigate: `←`/`→` or `h`/`l` or `Space`/`Enter`/`Backspace`, jump: `g`/`G`/`Home`/`End` or type slide number + `Enter`, quit: `q`/`Esc`
 
 ## Supported Input Formats
 
@@ -185,6 +316,7 @@ Navigate: `←`/`→` or `h`/`l`, jump: `g`/`G`, quit: `q`
 - TSV (tab-separated, auto-detected by `.tsv`/`.tab` extension or content)
 - JSON (array of objects, auto-detected by `.json` extension or `[` prefix)
 - NDJSON (newline-delimited JSON, auto-detected by `.ndjson`/`.jsonl` extension or `{` prefix)
+- Fixed-width (space-aligned, auto-detected from content or forced with `-f space`)
 - Stdin pipe (`-`), with optional `-f` to force format
 
 ## License

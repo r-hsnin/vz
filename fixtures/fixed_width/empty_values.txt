@@ -1,0 +1,4 @@
+NAME        STATUS    ERROR
+service-a   Running
+service-b   Failed    timeout
+service-c   Running
