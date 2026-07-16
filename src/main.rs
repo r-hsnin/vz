@@ -45,6 +45,10 @@ fn main() {
     if cli.markdown {
         cli.output = Some(cli::OutputFormat::Markdown);
     }
+    // --html is a shorthand for -o html
+    if cli.html {
+        cli.output = Some(cli::OutputFormat::Html);
+    }
     let json_output = cli.output == Some(cli::OutputFormat::Json);
 
     if let Err(e) = run(&cli) {

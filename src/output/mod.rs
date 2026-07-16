@@ -1,6 +1,7 @@
 //! Machine-readable output formats for AI agent integration.
 
 pub mod chart_json;
+pub mod html;
 pub mod markdown;
 pub mod spark;
 pub mod stats_text;

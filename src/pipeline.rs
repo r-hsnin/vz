@@ -133,6 +133,10 @@ fn dispatch_output(
             let opts = build_render_options(cli, y_opts, recommendation, schema);
             print_svg(recommendation, headers, rows, &opts)?;
         }
+        Some(cli::OutputFormat::Html) => {
+            let opts = build_render_options(cli, y_opts, recommendation, schema);
+            print_html(recommendation, headers, rows, &opts)?;
+        }
         Some(cli::OutputFormat::Markdown) => {
             output::markdown::print_markdown(recommendation, headers, rows, cli, schema)?;
         }
@@ -239,5 +243,37 @@ fn print_svg(
         "{}",
         output::svg::buffer_to_svg(&buf, opts.theme.svg_background())
     );
+    Ok(())
+}
+
+/// Render the chart as a self-contained HTML page with embedded SVG and print to stdout.
+fn print_html(
+    recommendation: &ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &oneshot::RenderOptions<'_>,
+) -> anyhow::Result<()> {
+    use ratatui::{buffer::Buffer, layout::Rect};
+
+    let width = opts.width.unwrap_or_else(oneshot::terminal_width);
+    let chart_type = oneshot::resolve_chart_type(recommendation, opts.chart_type_override);
+    let height = opts.height.unwrap_or(24);
+
+    let area = Rect::new(0, 0, width, height);
+    let mut buf = Buffer::empty(area);
+    oneshot::render_chart_to_buffer(
+        chart_type,
+        recommendation,
+        headers,
+        rows,
+        opts,
+        area,
+        &mut buf,
+    );
+
+    let bg = opts.theme.svg_background();
+    let svg = output::svg::buffer_to_svg(&buf, bg);
+    let title = opts.title.as_deref().unwrap_or("vz chart");
+    println!("{}", output::html::wrap_svg_in_html(&svg, title, bg));
     Ok(())
 }

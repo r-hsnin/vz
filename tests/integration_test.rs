@@ -4086,3 +4086,183 @@ fn test_diff_nonexistent_file_error() {
         .expect("Failed to run vz");
     assert!(!output.status.success());
 }
+
+// --- HTML output tests ---
+
+#[test]
+fn test_output_html_basic() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--output", "html"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("<!DOCTYPE html>"),
+        "HTML should start with doctype"
+    );
+    assert!(stdout.contains("<svg"), "HTML should contain embedded SVG");
+    assert!(
+        stdout.contains("</svg>"),
+        "HTML should have closing SVG tag"
+    );
+    assert!(
+        stdout.contains("<script>"),
+        "HTML should have inline JS for tooltips"
+    );
+    assert!(
+        stdout.contains("</html>"),
+        "HTML should have closing html tag"
+    );
+}
+
+#[test]
+fn test_output_html_shorthand_flag() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--html"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("<!DOCTYPE html>"));
+    assert!(stdout.contains("<svg"));
+}
+
+#[test]
+fn test_output_html_with_o_flag() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-o", "html"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("<!DOCTYPE html>"));
+}
+
+#[test]
+fn test_output_html_no_external_resources() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--html"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // No external script sources (xmlns namespace URIs are fine)
+    assert!(
+        !stdout.contains("src=\"http"),
+        "HTML must not load external scripts"
+    );
+    assert!(
+        !stdout.contains("href=\"http"),
+        "HTML must not load external stylesheets"
+    );
+    assert!(
+        !stdout.contains("src=\"//"),
+        "HTML must not load protocol-relative scripts"
+    );
+}
+
+#[test]
+fn test_output_html_with_custom_title() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--html", "--title", "My Sales Chart"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("<title>My Sales Chart</title>"));
+}
+
+#[test]
+fn test_output_html_contains_viewbox() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--html"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("viewBox"),
+        "Embedded SVG should have viewBox attribute"
+    );
+}
+
+#[test]
+fn test_output_html_with_theme_light() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--html", "--theme", "light"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("<!DOCTYPE html>"));
+    assert!(
+        stdout.contains("#ffffff"),
+        "Light theme should use white background"
+    );
+}
+
+#[test]
+fn test_output_html_conflicts_with_svg() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--html", "--svg"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success(), "--html and --svg should conflict");
+}
+
+#[test]
+fn test_output_html_with_bar_chart() {
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "-t",
+            "bar",
+            "--html",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("<!DOCTYPE html>"));
+    assert!(stdout.contains("<svg"));
+}
+
+#[test]
+fn test_output_html_with_custom_dimensions() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--html", "-W", "120", "-H", "30"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("<!DOCTYPE html>"));
+    assert!(stdout.contains("<svg"));
+}
+
+#[test]
+fn test_output_html_from_stdin() {
+    use std::io::Write;
+    let mut child = vz_binary()
+        .args(["-", "--html"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("Failed to start vz");
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"city,revenue\nTokyo,1000\nOsaka,2000\n")
+        .unwrap();
+    let output = child.wait_with_output().expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("<!DOCTYPE html>"));
+    assert!(stdout.contains("<svg"));
+}

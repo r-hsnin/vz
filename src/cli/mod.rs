@@ -89,12 +89,16 @@ pub struct Cli {
     pub spark: bool,
 
     /// Shorthand for --output svg (SVG image export).
-    #[arg(long = "svg", conflicts_with_all = ["output", "json", "spark", "markdown"])]
+    #[arg(long = "svg", conflicts_with_all = ["output", "json", "spark", "markdown", "html"])]
     pub svg: bool,
 
     /// Shorthand for --output markdown (Markdown table export).
-    #[arg(long = "markdown", conflicts_with_all = ["output", "json", "spark", "svg"])]
+    #[arg(long = "markdown", conflicts_with_all = ["output", "json", "spark", "svg", "html"])]
     pub markdown: bool,
+
+    /// Shorthand for --output html (self-contained HTML page with embedded chart).
+    #[arg(long = "html", conflicts_with_all = ["output", "json", "spark", "svg", "markdown"])]
+    pub html: bool,
 
     /// Sample at most N rows from the data (systematic sampling for large datasets).
     #[arg(long = "sample", value_name = "N")]
@@ -247,6 +251,8 @@ pub enum OutputFormat {
     Svg,
     /// Markdown table for documentation embedding.
     Markdown,
+    /// Self-contained HTML page with embedded SVG chart and interactive tooltips.
+    Html,
 }
 
 /// Color theme preset.
