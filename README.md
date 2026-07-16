@@ -198,6 +198,31 @@ Files with matching schemas (same columns, case-insensitive) are automatically m
 A `_source` column is added to identify each file's origin, useful for `--color` grouping.
 Large directories trigger automatic systematic sampling with a warning; use `--no-limit` to override.
 
+## Diff Mode
+
+Compare two data files to visualize changes:
+
+```bash
+# Compare two files (bar chart with ▲/▼ annotations)
+vz before.csv after.csv
+
+# Sort by largest change
+vz q1.csv q2.csv --sort desc
+
+# Show only top 5 changes
+vz q1.csv q2.csv --sort desc --top 5
+
+# Sparkline diff output
+vz q1.csv q2.csv -o spark
+
+# JSON diff output
+vz q1.csv q2.csv -o json
+```
+
+Both files must have matching schemas (same column names, case-insensitive).
+Categorical X columns produce a bar chart with ▲/▼ annotations showing per-category change and percentage delta.
+Temporal X columns produce a line chart overlay with before (gray) and after (cyan) series.
+
 ## Output Format
 
 The default mode renders a chart to stdout with:
