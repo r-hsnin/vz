@@ -4531,3 +4531,121 @@ fn test_output_html_from_stdin() {
     assert!(stdout.contains("<!DOCTYPE html>"));
     assert!(stdout.contains("<svg"));
 }
+
+// ========== Explore Diff Mode Tests ==========
+
+#[test]
+fn test_explore_diff_two_files_does_not_panic() {
+    let output = vz_binary()
+        .args([
+            "explore",
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+        ])
+        .env("VZ_TEST_HEADLESS", "1")
+        .output()
+        .expect("Failed to run vz");
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !combined.contains("panicked"),
+        "Should not panic: {}",
+        combined
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_explore_diff_temporal_does_not_panic() {
+    let output = vz_binary()
+        .args([
+            "explore",
+            "fixtures/diff/timeseries_before.csv",
+            "fixtures/diff/timeseries_after.csv",
+        ])
+        .env("VZ_TEST_HEADLESS", "1")
+        .output()
+        .expect("Failed to run vz");
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !combined.contains("panicked"),
+        "Should not panic: {}",
+        combined
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_explore_diff_schema_mismatch_errors() {
+    let output = vz_binary()
+        .args([
+            "explore",
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/schema_mismatch.csv",
+        ])
+        .env("VZ_TEST_HEADLESS", "1")
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Schema mismatch"),
+        "Expected schema mismatch error, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_explore_diff_identical_files() {
+    let output = vz_binary()
+        .args([
+            "explore",
+            "fixtures/diff/identical.csv",
+            "fixtures/diff/identical.csv",
+        ])
+        .env("VZ_TEST_HEADLESS", "1")
+        .output()
+        .expect("Failed to run vz");
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !combined.contains("panicked"),
+        "Should not panic: {}",
+        combined
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_explore_diff_daily_temporal() {
+    let output = vz_binary()
+        .args([
+            "explore",
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+        ])
+        .env("VZ_TEST_HEADLESS", "1")
+        .output()
+        .expect("Failed to run vz");
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !combined.contains("panicked"),
+        "Should not panic: {}",
+        combined
+    );
+    assert!(output.status.success());
+}

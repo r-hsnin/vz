@@ -151,9 +151,9 @@ pub struct Cli {
 pub enum Command {
     /// Interactive exploration mode (TUI).
     Explore {
-        /// Input file.
-        #[arg(value_name = "FILE")]
-        file: PathBuf,
+        /// Input file(s). Provide two files for diff exploration.
+        #[arg(value_name = "FILE", num_args = 1..=2, required = true)]
+        file: Vec<PathBuf>,
         /// Filter rows: e.g. --where "city=Tokyo" (same syntax as oneshot).
         #[arg(short = 'w', long = "where", value_name = "FILTER")]
         filter: Vec<String>,

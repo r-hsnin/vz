@@ -9,7 +9,7 @@ use super::{DiffEntry, DiffResult, DiffTimeSeries};
 
 /// Compute a temporal diff between two time-series datasets.
 /// Aligns both datasets on a sorted union of X (date) labels, aggregating duplicates by sum.
-pub(super) fn compute_diff_temporal(
+pub fn compute_diff_temporal(
     before: &LoadedData,
     after: &LoadedData,
     x_col: &str,
@@ -79,7 +79,7 @@ pub(super) fn compute_diff_temporal(
 }
 
 /// Compute the diff between two datasets on the given X/Y columns.
-pub(super) fn compute_diff(
+pub fn compute_diff(
     before: &LoadedData,
     after: &LoadedData,
     x_col: &str,

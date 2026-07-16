@@ -9,6 +9,9 @@ mod schema;
 #[cfg(test)]
 mod tests;
 
+pub use compute::{compute_diff, compute_diff_temporal};
+pub use schema::validate_schema;
+
 use anyhow::Result;
 use std::path::Path;
 

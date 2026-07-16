@@ -7,7 +7,7 @@ use crate::cli::Cli;
 use crate::loader::LoadedData;
 
 /// Validate that two datasets have compatible schemas (same column names, case-insensitive).
-pub(super) fn validate_schema(
+pub fn validate_schema(
     before: &LoadedData,
     after: &LoadedData,
     before_path: &Path,

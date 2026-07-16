@@ -61,20 +61,25 @@ fn main() {
 fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Some(Command::Explore { file, filter }) => {
-            let data = if file.is_dir() {
-                let opts = directory::scanner::ScanOptions {
-                    glob_pattern: None,
-                    recurse: false,
-                };
-                let entries = directory::scanner::scan_directory(file, &opts)?;
-                let result = directory::combiner::combine_files(&entries, false)?;
-                result.data
+            if file.len() == 2 {
+                run_explore_diff(&file[0], &file[1], cli)?;
             } else {
-                loader::load_data(file)?
-            };
-            let data = apply_filters(data, filter)?;
-            let schema = pipeline::infer_from_data(&data);
-            explore::run_explore(schema, data.rows, resolve_theme(cli))?;
+                let path = &file[0];
+                let data = if path.is_dir() {
+                    let opts = directory::scanner::ScanOptions {
+                        glob_pattern: None,
+                        recurse: false,
+                    };
+                    let entries = directory::scanner::scan_directory(path, &opts)?;
+                    let result = directory::combiner::combine_files(&entries, false)?;
+                    result.data
+                } else {
+                    loader::load_data(path)?
+                };
+                let data = apply_filters(data, filter)?;
+                let schema = pipeline::infer_from_data(&data);
+                explore::run_explore(schema, data.rows, resolve_theme(cli))?;
+            }
         }
         Some(Command::Present { file }) => {
             present::run_present(file, resolve_theme(cli))?;
@@ -87,6 +92,61 @@ fn run(cli: &Cli) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Run explore mode with two files (diff exploration).
+fn run_explore_diff(before_path: &Path, after_path: &Path, cli: &Cli) -> Result<()> {
+    let before = loader::load_data(before_path)?;
+    let after = loader::load_data(after_path)?;
+
+    diff::validate_schema(&before, &after, before_path, after_path)?;
+
+    let schema = pipeline::infer_from_data(&before);
+    let theme = resolve_theme(cli);
+
+    // Resolve X column: first categorical or temporal
+    let x_col = schema
+        .columns
+        .iter()
+        .find(|c| {
+            c.data_type == vz::infer::types::DataType::Categorical
+                || c.data_type == vz::infer::types::DataType::Temporal
+        })
+        .map(|c| c.name.clone())
+        .unwrap_or_else(|| before.headers.first().cloned().unwrap_or_default());
+
+    // Resolve Y column: first quantitative that is not X
+    let y_col = schema
+        .columns
+        .iter()
+        .find(|c| c.data_type == vz::infer::types::DataType::Quantitative && c.name != x_col)
+        .map(|c| c.name.clone())
+        .ok_or_else(|| anyhow::anyhow!("No quantitative column found for Y axis"))?;
+
+    // Detect temporal X
+    let x_is_temporal = schema
+        .find_column(&x_col)
+        .map(|c| c.data_type == vz::infer::types::DataType::Temporal)
+        .unwrap_or(false);
+
+    let diff_data = if x_is_temporal {
+        explore::DiffData::Temporal(diff::compute_diff_temporal(
+            &before, &after, &x_col, &y_col,
+        )?)
+    } else {
+        explore::DiffData::Categorical(diff::compute_diff(&before, &after, &x_col, &y_col)?)
+    };
+
+    let before_name = before_path
+        .file_name()
+        .map(|f| f.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "before".into());
+    let after_name = after_path
+        .file_name()
+        .map(|f| f.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "after".into());
+
+    explore::run_explore_diff(diff_data, before_name, after_name, theme)
 }
 
 /// Run the oneshot (default) mode: load data, infer types, render chart.

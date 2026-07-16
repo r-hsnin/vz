@@ -132,7 +132,7 @@ mod tests {
         let cli = Cli::try_parse_from(["vz", "explore", "data.csv"]).unwrap();
         match cli.command {
             Some(Command::Explore { ref file, .. }) => {
-                assert_eq!(file, &PathBuf::from("data.csv"));
+                assert_eq!(file, &vec![PathBuf::from("data.csv")]);
             }
             _ => panic!("Expected Explore command"),
         }
