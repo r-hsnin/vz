@@ -8,7 +8,7 @@ use crate::loader::LoadedData;
 use crate::output;
 
 /// Print column metadata for --info flag.
-pub(crate) fn print_info(file: &Path, data: &LoadedData, schema: &Schema) {
+pub fn print_info(file: &Path, data: &LoadedData, schema: &Schema) {
     println!("File: {}", file.display());
     println!("Rows: {}", data.rows.len());
     println!("Columns: {}", schema.columns.len());
@@ -27,11 +27,7 @@ pub(crate) fn print_info(file: &Path, data: &LoadedData, schema: &Schema) {
 }
 
 /// Print column metadata as JSON for machine-readable output.
-pub(crate) fn print_info_json(
-    file: &Path,
-    data: &LoadedData,
-    schema: &Schema,
-) -> anyhow::Result<()> {
+pub fn print_info_json(file: &Path, data: &LoadedData, schema: &Schema) -> anyhow::Result<()> {
     let recommendation = chart::select_chart(schema, None, None).ok();
     let output = output::build_info_output(
         &file.display().to_string(),

@@ -2,7 +2,7 @@ use crate::cli::{self, Cli};
 use crate::loader;
 
 /// Convert CLI format argument to loader InputFormat.
-pub(crate) fn format_override(cli: &Cli) -> Option<loader::InputFormat> {
+pub fn format_override(cli: &Cli) -> Option<loader::InputFormat> {
     cli.format.map(|f| match f {
         cli::InputFormatArg::Csv => loader::InputFormat::Csv,
         cli::InputFormatArg::Tsv => loader::InputFormat::Tsv,

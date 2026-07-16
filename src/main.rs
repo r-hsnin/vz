@@ -1,31 +1,16 @@
-pub mod chart;
-pub mod cli;
-pub mod diagnostics;
-pub mod diff;
-pub mod directory;
-pub mod explore;
-pub mod filter;
-mod helpers;
-pub mod infer;
-mod info;
-pub mod loader;
-pub mod oneshot;
-pub mod output;
-mod pipeline;
-pub mod present;
-pub mod render;
-pub mod sparkline;
-pub mod theme;
-pub mod util;
-pub mod watch;
-
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 
 use std::path::Path;
 
-use cli::{Cli, Command};
-use helpers::{apply_filters, format_override, resolve_input_file, resolve_theme};
+use vz::cli::{self, Cli, Command};
+use vz::diagnostics;
+use vz::directory;
+use vz::helpers::{apply_filters, format_override, resolve_input_file, resolve_theme};
+use vz::loader;
+use vz::pipeline;
+use vz::watch;
+use vz::{diff, explore, present};
 
 fn main() {
     let mut cli = Cli::parse();

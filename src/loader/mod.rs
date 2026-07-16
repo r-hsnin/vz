@@ -77,6 +77,22 @@ pub fn load_data_opts(path: &Path, no_header: bool) -> Result<LoadedData> {
     load_data_full(path, no_header, None)
 }
 
+/// Load data directly from a content string with explicit format.
+/// Useful for benchmarks and tests that want to avoid file I/O.
+pub fn load_from_content(
+    content: &str,
+    format: InputFormat,
+    no_header: bool,
+) -> Result<LoadedData> {
+    match format {
+        InputFormat::Csv => load_delimited(content, b',', no_header),
+        InputFormat::Tsv => load_delimited(content, b'\t', no_header),
+        InputFormat::Json => load_json_array(content),
+        InputFormat::Ndjson => load_ndjson(content),
+        InputFormat::Space => space::load_space(content, no_header),
+    }
+}
+
 /// Load data with full options: header control and format override.
 pub fn load_data_full(
     path: &Path,
@@ -127,7 +143,9 @@ fn load_delimited(content: &str, delimiter: u8, no_header: bool) -> Result<Loade
         return load_delimited_no_header(content, delimiter);
     }
 
-    let mut rows: Vec<Vec<String>> = Vec::new();
+    // Estimate row count from content length for capacity hint
+    let estimated_rows = content.len() / 40; // ~40 bytes per row heuristic
+    let mut rows: Vec<Vec<String>> = Vec::with_capacity(estimated_rows);
     for (i, result) in rdr.records().enumerate() {
         match result {
             Ok(record) => rows.push(record.iter().map(|s| s.to_string()).collect()),

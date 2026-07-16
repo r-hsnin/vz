@@ -8,7 +8,7 @@ use crate::{chart, filter};
 use super::args::YOptions;
 
 /// Parse and apply --where filters to loaded data.
-pub(crate) fn apply_filters(data: LoadedData, filters: &[String]) -> Result<LoadedData> {
+pub fn apply_filters(data: LoadedData, filters: &[String]) -> Result<LoadedData> {
     if filters.is_empty() {
         return Ok(data);
     }
@@ -27,7 +27,7 @@ pub(crate) fn apply_filters(data: LoadedData, filters: &[String]) -> Result<Load
     Ok(filtered)
 }
 
-pub(crate) fn build_recommendation(
+pub fn build_recommendation(
     cli: &Cli,
     schema: &Schema,
     y_opts: &YOptions,
@@ -54,7 +54,7 @@ pub(crate) fn build_recommendation(
 }
 
 /// When user overrides to bar chart, prefer a categorical column for X-axis.
-pub(crate) fn adjust_bar_recommendation(
+pub fn adjust_bar_recommendation(
     recommendation: &mut chart::ChartRecommendation,
     schema: &crate::infer::types::Schema,
 ) {

@@ -16,10 +16,14 @@ use crate::oneshot;
 use crate::output;
 
 /// Infer schema from loaded data (eliminates boilerplate in multiple call sites).
-pub(crate) fn infer_from_data(data: &LoadedData) -> Schema {
+///
+/// Only passes the first 100 rows to inference, matching SAMPLE_SIZE in detector.rs.
+/// This avoids allocating a full `Vec<Vec<&str>>` for large datasets.
+pub fn infer_from_data(data: &LoadedData) -> Schema {
+    const SAMPLE_SIZE: usize = 100;
     let headers: Vec<&str> = data.headers.iter().map(|s| s.as_str()).collect();
-    let rows: Vec<Vec<&str>> = data
-        .rows
+    let row_limit = data.rows.len().min(SAMPLE_SIZE);
+    let rows: Vec<Vec<&str>> = data.rows[..row_limit]
         .iter()
         .map(|r| r.iter().map(|s| s.as_str()).collect())
         .collect();
@@ -28,7 +32,7 @@ pub(crate) fn infer_from_data(data: &LoadedData) -> Schema {
 
 /// Shared post-load pipeline: filter → sample → validate → infer → render.
 /// Used by both single-file and directory modes.
-pub(crate) fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
+pub fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
     let pre_filter_count = data.rows.len();
     let data = apply_filters(data, &cli.filter)?;
     let data = if let Some(max_rows) = cli.sample {

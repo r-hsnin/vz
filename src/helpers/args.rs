@@ -5,7 +5,7 @@ use crate::cli::{self, Cli, parse_multi_y_specs};
 use crate::infer::types::Schema;
 use crate::{chart, oneshot, theme};
 
-pub(crate) fn build_render_options<'a>(
+pub fn build_render_options<'a>(
     cli: &'a Cli,
     y_opts: &'a YOptions,
     recommendation: &chart::selector::ChartRecommendation,
@@ -31,7 +31,7 @@ pub(crate) fn build_render_options<'a>(
 /// Determine effective aggregation function.
 /// Auto-switches to Count when bar chart is forced on a categorical Y column
 /// that was auto-inferred (not explicitly specified by the user).
-pub(crate) fn effective_agg(
+pub fn effective_agg(
     cli: &Cli,
     recommendation: &chart::selector::ChartRecommendation,
     schema: &Schema,
@@ -59,7 +59,7 @@ pub(crate) fn effective_agg(
 }
 
 /// Resolve the theme from CLI args.
-pub(crate) fn resolve_theme(cli: &Cli) -> theme::Theme {
+pub fn resolve_theme(cli: &Cli) -> theme::Theme {
     match cli.theme {
         Some(cli::ThemeArg::Light) => theme::Theme::light(),
         Some(cli::ThemeArg::HighContrast) => theme::Theme::high_contrast(),
@@ -67,7 +67,7 @@ pub(crate) fn resolve_theme(cli: &Cli) -> theme::Theme {
     }
 }
 
-pub(crate) fn resolve_input_file(cli: &Cli) -> Result<PathBuf> {
+pub fn resolve_input_file(cli: &Cli) -> Result<PathBuf> {
     match cli.primary_file() {
         Some(f) => Ok(f.to_path_buf()),
         None => {
@@ -81,14 +81,14 @@ pub(crate) fn resolve_input_file(cli: &Cli) -> Result<PathBuf> {
 }
 
 /// Parsed Y-axis options from CLI.
-pub(crate) struct YOptions {
+pub struct YOptions {
     pub hint: Option<String>,
     pub label_override: Option<String>,
     pub extra_columns: Vec<(String, Option<String>)>,
 }
 
 /// Parse Y-axis options: primary Y hint, label override, and extra Y columns.
-pub(crate) fn parse_y_options(cli: &Cli) -> YOptions {
+pub fn parse_y_options(cli: &Cli) -> YOptions {
     let y_specs: Vec<(&str, Option<&str>)> = cli
         .y_col
         .as_deref()
