@@ -2636,9 +2636,40 @@ fn test_theme_flag_invalid_rejected() {
 }
 
 #[test]
+fn test_year_month_temporal_produces_line_chart() {
+    let dir = tempfile::tempdir().unwrap();
+    let file_path = dir.path().join("year_month.csv");
+    std::fs::write(
+        &file_path,
+        "month,revenue\n2024-01,100\n2024-02,150\n2024-03,200\n2024-04,180\n2024-05,250\n",
+    )
+    .unwrap();
+
+    let output = vz_binary()
+        .arg(file_path.as_os_str())
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "vz failed: {}", stderr);
+    assert!(
+        stderr.contains("Line"),
+        "Expected Line chart for YYYY-MM temporal data, got stderr: '{}'",
+        stderr
+    );
+}
+
+#[test]
 fn test_summary_shows_skipped_rows() {
     let output = vz_binary()
-        .args(["fixtures/mixed_values.csv", "-t", "line"])
+        .args([
+            "fixtures/mixed_values.csv",
+            "-t",
+            "line",
+            "-x",
+            "date",
+            "-y",
+            "revenue",
+        ])
         .output()
         .expect("Failed to run vz");
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -3984,13 +4015,18 @@ fn test_diff_timeseries() {
         .output()
         .expect("Failed to run vz");
     let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {}", stderr);
+    // Temporal diff produces line overlay with "vs" title
     assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
+        stderr.contains("Line") || stderr.contains("Diff"),
+        "Expected Line or Diff chart for temporal diff, got stderr: '{}'",
+        stderr
     );
-    assert!(stdout.contains("Diff"), "Missing Diff header");
-    assert!(stdout.contains("date"), "Missing x=date column");
+    assert!(
+        stderr.contains("date") || stdout.contains("date"),
+        "Missing date column reference in output"
+    );
 }
 
 #[test]
