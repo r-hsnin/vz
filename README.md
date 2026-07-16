@@ -168,6 +168,8 @@ vz present slides.md
 | `vz present <FILE>` | Slide presentation with embedded charts |
 | `vz completions <SHELL>` | Generate shell completion scripts |
 
+Supported shells for completions: `bash`, `zsh`, `fish`, `elvish`, `powershell`. See the [Shell Completions guide](https://r-hsnin.github.io/vz/guide/shell-completions) for setup instructions.
+
 <!-- /AUTO-GENERATED -->
 
 ## Directory Mode

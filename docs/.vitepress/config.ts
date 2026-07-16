@@ -29,6 +29,7 @@ export default defineConfig({
               { text: 'Chart Types', link: '/guide/chart-types' },
               { text: 'Output Modes', link: '/guide/output-modes' },
               { text: 'Diff Mode', link: '/guide/diff-mode' },
+              { text: 'Shell Completions', link: '/guide/shell-completions' },
             ]
           }
         ],
@@ -51,6 +52,7 @@ export default defineConfig({
               { text: 'チャート種別', link: '/ja/guide/chart-types' },
               { text: '出力モード', link: '/ja/guide/output-modes' },
               { text: '差分モード', link: '/ja/guide/diff-mode' },
+              { text: 'シェル補完', link: '/ja/guide/shell-completions' },
             ]
           }
         ],
