@@ -1,5 +1,5 @@
 use super::*;
-use crate::infer::types::ColumnMeta;
+use crate::infer::types::{ColumnMeta, DataType};
 
 fn make_test_app() -> ExploreApp {
     let schema = Schema::new(vec![
