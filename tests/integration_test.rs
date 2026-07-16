@@ -4893,3 +4893,564 @@ fn test_bom_stdin_pipe() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+// =============================================================================
+// Cycle 27: Output value assertions (spark, markdown, html, diff)
+// =============================================================================
+
+#[test]
+fn test_spark_output_values_range_and_trend() {
+    // sales.csv has revenue: 1000, 1500, 1200, 800, 2000, 1800
+    // Range: 800–2000 → formatted as (800–2k), Trend: first=1000, last=1800 → ↑ +80%
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--spark"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("(800–2k)"),
+        "Expected range (800–2k) in spark output, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("↑ +80%"),
+        "Expected trend ↑ +80% in spark output, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_spark_output_sparkline_char_count() {
+    // sales.csv has 6 rows → sparkline should have exactly 6 chars
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--spark"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    let parts: Vec<&str> = trimmed.split("  ").collect();
+    assert!(parts.len() >= 2, "Expected parts, got: {}", trimmed);
+    let spark_chars: Vec<char> = parts[1].chars().collect();
+    assert_eq!(
+        spark_chars.len(),
+        6,
+        "Expected 6 sparkline chars for 6 rows, got {} in: {}",
+        spark_chars.len(),
+        parts[1]
+    );
+}
+
+#[test]
+fn test_spark_bar_aggregation_values() {
+    // Bar with 3 categories → 3 sparkline chars, range (800–4.2k)
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "--spark",
+            "-t",
+            "bar",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    let parts: Vec<&str> = trimmed.split("  ").collect();
+    assert!(parts.len() >= 2, "Expected parts, got: {}", trimmed);
+    let spark_chars: Vec<char> = parts[1].chars().collect();
+    assert_eq!(
+        spark_chars.len(),
+        3,
+        "Expected 3 sparkline chars for 3 categories, got {} in: {}",
+        spark_chars.len(),
+        parts[1]
+    );
+}
+
+#[test]
+fn test_diff_spark_output_values() {
+    // Categorical diff: 4 categories, overall +5%
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--spark",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    assert!(
+        trimmed.starts_with("Δ revenue"),
+        "Expected Δ revenue prefix, got: {}",
+        trimmed
+    );
+    assert!(
+        trimmed.contains("(+5%)"),
+        "Expected overall (+5%) in diff spark, got: {}",
+        trimmed
+    );
+    // 4 categories → 4 sparkline chars
+    let parts: Vec<&str> = trimmed.split("  ").collect();
+    assert!(parts.len() >= 2, "Expected parts, got: {}", trimmed);
+    let spark_chars: Vec<char> = parts[1]
+        .chars()
+        .filter(|c| "▁▂▃▄▅▆▇█".contains(*c))
+        .collect();
+    assert_eq!(
+        spark_chars.len(),
+        4,
+        "Expected 4 sparkline chars for 4 categories, got {} in: {}",
+        spark_chars.len(),
+        parts[1]
+    );
+}
+
+#[test]
+fn test_diff_spark_temporal_output_values() {
+    // Temporal diff: 2 lines, 6 data points each, overall +13%
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+            "--spark",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines.len(),
+        2,
+        "Expected 2 lines for temporal diff spark, got: {:?}",
+        lines
+    );
+    assert!(
+        lines[0].contains("ts_daily_before"),
+        "First line should contain before filename, got: {}",
+        lines[0]
+    );
+    assert!(
+        lines[1].contains("ts_daily_after"),
+        "Second line should contain after filename, got: {}",
+        lines[1]
+    );
+    assert!(
+        lines[1].contains("(+13%)"),
+        "Second line should have overall (+13%), got: {}",
+        lines[1]
+    );
+    // Each line should have 6 sparkline chars
+    for (i, line) in lines.iter().enumerate() {
+        let spark_count = line.chars().filter(|c| "▁▂▃▄▅▆▇█".contains(*c)).count();
+        assert_eq!(
+            spark_count, 6,
+            "Line {} should have 6 sparkline chars, got {} in: {}",
+            i, spark_count, line
+        );
+    }
+}
+
+#[test]
+fn test_diff_markdown_output_values() {
+    // Verify actual cell values in diff markdown
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "-o",
+            "markdown",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Header columns
+    assert!(
+        stdout.contains("| city | Before | After | Change |"),
+        "Expected header row, got: {}",
+        stdout
+    );
+    // Value assertions for each city
+    assert!(
+        stdout.contains("| Tokyo | 1k | 1.2k | ▲ +20% |"),
+        "Expected Tokyo row values, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("| Osaka | 1.5k | 1.4k | ▼ -10% |"),
+        "Expected Osaka row values, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("| Nagoya | 800 | 950 | ▲ +19% |"),
+        "Expected Nagoya row values, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("| Fukuoka | 600 | 600 | ─ 0% |"),
+        "Expected Fukuoka row values, got: {}",
+        stdout
+    );
+    // Overall summary line
+    assert!(
+        stdout.contains("*Overall: ▲ +5%*"),
+        "Expected overall summary line, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_diff_markdown_temporal_values() {
+    // Verify temporal diff markdown cell values
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+            "-o",
+            "markdown",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Header
+    assert!(
+        stdout.contains("| date | Before | After | Change |"),
+        "Expected temporal header, got: {}",
+        stdout
+    );
+    // First row: 2024-01-01, before=100, after=110, +10%
+    assert!(
+        stdout.contains("| 2024-01-01 | 100 | 110 | ▲ +10% |"),
+        "Expected first temporal row, got: {}",
+        stdout
+    );
+    // Last row: 2024-01-06, before=180, after=220, +22%
+    assert!(
+        stdout.contains("| 2024-01-06 | 180 | 220 | ▲ +22% |"),
+        "Expected last temporal row, got: {}",
+        stdout
+    );
+    // Overall
+    assert!(
+        stdout.contains("*Overall: ▲ +13%*"),
+        "Expected overall +13%, got: {}",
+        stdout
+    );
+    // Row count: header + separator + 6 data rows + empty + overall = 10 lines
+    let non_empty_lines: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
+    assert_eq!(
+        non_empty_lines.len(),
+        9,
+        "Expected 9 non-empty lines (header + sep + 6 data + overall), got: {:?}",
+        non_empty_lines
+    );
+}
+
+#[test]
+fn test_output_markdown_bar_aggregated_values() {
+    // Bar chart markdown should show aggregated sums
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-o",
+            "markdown",
+            "-t",
+            "bar",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("| city | revenue |"),
+        "Expected header, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("| Tokyo | 4200 |"),
+        "Expected Tokyo sum 4200, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("| Osaka | 3300 |"),
+        "Expected Osaka sum 3300, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("| Nagoya | 800 |"),
+        "Expected Nagoya sum 800, got: {}",
+        stdout
+    );
+    // Exactly 3 data rows
+    let data_lines: Vec<&str> = stdout
+        .lines()
+        .filter(|l| l.starts_with("| ") && !l.contains("city") && !l.starts_with("|---"))
+        .collect();
+    assert_eq!(
+        data_lines.len(),
+        3,
+        "Expected 3 data rows for 3 cities, got: {:?}",
+        data_lines
+    );
+}
+
+#[test]
+fn test_output_markdown_raw_data_values() {
+    // Raw markdown should have all data rows with exact values
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-o", "markdown"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // All 4 columns present in header
+    assert!(
+        stdout.contains("| date | city | revenue | profit |"),
+        "Expected all 4 columns in header, got: {}",
+        stdout
+    );
+    // Verify first and last data rows
+    assert!(
+        stdout.contains("| 2024-01-01 | Tokyo | 1000 | 200 |"),
+        "Expected first row, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("| 2024-06-01 | Osaka | 1800 | 400 |"),
+        "Expected last row, got: {}",
+        stdout
+    );
+    // 6 data rows total
+    let data_lines: Vec<&str> = stdout
+        .lines()
+        .filter(|l| l.starts_with("| 2024-"))
+        .collect();
+    assert_eq!(
+        data_lines.len(),
+        6,
+        "Expected 6 data rows, got: {:?}",
+        data_lines
+    );
+}
+
+#[test]
+fn test_diff_json_categorical_values() {
+    // Verify actual numeric values in diff JSON
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--json",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+
+    // Structural assertions
+    assert_eq!(json["x_column"], "city");
+    assert_eq!(json["y_column"], "revenue");
+
+    // Category value assertions
+    let categories = json["categories"].as_array().unwrap();
+    let tokyo = &categories[0];
+    assert_eq!(tokyo["label"], "Tokyo");
+    assert_eq!(tokyo["before"], 1000.0);
+    assert_eq!(tokyo["after"], 1200.0);
+    assert_eq!(tokyo["delta"], 200.0);
+    assert_eq!(tokyo["pct_change"], 20.0);
+
+    let osaka = &categories[1];
+    assert_eq!(osaka["label"], "Osaka");
+    assert_eq!(osaka["before"], 1500.0);
+    assert_eq!(osaka["after"], 1350.0);
+    assert_eq!(osaka["delta"], -150.0);
+    assert_eq!(osaka["pct_change"], -10.0);
+
+    let fukuoka = &categories[3];
+    assert_eq!(fukuoka["label"], "Fukuoka");
+    assert_eq!(fukuoka["delta"], 0.0);
+    assert_eq!(fukuoka["pct_change"], 0.0);
+
+    // Overall percentage
+    let overall = json["overall_delta_pct"].as_f64().unwrap();
+    assert!(
+        (overall - 5.128).abs() < 0.01,
+        "Expected overall ~5.128%, got: {}",
+        overall
+    );
+}
+
+#[test]
+fn test_diff_json_temporal_values() {
+    // Verify temporal diff JSON data values
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+            "--json",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+
+    assert_eq!(json["chart_type"], "line");
+    assert_eq!(json["x_column"], "date");
+    assert_eq!(json["y_column"], "revenue");
+
+    // Dates array
+    let dates = json["dates"].as_array().unwrap();
+    assert_eq!(dates.len(), 6);
+    assert_eq!(dates[0], "2024-01-01");
+    assert_eq!(dates[5], "2024-01-06");
+
+    // Before series values
+    let before_series = json["before"]["series"].as_array().unwrap();
+    assert_eq!(before_series[0]["value"], 100.0);
+    assert_eq!(before_series[5]["value"], 180.0);
+
+    // After series values
+    let after_series = json["after"]["series"].as_array().unwrap();
+    assert_eq!(after_series[0]["value"], 110.0);
+    assert_eq!(after_series[5]["value"], 220.0);
+
+    // Overall delta
+    let overall = json["overall_delta_pct"].as_f64().unwrap();
+    assert!(
+        (overall - 13.253).abs() < 0.01,
+        "Expected overall ~13.253%, got: {}",
+        overall
+    );
+}
+
+#[test]
+fn test_diff_html_output_title_and_structure() {
+    // Diff HTML should have specific title with filenames
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--html",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("<title>Diff: sales_before vs sales_after</title>"),
+        "Expected diff title with filenames, got first 500: {}",
+        &stdout[..500.min(stdout.len())]
+    );
+    // Tooltip container
+    assert!(
+        stdout.contains("class=\"tooltip\""),
+        "Expected tooltip CSS class in HTML"
+    );
+    // Responsive SVG
+    assert!(
+        stdout.contains("max-width: 100%"),
+        "Expected responsive SVG CSS"
+    );
+    assert!(
+        stdout.contains("height: auto"),
+        "Expected height: auto for responsive SVG"
+    );
+    // Dark theme background
+    assert!(
+        stdout.contains("background: #1e1e1e"),
+        "Expected dark theme background"
+    );
+    // Interactive script with hover
+    assert!(
+        stdout.contains("mouseenter") || stdout.contains("mousemove"),
+        "Expected interactive hover event handlers"
+    );
+}
+
+#[test]
+fn test_output_html_title_default() {
+    // Default HTML title should be "vz chart"
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--html"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("<title>vz chart</title>"),
+        "Expected default title 'vz chart'"
+    );
+}
+
+#[test]
+fn test_output_html_structure_complete() {
+    // Verify complete HTML document structure
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "--html"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Exactly one html open/close
+    assert_eq!(
+        stdout.matches("<html").count(),
+        1,
+        "Expected exactly one <html> tag"
+    );
+    assert_eq!(
+        stdout.matches("</html>").count(),
+        1,
+        "Expected exactly one </html> tag"
+    );
+    // Has viewport meta for responsive
+    assert!(
+        stdout.contains("width=device-width, initial-scale=1"),
+        "Expected responsive viewport meta"
+    );
+    // Has chart-container div
+    assert!(
+        stdout.contains("chart-container"),
+        "Expected chart-container div"
+    );
+    // viewBox with default dimensions
+    assert!(
+        stdout.contains("viewBox=\"0 0 640 384\""),
+        "Expected default viewBox dimensions"
+    );
+}
+
+#[test]
+fn test_diff_html_temporal_title() {
+    // Temporal diff HTML should also have diff title
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+            "--html",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("<title>Diff: ts_daily_before vs ts_daily_after</title>"),
+        "Expected temporal diff title with filenames"
+    );
+}
