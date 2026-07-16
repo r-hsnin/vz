@@ -6,6 +6,7 @@ use crate::cli::Cli;
 use crate::diff::{DiffEntry, DiffResult, DiffTimeSeries};
 
 use super::apply_sort_and_limit;
+use super::html::{print_diff_html, print_diff_line_html};
 use super::json::print_diff_line_json;
 use super::markdown::{print_diff_line_markdown, print_diff_markdown};
 use super::spark::{print_diff_line_spark, print_diff_spark};
@@ -224,4 +225,71 @@ fn test_diff_markdown_no_overall_pct() {
     };
     let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "markdown"]).unwrap();
     print_diff_markdown(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+}
+
+// --- HTML output tests ---
+
+#[test]
+fn test_diff_html_categorical_basic() {
+    let diff = DiffResult {
+        entries: sample_entries(),
+        x_column: "city".into(),
+        y_column: "revenue".into(),
+        before_rows: 3,
+        after_rows: 3,
+        overall_pct: Some(6.06),
+    };
+    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "html"]).unwrap();
+    // Verify it doesn't panic (output goes to stdout)
+    print_diff_html(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+}
+
+#[test]
+fn test_diff_html_categorical_with_sort() {
+    let diff = DiffResult {
+        entries: sample_entries(),
+        x_column: "city".into(),
+        y_column: "revenue".into(),
+        before_rows: 3,
+        after_rows: 3,
+        overall_pct: Some(6.06),
+    };
+    let cli =
+        Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "html", "--sort", "desc"]).unwrap();
+    print_diff_html(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+}
+
+#[test]
+fn test_diff_html_categorical_with_top() {
+    let diff = DiffResult {
+        entries: sample_entries(),
+        x_column: "city".into(),
+        y_column: "revenue".into(),
+        before_rows: 3,
+        after_rows: 3,
+        overall_pct: Some(6.06),
+    };
+    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "html", "--top", "2"]).unwrap();
+    print_diff_html(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+}
+
+#[test]
+fn test_diff_html_temporal_basic() {
+    let ts = sample_ts();
+    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "html"]).unwrap();
+    print_diff_line_html(&cli, &ts, Path::new("before.csv"), Path::new("after.csv"));
+}
+
+#[test]
+fn test_diff_html_no_overall_pct() {
+    let diff = DiffResult {
+        entries: sample_entries(),
+        x_column: "city".into(),
+        y_column: "revenue".into(),
+        before_rows: 3,
+        after_rows: 3,
+        overall_pct: None,
+    };
+    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "html"]).unwrap();
+    print_diff_html(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
 }

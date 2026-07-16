@@ -4649,3 +4649,110 @@ fn test_explore_diff_daily_temporal() {
     );
     assert!(output.status.success());
 }
+
+// --- Diff HTML output tests ---
+
+#[test]
+fn test_diff_html_output() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "-o",
+            "html",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("<!DOCTYPE html>"),
+        "Missing DOCTYPE in: {}",
+        &stdout[..200.min(stdout.len())]
+    );
+    assert!(stdout.contains("<svg"), "Missing <svg> in HTML output");
+    assert!(stdout.contains("</svg>"), "Missing </svg> in HTML output");
+    assert!(
+        stdout.contains("<script>"),
+        "Missing <script> in HTML output"
+    );
+    assert!(stdout.contains("</html>"), "Missing </html> in output");
+}
+
+#[test]
+fn test_diff_html_shorthand() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--html",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("<!DOCTYPE html>"),
+        "Missing DOCTYPE in HTML output"
+    );
+    assert!(stdout.contains("<svg"), "Missing <svg> in HTML output");
+}
+
+#[test]
+fn test_diff_html_temporal() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/ts_daily_before.csv",
+            "fixtures/diff/ts_daily_after.csv",
+            "--html",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("<!DOCTYPE html>"),
+        "Missing DOCTYPE in HTML output"
+    );
+    assert!(stdout.contains("<svg"), "Missing <svg> in HTML output");
+    assert!(stdout.contains("viewBox"), "Missing viewBox in SVG output");
+}
+
+#[test]
+fn test_diff_html_with_sort_and_top() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--html",
+            "--sort",
+            "desc",
+            "--top",
+            "2",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("<!DOCTYPE html>"),
+        "Missing DOCTYPE in HTML output"
+    );
+    assert!(stdout.contains("<svg"), "Missing <svg> in HTML output");
+}
