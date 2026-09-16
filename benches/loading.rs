@@ -1,6 +1,8 @@
 //! Benchmarks for the vz data pipeline: loading, inference, and full pipeline.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 use vz::loader::{self, InputFormat};
 use vz::pipeline;
 
