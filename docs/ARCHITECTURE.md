@@ -95,6 +95,12 @@ structures before passing them to `render_chart_data()`:
 - `explore/mod.rs` — interactive column selection → ChartData construction
 - `present/chart_loader.rs` — Markdown chart block → ChartData
 
+Layering note: modes call into `pipeline::render_data` / `pipeline::infer_from_data`
+and `diff` column resolution (`diff::auto_x_column` et al.). This direction is
+intentional — `pipeline` and `diff::schema` are shared services, not layers above
+the modes. `pipeline` itself never depends on `diff` / `directory` / `present` /
+`explore`, so the module graph stays acyclic.
+
 ### Change Impact Map
 
 - `loader/` change → affects all modes. Run full integration tests.
