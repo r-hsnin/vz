@@ -15,6 +15,13 @@ push 先は `dev`。`origin/main` への直接 push は pre-push hook が阻止�
 
 解除後の手順は `docs/RUNBOOK.md` を参照。公開範囲は `release-manifest.txt` が単一の真実で、記載の無いファイルは非公開が既定。manifest の変更は公開範囲の変更として扱い、無断で変更しない。
 
+## 作業フロー
+
+- 作業前に `docs/GOTCHAS.md` を読む。既知の罠を踏まない
+- TDD で進める。unit テスト（モジュール内 `#[cfg(test)]` / `tests.rs`）と integration テスト（`tests/`）の両方を追加・更新する
+- 変更には必ずドキュメントを連動させる（下の文書表の「読む・更新する条件」に従う）
+- 失敗・躓いた点は `docs/GOTCHAS.md` に記す。ただし再現し得るものに限り、単発で今後確実に再現しないものは書かない
+
 ## 検証（commit 前に通す）
 
 ```bash
