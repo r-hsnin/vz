@@ -24,6 +24,7 @@ Release procedures live in [RUNBOOK.md](RUNBOOK.md).
 ## Development Setup
 
 - **Git hooks not running:** if `core.hooksPath` points to a custom path (legacy `scripts/hooks` setup), Git ignores lefthook's hooks. Run `lefthook install --reset-hooks-path` once.
+- **pre-push jobs don't receive git args automatically:** pass them explicitly via `{1}` in `run:` (see `lefthook.yml`). Hooks reading the ref list from stdin also need `use_stdin: true`; without it lefthook can hang.
 
 ## Runtime Issues
 
