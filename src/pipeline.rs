@@ -47,14 +47,14 @@ pub fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
     validate_loaded_data(&data, file, &cli.filter, pre_filter_count)?;
 
     // Validate -c column exists in the loaded data
-    if let Some(ref color_col) = cli.color_col {
-        if !data.headers.iter().any(|h| h == color_col) {
-            anyhow::bail!(
-                "Color column '{}' not found. Available columns: {}",
-                color_col,
-                data.headers.join(", ")
-            );
-        }
+    if let Some(ref color_col) = cli.color_col
+        && !data.headers.iter().any(|h| h == color_col)
+    {
+        anyhow::bail!(
+            "Color column '{}' not found. Available columns: {}",
+            color_col,
+            data.headers.join(", ")
+        );
     }
 
     let schema = infer_from_data(&data);

@@ -17,7 +17,7 @@ Release procedures live in [RUNBOOK.md](RUNBOOK.md).
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `error[E0658]: let chains` | Rust version too old | Update: `rustup update` (requires 1.87+) |
+| `error[E0658]: let chains` | Rust version too old | Update: `rustup update` (requires 1.88+) |
 | `crossterm` compile error | Missing system deps | Linux: ensure `libxcb` or similar available |
 | `ratatui` version mismatch | Lockfile stale | `cargo update` |
 

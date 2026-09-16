@@ -107,10 +107,10 @@ fn collect_files(
         }
 
         // Apply glob pattern if specified (matches against filename only)
-        if let Some(ref pattern) = opts.glob_pattern {
-            if !glob_matches(pattern, &filename) {
-                continue;
-            }
+        if let Some(ref pattern) = opts.glob_pattern
+            && !glob_matches(pattern, &filename)
+        {
+            continue;
         }
 
         // Compute stem: relative path from root (without extension) for recursive,

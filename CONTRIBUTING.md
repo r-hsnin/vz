@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Rust 1.87+ (install via [rustup](https://rustup.rs/))
+- Rust 1.88+ (install via [rustup](https://rustup.rs/))
 - Cargo (comes with rustup)
 
 ## Development Setup

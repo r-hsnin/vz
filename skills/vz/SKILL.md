@@ -21,7 +21,7 @@ Zero-config CLI BI tool. Data types determine the chart automatically.
 cargo install --git https://github.com/r-hsnin/vz
 ```
 
-Requires Rust 1.87+.
+Requires Rust 1.88+.
 
 ## Core Workflow
 

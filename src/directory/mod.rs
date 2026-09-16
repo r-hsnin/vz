@@ -95,10 +95,10 @@ pub fn run_directory(cli: &Cli, dir: &Path) -> Result<()> {
         auto_sample_combined(result.data, MAX_COMBINED_ROWS, cli.no_limit);
 
     // Emit large dataset warning only if auto-sampling did NOT fire
-    if auto_sample_warning.is_none() {
-        if let Some(warning) = large_dataset_warning(data.rows.len()) {
-            eprintln!("{warning}");
-        }
+    if auto_sample_warning.is_none()
+        && let Some(warning) = large_dataset_warning(data.rows.len())
+    {
+        eprintln!("{warning}");
     }
 
     // Print summary to stderr
