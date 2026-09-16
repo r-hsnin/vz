@@ -1,5 +1,20 @@
 //! HTML output: wraps SVG chart in a self-contained HTML page with interactive tooltips.
 
+/// Render the chart as a self-contained HTML page with embedded SVG
+/// and print to stdout.
+pub fn print_html(
+    recommendation: &crate::chart::selector::ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &crate::oneshot::RenderOptions<'_>,
+) -> anyhow::Result<()> {
+    let bg = opts.theme.svg_background();
+    let svg = crate::output::svg::render_chart_svg(recommendation, headers, rows, opts);
+    let title = opts.title.as_deref().unwrap_or("vz chart");
+    println!("{}", wrap_svg_in_html(&svg, title, bg));
+    Ok(())
+}
+
 /// Wrap an SVG string in a complete, self-contained HTML5 document.
 ///
 /// The resulting HTML includes:

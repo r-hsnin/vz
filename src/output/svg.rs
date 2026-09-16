@@ -159,6 +159,45 @@ fn color_to_hex(color: Color) -> String {
     }
 }
 
+/// Render a chart into an SVG string via an off-screen buffer.
+pub fn render_chart_svg(
+    recommendation: &crate::chart::selector::ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &crate::oneshot::RenderOptions<'_>,
+) -> String {
+    use ratatui::layout::Rect;
+
+    let width = opts.width.unwrap_or_else(crate::oneshot::terminal_width);
+    let chart_type = crate::oneshot::resolve_chart_type(recommendation, opts.chart_type_override);
+    let height = opts.height.unwrap_or(crate::oneshot::DEFAULT_HEIGHT);
+
+    let area = Rect::new(0, 0, width, height);
+    let mut buf = Buffer::empty(area);
+    crate::oneshot::render_chart_to_buffer(
+        chart_type,
+        recommendation,
+        headers,
+        rows,
+        opts,
+        area,
+        &mut buf,
+    );
+
+    buffer_to_svg(&buf, opts.theme.svg_background())
+}
+
+/// Render the chart to SVG and print to stdout.
+pub fn print_svg(
+    recommendation: &crate::chart::selector::ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &crate::oneshot::RenderOptions<'_>,
+) -> anyhow::Result<()> {
+    println!("{}", render_chart_svg(recommendation, headers, rows, opts));
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,5 +280,36 @@ mod tests {
         assert!(!svg.contains("font-weight"));
         assert!(!svg.contains("font-style"));
         assert!(svg.contains("Plain"));
+    }
+
+    #[test]
+    fn test_render_chart_svg_produces_svg_document() {
+        use crate::chart::selector::ChartType;
+        use crate::test_helpers::make_recommendation;
+
+        let rec = make_recommendation(ChartType::Bar, "city", Some("revenue"), None);
+        let headers = vec!["city".to_string(), "revenue".to_string()];
+        let rows = vec![
+            vec!["Tokyo".to_string(), "100".to_string()],
+            vec!["Osaka".to_string(), "200".to_string()],
+        ];
+        let opts = crate::oneshot::RenderOptions {
+            chart_type_override: None,
+            y_label_override: None,
+            width: Some(60),
+            height: Some(20),
+            sort_order: None,
+            extra_y_columns: vec![],
+            limit: None,
+            agg: crate::cli::AggFunction::Sum,
+            title: None,
+            labels: false,
+            theme: crate::theme::Theme::default(),
+            bins: None,
+        };
+        let svg = render_chart_svg(&rec, &headers, &rows, &opts);
+        assert!(svg.starts_with("<svg"), "Should start with <svg tag");
+        assert!(svg.contains("viewBox"), "Should have viewBox");
+        assert!(svg.contains("</svg>"), "Should have closing tag");
     }
 }

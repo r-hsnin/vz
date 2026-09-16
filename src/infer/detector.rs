@@ -3,8 +3,9 @@ use crate::infer::types::DataType;
 /// Maximum unique values for a column to be considered categorical.
 const CATEGORICAL_THRESHOLD: usize = 20;
 
-/// Number of rows to sample for type inference.
-const SAMPLE_SIZE: usize = 100;
+/// Number of rows sampled for type inference.
+/// Shared by [`infer_column_type`] and the loaded-data fast path in `pipeline`.
+pub(crate) const SAMPLE_SIZE: usize = 100;
 
 /// Detect the data type of a single value string.
 pub fn detect_value_type(value: &str) -> DataType {

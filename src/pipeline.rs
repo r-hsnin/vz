@@ -17,10 +17,10 @@ use crate::output;
 
 /// Infer schema from loaded data (eliminates boilerplate in multiple call sites).
 ///
-/// Only passes the first 100 rows to inference, matching SAMPLE_SIZE in detector.rs.
-/// This avoids allocating a full `Vec<Vec<&str>>` for large datasets.
+/// Only passes the first [`SAMPLE_SIZE`](crate::infer::detector::SAMPLE_SIZE)
+/// rows to inference. This avoids allocating a full `Vec<Vec<&str>>` for large datasets.
 pub fn infer_from_data(data: &LoadedData) -> Schema {
-    const SAMPLE_SIZE: usize = 100;
+    use crate::infer::detector::SAMPLE_SIZE;
     let headers: Vec<&str> = data.headers.iter().map(|s| s.as_str()).collect();
     let row_limit = data.rows.len().min(SAMPLE_SIZE);
     let rows: Vec<Vec<&str>> = data.rows[..row_limit]
@@ -135,11 +135,11 @@ fn dispatch_output(
         }
         Some(cli::OutputFormat::Svg) => {
             let opts = build_render_options(cli, y_opts, recommendation, schema);
-            print_svg(recommendation, headers, rows, &opts)?;
+            output::svg::print_svg(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Html) => {
             let opts = build_render_options(cli, y_opts, recommendation, schema);
-            print_html(recommendation, headers, rows, &opts)?;
+            output::html::print_html(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Markdown) => {
             output::markdown::print_markdown(recommendation, headers, rows, cli, schema)?;
@@ -216,68 +216,4 @@ fn print_chart_json(
         &data.rows,
         &params,
     )
-}
-
-/// Render the chart to SVG and print to stdout.
-fn print_svg(
-    recommendation: &ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-    opts: &oneshot::RenderOptions<'_>,
-) -> anyhow::Result<()> {
-    use ratatui::{buffer::Buffer, layout::Rect};
-
-    let width = opts.width.unwrap_or_else(oneshot::terminal_width);
-    let chart_type = oneshot::resolve_chart_type(recommendation, opts.chart_type_override);
-    let height = opts.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
-
-    let area = Rect::new(0, 0, width, height);
-    let mut buf = Buffer::empty(area);
-    oneshot::render_chart_to_buffer(
-        chart_type,
-        recommendation,
-        headers,
-        rows,
-        opts,
-        area,
-        &mut buf,
-    );
-
-    println!(
-        "{}",
-        output::svg::buffer_to_svg(&buf, opts.theme.svg_background())
-    );
-    Ok(())
-}
-
-/// Render the chart as a self-contained HTML page with embedded SVG and print to stdout.
-fn print_html(
-    recommendation: &ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-    opts: &oneshot::RenderOptions<'_>,
-) -> anyhow::Result<()> {
-    use ratatui::{buffer::Buffer, layout::Rect};
-
-    let width = opts.width.unwrap_or_else(oneshot::terminal_width);
-    let chart_type = oneshot::resolve_chart_type(recommendation, opts.chart_type_override);
-    let height = opts.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
-
-    let area = Rect::new(0, 0, width, height);
-    let mut buf = Buffer::empty(area);
-    oneshot::render_chart_to_buffer(
-        chart_type,
-        recommendation,
-        headers,
-        rows,
-        opts,
-        area,
-        &mut buf,
-    );
-
-    let bg = opts.theme.svg_background();
-    let svg = output::svg::buffer_to_svg(&buf, bg);
-    let title = opts.title.as_deref().unwrap_or("vz chart");
-    println!("{}", output::html::wrap_svg_in_html(&svg, title, bg));
-    Ok(())
 }
