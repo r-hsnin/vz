@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Rust 1.88+ (install via [rustup](https://rustup.rs/))
+- Rust via [rustup](https://rustup.rs/) — the pinned toolchain in `rust-toolchain.toml` is installed automatically (MSRV: 1.88+)
 - Cargo (comes with rustup)
 
 ## Development Setup

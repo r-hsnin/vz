@@ -34,6 +34,8 @@ lefthook 導入済みなら pre-commit（fmt --check / clippy）と pre-push（o
 
 依存を変更したら `cargo machete`（要 `cargo install cargo-machete`）で未使用依存を確認する。
 
+ツールチェーンは `rust-toolchain.toml`（1.97.0）で固定。MSRV 1.88 は CI の msrv ジョブで検証する。
+
 ## コミット
 
 - 論理単位ごとにコミットしながら作業を進める（複数の関心事を1コミットに混ぜない）
