@@ -1,0 +1,19 @@
+---
+source: tests/snapshot_test.rs
+assertion_line: 103
+expression: output
+---
+                              department × status                      0       3
+Engineering
+
+                            2                                 1
+
+Sales
+
+                            1                                 2
+
+Marketing
+
+                            3                                 1
+
+            Active                            Inactive

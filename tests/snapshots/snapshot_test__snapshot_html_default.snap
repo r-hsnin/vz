@@ -1,0 +1,135 @@
+---
+source: tests/snapshot_test.rs
+assertion_line: 91
+expression: output
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vz chart</title>
+<style>
+body {
+  margin: 0;
+  background: #1e1e1e;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.chart-container {
+  position: relative;
+}
+.tooltip {
+  position: absolute;
+  display: none;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+}
+svg {
+  max-width: 100%;
+  height: auto;
+}
+</style>
+</head>
+<body>
+<div class="chart-container">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 384" width="640" height="384">
+<rect width="100%" height="100%" fill="#1e1e1e"/>
+<style>text { font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 14px; white-space: pre; }</style>
+<text y="13"><tspan x="0" fill="#cccccc">┌───────────────────────────────</tspan><tspan x="256" fill="#cccccc" font-weight="bold">revenue vs date</tspan><tspan x="376" fill="#cccccc">────────────────────────────────┐</tspan></text>
+<text y="29"><tspan x="0" fill="#cccccc">│2k       </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">revenue                                             </tspan><tspan x="504" fill="#4ec9b0">⡠⠔⠁</tspan><tspan x="528" fill="#cccccc">     ┌──────┐│</tspan></text>
+<text y="45"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                                                 </tspan><tspan x="480" fill="#4ec9b0">⢀⠔⠊</tspan><tspan x="504" fill="#cccccc">       </tspan><tspan x="560" fill="#4ec9b0">█ Tokyo </tspan><tspan x="624" fill="#cccccc">││</tspan></text>
+<text y="61"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                                               </tspan><tspan x="464" fill="#4ec9b0">⡠⠒⠁</tspan><tspan x="488" fill="#cccccc">         </tspan><tspan x="560" fill="#dcdcaa">█ Osaka⣀</tspan><tspan x="624" fill="#cccccc">││</tspan></text>
+<text y="77"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                                            </tspan><tspan x="440" fill="#4ec9b0">⢀⠔⠉</tspan><tspan x="464" fill="#cccccc">    </tspan><tspan x="496" fill="#dcdcaa">⢀⣀⣀⣀⠤⠤⠤⠤</tspan><tspan x="560" fill="#6a9955">█ Nagoya</tspan><tspan x="624" fill="#cccccc">││</tspan></text>
+<text y="93"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                                     </tspan><tspan x="384" fill="#dcdcaa">⣀⣀⣀⣀⠤⠤⠤⠔⠒⠒⠒⠉⠉⠉⠁</tspan><tspan x="504" fill="#cccccc">        └──────┘│</tspan></text>
+<text y="109"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                       </tspan><tspan x="272" fill="#dcdcaa">⣀⣀⣀⡠⠤⠤⠤⠒⠒⠒⠊⠉⠉⠉</tspan><tspan x="384" fill="#cccccc">  </tspan><tspan x="400" fill="#4ec9b0">⣀⠔⠁</tspan><tspan x="424" fill="#cccccc">                          │</tspan></text>
+<text y="125"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">             </tspan><tspan x="192" fill="#dcdcaa">⠠⠤⠔⠒⠒⠒⠉⠉⠉⠉</tspan><tspan x="272" fill="#cccccc">             </tspan><tspan x="376" fill="#4ec9b0">⢀⠤⠊</tspan><tspan x="400" fill="#cccccc">                             │</tspan></text>
+<text y="141"><tspan x="0" fill="#cccccc">│1.5k     </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                                  </tspan><tspan x="360" fill="#4ec9b0">⡠⠔⠁</tspan><tspan x="384" fill="#cccccc">                               │</tspan></text>
+<text y="157"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                               </tspan><tspan x="336" fill="#4ec9b0">⢀⠔⠊</tspan><tspan x="360" fill="#cccccc">                                  │</tspan></text>
+<text y="173"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                             </tspan><tspan x="320" fill="#4ec9b0">⡠⠒⠁</tspan><tspan x="344" fill="#cccccc">                                    │</tspan></text>
+<text y="189"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                       </tspan><tspan x="272" fill="#4ec9b0">⢀⣀⣀⠤⠔⠉</tspan><tspan x="320" fill="#cccccc">                                       │</tspan></text>
+<text y="205"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">              </tspan><tspan x="200" fill="#4ec9b0">⣀⣀⠤⠤⠔⠒⠒⠉⠉⠁</tspan><tspan x="280" fill="#cccccc">                                            │</tspan></text>
+<text y="221"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">    </tspan><tspan x="120" fill="#4ec9b0">⣀⣀⡠⠤⠤⠒⠒⠊⠉⠉</tspan><tspan x="200" fill="#cccccc">                                                      │</tspan></text>
+<text y="237"><tspan x="0" fill="#cccccc">│1k       </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#4ec9b0">⠒⠊⠉⠉</tspan><tspan x="120" fill="#cccccc">                                                                │</tspan></text>
+<text y="253"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                                                                    │</tspan></text>
+<text y="269"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                                        </tspan><tspan x="408" fill="#6a9955">•</tspan><tspan x="416" fill="#cccccc">                           │</tspan></text>
+<text y="285"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                                                                    │</tspan></text>
+<text y="301"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                                                                    │</tspan></text>
+<text y="317"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                                                                    │</tspan></text>
+<text y="333"><tspan x="0" fill="#cccccc">│500      </tspan><tspan x="80" fill="#808080">│</tspan><tspan x="88" fill="#cccccc">                                                                date│</tspan></text>
+<text y="349"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">└────────────────────────────────────────────────────────────────────</tspan><tspan x="632" fill="#cccccc">│</tspan></text>
+<text y="365"><tspan x="0" fill="#cccccc">│2024-01-01            2024-02-01 2024-03-01 2024-04-01 2024-05-01   2024-06-01│</tspan></text>
+<text y="381"><tspan x="0" fill="#cccccc">└──────────────────────────────────────────────────────────────────────────────┘</tspan></text>
+</svg>
+
+<div class="tooltip" id="tooltip"></div>
+</div>
+<script>
+(function() {
+  var tooltip = document.getElementById('tooltip');
+  var container = document.querySelector('.chart-container');
+  var svg = container.querySelector('svg');
+  if (!svg) return;
+
+  // Find all tspan elements with text content (potential data labels)
+  var tspans = svg.querySelectorAll('tspan');
+
+  function showTooltip(evt, text) {
+    tooltip.textContent = text;
+    tooltip.style.display = 'block';
+    var rect = container.getBoundingClientRect();
+    tooltip.style.left = (evt.clientX - rect.left + 10) + 'px';
+    tooltip.style.top = (evt.clientY - rect.top - 30) + 'px';
+  }
+
+  function hideTooltip() {
+    tooltip.style.display = 'none';
+  }
+
+  // Attach hover listeners to tspan elements that contain visible text
+  tspans.forEach(function(el) {
+    var text = el.textContent.trim();
+    if (text.length > 0 && text.length < 40) {
+      el.style.cursor = 'pointer';
+      el.addEventListener('mouseenter', function(e) {
+        showTooltip(e, text);
+      });
+      el.addEventListener('mousemove', function(e) {
+        showTooltip(e, text);
+      });
+      el.addEventListener('mouseleave', hideTooltip);
+    }
+  });
+
+  // Also handle rect elements with non-background fills (chart bars)
+  var rects = svg.querySelectorAll('rect');
+  rects.forEach(function(el) {
+    var fill = el.getAttribute('fill');
+    if (fill && fill !== '#1e1e1e' && el.getAttribute('width') !== '100%') {
+      el.style.cursor = 'pointer';
+      el.addEventListener('mouseenter', function(e) {
+        var w = parseFloat(el.getAttribute('width')) || 0;
+        var h = parseFloat(el.getAttribute('height')) || 0;
+        showTooltip(e, Math.round(w) + '\u{00d7}' + Math.round(h));
+      });
+      el.addEventListener('mousemove', function(e) {
+        var w = parseFloat(el.getAttribute('width')) || 0;
+        var h = parseFloat(el.getAttribute('height')) || 0;
+        showTooltip(e, Math.round(w) + '\u{00d7}' + Math.round(h));
+      });
+      el.addEventListener('mouseleave', hideTooltip);
+    }
+  });
+})();
+</script>
+</body>
+</html>
