@@ -8,7 +8,7 @@ CLI BI tool with smart visualization and terminal presentation.
 
 **Convention over Configuration** — data types determine the visualization automatically.
 
-🤝 [Contributing](CONTRIBUTING.md) · 🏗️ [Design](DESIGN.md)
+🤝 [Contributing](CONTRIBUTING.md) · 🏗️ [Architecture](docs/ARCHITECTURE.md) · 📐 [Design](docs/DESIGN.md)
 
 ## Features
 

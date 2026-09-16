@@ -13,12 +13,11 @@ benches/
 CONTRIBUTING.md
 Cargo.lock
 Cargo.toml
-DESIGN.md
 LICENSE
 README.md
-RUNBOOK.md
 demo/
+docs/
 fixtures/
-skill/
+skills/
 src/
 tests/

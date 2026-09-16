@@ -24,7 +24,7 @@ cargo run --release -- fixtures/sales.csv
 
 ## Project Structure
 
-Module layout and architecture live in [DESIGN.md](DESIGN.md#module-structure).
+Module layout and architecture live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#module-structure).
 
 ## Available Commands
 
@@ -163,4 +163,4 @@ Before submitting a PR:
 - [ ] `cargo test` — all tests pass
 - [ ] New functionality has tests
 - [ ] README.md updated if the CLI interface changed
-- [ ] DESIGN.md updated if the architecture changed
+- [ ] docs/ updated if the architecture or design changed

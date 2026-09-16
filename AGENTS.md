@@ -13,7 +13,7 @@ push 先は `dev`。`origin/main` への直接 push は pre-push hook が阻止�
 
 当面 `origin` へのリリースは行わない。`./scripts/release.sh` は実行しない。日常作業は `dev` への push のみで進める。
 
-解除後の手順は `RUNBOOK.md` を参照。公開範囲は `release-manifest.txt` が単一の真実で、記載の無いファイルは非公開が既定。manifest の変更は公開範囲の変更として扱い、無断で変更しない。
+解除後の手順は `docs/RUNBOOK.md` を参照。公開範囲は `release-manifest.txt` が単一の真実で、記載の無いファイルは非公開が既定。manifest の変更は公開範囲の変更として扱い、無断で変更しない。
 
 ## 検証（commit 前に通す）
 
@@ -48,7 +48,9 @@ git config core.hooksPath scripts/hooks
 | 文書 | 役割（単一の真実） | 読む・更新する条件 |
 |---|---|---|
 | `README.md` | 利用者向けの機能・CLI・チャート選択ルール | CLI や挙動を変えた時 |
-| `DESIGN.md` | 設計: モジュール構造・データフロー・設計判断 | 構造を変えた時 |
+| `docs/ARCHITECTURE.md` | 構造: モジュール・データフロー・変更影響 | 構造を変えた時 |
+| `docs/DESIGN.md` | 設計意図: 理念・推論ルール・スコープ・設計判断 | 設計判断を変えた時 |
+| `docs/GOTCHAS.md` | 非自明な挙動と既知の不具合 | 新たな罠を発見・解消した時 |
+| `docs/RUNBOOK.md` | リリース手順と復旧 | リリース・障害対応時 |
 | `CONTRIBUTING.md` | 開発手順: setup・コマンド・テスト・ベンチ・PR | 開発参加・テスト追加時 |
-| `RUNBOOK.md` | リリース手順とトラブルシュート | リリース・障害対応時 |
-| `skill/SKILL.md` | エージェントから vz を使う手順 | スキルの提供内容を変えた時 |
+| `skills/vz/SKILL.md` | エージェントから vz を使う手順 | スキルの提供内容を変えた時 |
