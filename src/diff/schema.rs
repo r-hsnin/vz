@@ -54,6 +54,37 @@ pub fn validate_schema(
     Ok(())
 }
 
+/// Auto-detect X column: first categorical/temporal column,
+/// falling back to the first header.
+pub fn auto_x_column(schema: &crate::infer::types::Schema, headers: &[String]) -> Option<String> {
+    use crate::infer::types::DataType;
+    schema
+        .columns
+        .iter()
+        .find(|c| c.data_type == DataType::Categorical || c.data_type == DataType::Temporal)
+        .map(|c| c.name.clone())
+        .or_else(|| headers.first().cloned())
+}
+
+/// Auto-detect Y column: first quantitative column that is not `x_col`.
+pub fn auto_y_column(schema: &crate::infer::types::Schema, x_col: &str) -> Option<String> {
+    use crate::infer::types::DataType;
+    schema
+        .columns
+        .iter()
+        .find(|c| c.data_type == DataType::Quantitative && c.name != x_col)
+        .map(|c| c.name.clone())
+}
+
+/// Check whether a column is temporal (unknown columns read as non-temporal).
+pub fn is_temporal_column(schema: &crate::infer::types::Schema, col: &str) -> bool {
+    use crate::infer::types::DataType;
+    schema
+        .find_column(col)
+        .map(|c| c.data_type == DataType::Temporal)
+        .unwrap_or(false)
+}
+
 /// Resolve which column to use as X axis for diff comparison.
 pub(super) fn resolve_x_column(
     cli: &Cli,
@@ -72,18 +103,7 @@ pub(super) fn resolve_x_column(
         return Ok(col.to_string());
     }
 
-    // Auto-detect: first categorical/temporal column
-    use crate::infer::types::DataType;
-    for col_meta in &schema.columns {
-        if col_meta.data_type == DataType::Categorical || col_meta.data_type == DataType::Temporal {
-            return Ok(col_meta.name.clone());
-        }
-    }
-
-    // Fallback to first column
-    data.headers
-        .first()
-        .cloned()
+    auto_x_column(schema, &data.headers)
         .ok_or_else(|| anyhow::anyhow!("No columns available for X axis"))
 }
 
@@ -106,19 +126,13 @@ pub(super) fn resolve_y_column(
         return Ok(col.to_string());
     }
 
-    // Auto-detect: first quantitative column that is not x_col
-    use crate::infer::types::DataType;
-    for col_meta in &schema.columns {
-        if col_meta.data_type == DataType::Quantitative && col_meta.name != x_col {
-            return Ok(col_meta.name.clone());
-        }
-    }
-
-    bail!(
-        "No quantitative column found for Y axis (excluding X='{}'). Available: {}",
-        x_col,
-        data.headers.join(", ")
-    )
+    auto_y_column(schema, x_col).ok_or_else(|| {
+        anyhow::anyhow!(
+            "No quantitative column found for Y axis (excluding X='{}'). Available: {}",
+            x_col,
+            data.headers.join(", ")
+        )
+    })
 }
 
 /// Find column index by name (case-sensitive, with case-insensitive fallback).
@@ -128,4 +142,90 @@ pub(super) fn col_index(headers: &[String], name: &str) -> Option<usize> {
         let lower = name.to_lowercase();
         headers.iter().position(|h| h.to_lowercase() == lower)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infer::types::DataType;
+    use crate::test_helpers::make_schema;
+
+    fn headers(names: &[&str]) -> Vec<String> {
+        names.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn auto_x_prefers_first_categorical_or_temporal() {
+        let schema = make_schema(&[
+            ("date", DataType::Temporal),
+            ("city", DataType::Categorical),
+            ("region", DataType::Categorical),
+        ]);
+        assert_eq!(
+            auto_x_column(&schema, &headers(&["date", "city", "region"])),
+            Some("date".to_string())
+        );
+    }
+
+    #[test]
+    fn auto_x_skips_quantitative() {
+        let schema = make_schema(&[
+            ("revenue", DataType::Quantitative),
+            ("city", DataType::Categorical),
+        ]);
+        assert_eq!(
+            auto_x_column(&schema, &headers(&["revenue", "city"])),
+            Some("city".to_string())
+        );
+    }
+
+    #[test]
+    fn auto_x_falls_back_to_first_header() {
+        let schema = make_schema(&[
+            ("revenue", DataType::Quantitative),
+            ("profit", DataType::Quantitative),
+        ]);
+        assert_eq!(
+            auto_x_column(&schema, &headers(&["revenue", "profit"])),
+            Some("revenue".to_string())
+        );
+    }
+
+    #[test]
+    fn auto_x_returns_none_without_columns() {
+        let schema = make_schema(&[]);
+        assert_eq!(auto_x_column(&schema, &[]), None);
+    }
+
+    #[test]
+    fn auto_y_skips_x_column() {
+        let schema = make_schema(&[
+            ("revenue", DataType::Quantitative),
+            ("profit", DataType::Quantitative),
+        ]);
+        assert_eq!(
+            auto_y_column(&schema, "revenue"),
+            Some("profit".to_string())
+        );
+    }
+
+    #[test]
+    fn auto_y_returns_none_without_quantitative() {
+        let schema = make_schema(&[
+            ("date", DataType::Temporal),
+            ("city", DataType::Categorical),
+        ]);
+        assert_eq!(auto_y_column(&schema, "city"), None);
+    }
+
+    #[test]
+    fn is_temporal_column_detects_temporal() {
+        let schema = make_schema(&[
+            ("date", DataType::Temporal),
+            ("city", DataType::Categorical),
+        ]);
+        assert!(is_temporal_column(&schema, "date"));
+        assert!(!is_temporal_column(&schema, "city"));
+        assert!(!is_temporal_column(&schema, "missing"));
+    }
 }

@@ -31,7 +31,6 @@ fn load_diff_chart_data(
     theme: &crate::theme::Theme,
 ) -> Result<crate::render::ChartData> {
     use crate::diff::{compute_diff, compute_diff_temporal, validate_schema};
-    use crate::infer::types::DataType;
     use crate::render::{Axis, ChartConfig, ChartData, Series};
 
     let before_path = resolve_chart_source_path(&block.source, base_dir);
@@ -61,11 +60,7 @@ fn load_diff_chart_data(
     let x_col = if let Some(ref x) = block.x_col {
         x.clone()
     } else {
-        schema
-            .columns
-            .iter()
-            .find(|c| c.data_type == DataType::Categorical || c.data_type == DataType::Temporal)
-            .map(|c| c.name.clone())
+        crate::diff::auto_x_column(&schema, &before.headers)
             .unwrap_or_else(|| before.headers.first().cloned().unwrap_or_default())
     };
 
@@ -73,19 +68,12 @@ fn load_diff_chart_data(
     let y_col = if let Some(ref y) = block.y_col {
         y.clone()
     } else {
-        schema
-            .columns
-            .iter()
-            .find(|c| c.data_type == DataType::Quantitative && c.name != x_col)
-            .map(|c| c.name.clone())
+        crate::diff::auto_y_column(&schema, &x_col)
             .ok_or_else(|| anyhow::anyhow!("No quantitative column found for Y axis"))?
     };
 
     // Determine if X is temporal.
-    let x_is_temporal = schema
-        .find_column(&x_col)
-        .map(|c| c.data_type == DataType::Temporal)
-        .unwrap_or(false);
+    let x_is_temporal = crate::diff::is_temporal_column(&schema, &x_col);
 
     if x_is_temporal {
         // Temporal diff → 2-series line chart overlay.

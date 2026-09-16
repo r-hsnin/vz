@@ -10,7 +10,7 @@ mod schema;
 mod tests;
 
 pub use compute::{compute_diff, compute_diff_temporal};
-pub use schema::validate_schema;
+pub use schema::{auto_x_column, auto_y_column, is_temporal_column, validate_schema};
 
 use anyhow::Result;
 use std::path::Path;
@@ -70,10 +70,7 @@ pub fn run_diff(cli: &Cli, before_path: &Path, after_path: &Path) -> Result<()> 
     let y_col = schema::resolve_y_column(cli, &before, &inferred, &x_col)?;
 
     // Check if X column is temporal → use line chart overlay
-    let x_is_temporal = inferred
-        .find_column(&x_col)
-        .map(|c| c.data_type == crate::infer::types::DataType::Temporal)
-        .unwrap_or(false);
+    let x_is_temporal = schema::is_temporal_column(&inferred, &x_col);
 
     if x_is_temporal {
         let ts = compute::compute_diff_temporal(&before, &after, &x_col, &y_col)?;

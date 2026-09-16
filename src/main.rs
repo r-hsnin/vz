@@ -105,29 +105,15 @@ fn run_explore_diff(before_path: &Path, after_path: &Path, cli: &Cli) -> Result<
     let theme = resolve_theme(cli);
 
     // Resolve X column: first categorical or temporal
-    let x_col = schema
-        .columns
-        .iter()
-        .find(|c| {
-            c.data_type == vz::infer::types::DataType::Categorical
-                || c.data_type == vz::infer::types::DataType::Temporal
-        })
-        .map(|c| c.name.clone())
+    let x_col = diff::auto_x_column(&schema, &before.headers)
         .unwrap_or_else(|| before.headers.first().cloned().unwrap_or_default());
 
     // Resolve Y column: first quantitative that is not X
-    let y_col = schema
-        .columns
-        .iter()
-        .find(|c| c.data_type == vz::infer::types::DataType::Quantitative && c.name != x_col)
-        .map(|c| c.name.clone())
+    let y_col = diff::auto_y_column(&schema, &x_col)
         .ok_or_else(|| anyhow::anyhow!("No quantitative column found for Y axis"))?;
 
     // Detect temporal X
-    let x_is_temporal = schema
-        .find_column(&x_col)
-        .map(|c| c.data_type == vz::infer::types::DataType::Temporal)
-        .unwrap_or(false);
+    let x_is_temporal = diff::is_temporal_column(&schema, &x_col);
 
     let diff_data = if x_is_temporal {
         explore::DiffData::Temporal(diff::compute_diff_temporal(
