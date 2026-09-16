@@ -32,9 +32,11 @@ cargo test
 
 ## コミット
 
+- 論理単位ごとにコミットしながら作業を進める（複数の関心事を1コミットに混ぜない）
 - 形式: `<type>: <日本語の説明>`。type は feat/fix/refactor/docs/test/chore/perf/ci
 - 変更ファイルを明示して stage する
 - Cargo.toml の version はリリース時のみ変更する
+- push はユーザーの承認後にのみ行う
 
 ## ガードレール
 
