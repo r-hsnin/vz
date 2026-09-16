@@ -57,8 +57,12 @@ cargo test test_basic_csv
 # Run all tests in a module
 cargo test oneshot::tests
 
-# Run integration tests only
-cargo test --test integration_test
+# Run integration tests only (per-area targets: oneshot, flags, inputs,
+# output, directory, diff, modes)
+cargo test --test diff
+
+# Run a single area, e.g. directory mode
+cargo test --test directory
 
 # Run snapshot tests only
 cargo test --test snapshot_test
@@ -69,15 +73,22 @@ cargo test -- --nocapture
 
 ### Writing tests
 
+- Integration tests go in per-area targets under `tests/` (`oneshot.rs`,
+  `flags.rs`, `inputs.rs`, `output.rs`, `directory.rs`, `diff.rs`, `modes.rs`);
+  shared binary construction, temp-file fixtures, and thresholds live in
+  `tests/common/mod.rs` — reuse them instead of adding new helpers
 - Unit tests go in the same file as the code, inside a `#[cfg(test)]` module
-  (larger modules use sibling `tests.rs` / `*_tests.rs` files)
-- Integration tests go in `tests/integration_test.rs`
+  (larger modules use sibling `tests.rs` / `*_tests.rs` files);
+  shared `make_schema` / `make_recommendation` fixtures live in
+  `src/test_helpers.rs` (test builds only)
 - Use `pretty_assertions` for readable diffs
 - Use `tempfile` for temporary file creation in tests
 
 Example integration test:
 
 ```rust
+use common::vz_binary;
+
 #[test]
 fn test_my_feature() {
     let output = vz_binary()
