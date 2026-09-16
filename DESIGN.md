@@ -50,48 +50,30 @@ Three output modes: **One-shot** (default stdout), **Explore** (interactive TUI)
 
 ```
 src/
-├── main.rs              — Entry point, CLI dispatch
-├── cli/mod.rs           — clap4 argument definitions
-├── loader/mod.rs        — Unified data loader (CSV/TSV/JSON/NDJSON, format auto-detect)
-├── filter.rs            — Row filtering (--where predicates)
-├── infer/               — Type inference engine
-│   ├── mod.rs           — Schema inference entrypoint
-│   ├── types.rs         — DataType enum, ColumnMeta, Schema
-│   └── detector.rs      — Value-level type detection
-├── chart/               — Chart selection & data building
-│   ├── mod.rs           — Module re-exports
-│   ├── selector.rs      — Type combination → chart type mapping
-│   └── data_builder.rs  — Schema + rows → renderable chart data (shared across modes)
-├── render/              — Terminal chart rendering (ratatui widgets)
-│   ├── mod.rs           — Shared types (Axis, Series, ChartConfig, BarChartData, HistogramData)
-│   ├── line.rs          — Line chart widget
-│   ├── bar.rs           — Bar chart widget
-│   ├── scatter.rs       — Scatter plot widget
-│   ├── histogram.rs     — Histogram widget
-│   ├── heatmap.rs       — Heatmap widget (categorical × categorical)
-│   └── nice_numbers.rs  — Axis tick calculation (nice numbers algorithm)
-├── oneshot/mod.rs       — One-shot stdout rendering (Buffer → ANSI, multi-series, summary)
-│   ├── ansi.rs          — ANSI color output, print_buffer
-│   ├── builders.rs      — Chart data construction (bar, histogram, heatmap, line/scatter)
-│   └── summary.rs       — Summary line formatting (sparkline, trend, hints)
-├── explore/mod.rs       — Interactive TUI mode (chart switching, column selection, data table)
-├── present/mod.rs       — Slide presentation mode (Markdown + ```chart blocks)
-│   ├── parser.rs        — Markdown→Slide AST parser
-│   ├── render.rs        — Slide rendering (draw_slide, element rendering)
-│   └── chart_loader.rs  — Chart data loading for embedded chart blocks
-├── watch.rs             — File watching mode (--watch, auto-redraw on changes)
-├── output/              — Output format renderers (machine-readable & export)
-│   ├── mod.rs           — Column stats computation, JSON metadata output
-│   ├── chart_json.rs    — Chart data as JSON (series, labels, bins)
-│   ├── markdown.rs      — Markdown table output (--output markdown)
-│   ├── spark.rs         — Sparkline output mode (--output spark)
-│   ├── stats_text.rs    — Text formatting for column statistics (--info)
-│   ├── svg.rs           — SVG image export (Buffer → SVG document)
-│   └── table.rs         — Text table output (--output table)
-├── diagnostics.rs       — Error hints & file suggestions for common errors
-├── theme.rs             — Color theme definitions (dark, light, high-contrast)
-├── util.rs              — Shared numeric utilities (min_max)
-├── sparkline.rs         — Shared sparkline generation (Unicode block chars)
+├── main.rs                 — binary entry, CLI dispatch
+├── lib.rs                  — library crate re-exports (for benches/tests)
+├── pipeline.rs             — render pipeline: infer → select → build → render → output
+├── cli/                    — clap definitions (mod.rs, args.rs, types.rs)
+├── helpers/                — CLI arg processing, format detection, data transforms
+├── loader/                 — CSV/TSV/JSON/NDJSON/space unified loader, format auto-detect
+├── filter.rs               — --where predicate engine
+├── infer/                  — type inference (types.rs: Schema/ColumnMeta, detector.rs)
+├── chart/                  — selector.rs (types → chart), data_builder.rs (rows → chart data)
+├── render/                 — ratatui widgets: line, bar, scatter, histogram, heatmap, nice_numbers
+├── oneshot/                — stdout rendering: builders, summary, ansi
+├── info.rs                 — --info column metadata
+├── output/                 — machine-readable exporters: chart_json, markdown, spark, stats_text, svg, html, table
+├── diff/                   — two-file comparison: schema, compute, render/{bar,line,spark,json,markdown,html}
+├── directory/              — directory mode: scanner, combiner, catalog, date_extract
+├── explore/                — interactive TUI: app, state, render, diff, diff_render
+├── present/                — slides: parser, render, chart_loader
+├── watch.rs                — --watch auto-redraw
+├── theme.rs                — color themes (dark/light/high-contrast)
+├── sparkline.rs            — shared sparkline generation
+├── util.rs                 — shared numeric utilities
+└── diagnostics.rs          — error hints & file suggestions
+
+Unit tests live beside their module (`tests.rs` / `*_tests.rs`); end-to-end tests in `tests/`.
 ```
 
 ## Data Flow & Dependencies
@@ -121,7 +103,6 @@ structures before passing them to `render_chart_data()`:
 - `oneshot/builders.rs` — sorting, truncation, label fitting, theme application
 - `explore/mod.rs` — interactive column selection → ChartData construction
 - `present/chart_loader.rs` — Markdown chart block → ChartData
-```
 
 **Change Impact Map:**
 - `loader/` change → affects all modes. Run full integration tests.
@@ -143,70 +124,33 @@ structures before passing them to `render_chart_data()`:
 
 Sampling: first 100 rows for inference, full scan if ambiguous.
 
-## Chart Selection Rules
+## Chart Selection Design
 
-| X type | Y type | Chart |
-|--------|--------|-------|
-| Temporal | Quantitative | Line |
-| Categorical | Quantitative | Bar |
-| Quantitative | Quantitative | Scatter |
-| (single column) | Quantitative | Histogram |
-| Categorical | Categorical | Heatmap (count) |
+The user-facing selection table and behavior live in [README.md](README.md#chart-selection-rules).
 
-## CLI Interface
+Design intent: the selector maps inferred column types to a chart type, normalizes
+reversed axes (e.g. Quantitative × Temporal) to the canonical orientation, and falls
+back to Bar for unmatched type pairs.
 
-```bash
-# Auto mode — one-shot chart to stdout (default)
-vz data.csv
+## CLI Design
 
-# Specify axes
-vz data.csv -x month -y revenue
+Flag definitions and examples live in [README.md](README.md#usage); `vz --help` is authoritative at runtime.
 
-# Override chart type
-vz data.csv -x month -y revenue --type bar
-
-# Label override
-vz data.csv -y revenue:"Revenue (USD)"
-
-# Multi-Y series (comma-separated)
-vz data.csv -y revenue,profit
-
-# Color grouping (multi-series by category)
-vz data.csv -c city
-
-# Filter rows
-vz data.csv --where "city=Tokyo" --where "revenue>1000"
-
-# Sort bar chart (desc/asc)
-vz data.csv -t bar --sort desc
-
-# Limit bar chart to top/bottom N
-vz data.csv -t bar --top 5
-vz data.csv -t bar --tail 3
-
-# Column metadata
-vz data.csv --info
-
-# Stdin pipe (auto-detected, no '-' needed)
-cat data.csv | vz
-
-# Explore mode — interactive TUI
-vz explore data.csv
-
-# Present mode — slides from markdown
-vz present slides.md
-```
+Design guideline: the common case needs no flags (`vz data.csv`), and every override
+(axes, type, aggregation, filtering) is opt-in.
 
 ## Scope
 
-### In Scope (v0.1)
+### In Scope (v0.2)
 - File-based batch visualization (CSV/TSV/JSON/NDJSON)
 - Auto-inference of column types and chart selection
 - Three output modes: oneshot (stdout), explore (TUI), present (slides)
-- Machine-readable exports: JSON, SVG, Markdown, sparkline, table
+- Machine-readable exports: JSON, SVG, HTML, Markdown, sparkline, table
 - Row filtering, aggregation, sampling
 - Color themes (dark, light, high-contrast)
 - File watch mode for iterative exploration
+- Diff mode (two-file comparison)
+- Directory mode (multi-file combine)
 - Shell completions
 
 ### Non-goals (for now)

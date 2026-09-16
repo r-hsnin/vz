@@ -21,7 +21,7 @@ Zero-config CLI BI tool. Data types determine the chart automatically.
 cargo install --git https://github.com/r-hsnin/vz
 ```
 
-Requires Rust 1.85+.
+Requires Rust 1.87+.
 
 ## Core Workflow
 
@@ -45,6 +45,8 @@ vz data.csv -c region
 cat data.csv | vz -
 kubectl top pods | vz - -f tsv
 ```
+
+All flags: `vz --help`.
 
 ## Chart Selection Rules
 
@@ -85,67 +87,13 @@ Other output formats:
 - `--markdown` — Markdown table (paste into README, issues)
 - `--output table` — formatted text table
 
-## Key Flags
-
-| Flag | Purpose |
-|------|---------|
-| `-x COL` | X axis column |
-| `-y COL[,COL2]` | Y axis column(s), supports `col:Label` |
-| `-t TYPE` | Force chart type |
-| `-c COL` | Color/group-by column |
-| `-f FORMAT` | Force input format (csv/tsv/json/ndjson) |
-| `-W N` / `-H N` | Width/height in terminal cells |
-| `--where "col=val"` | Filter rows: `=`, `!=`, `>`, `<`, `>=`, `<=` (repeatable) |
-| `--title TEXT` | Custom chart title |
-| `--sort desc\|asc` | Sort bar chart |
-| `--top N` / `--tail N` | Limit categories |
-| `--agg sum\|mean\|count\|max\|min` | Aggregation function |
-| `--sample N` | Systematic sampling for large data |
-| `--labels` | Show value+percentage on bars |
-| `--no-header` | First row is data, not header |
-| `-Y` / `--all-y` | Plot all numeric columns |
-| `--watch` | Auto-redraw on file change |
-| `--theme dark\|light\|high-contrast` | Color theme |
-| `--bins N` | Histogram bin count (default: 10) |
-
 ## Subcommands
 
-### Explore (interactive TUI)
-
 ```bash
-vz explore data.csv
-vz explore data.csv --where "city=Tokyo"
+vz explore data.csv          # Interactive TUI (vim-style: h/l X, j/k Y, c color, d/Tab chart↔table)
+vz present slides.md         # Terminal slides from Markdown with ```chart blocks
+vz completions <SHELL>       # Shell completions (bash/zsh/fish/elvish/powershell)
 ```
-
-Vim-style navigation: `h/l` change X, `j/k` change Y, `c` cycle color,
-`d`/`Tab` toggle chart↔table, `1-4` force chart type, `y` show CLI command.
-
-### Present (terminal slides)
-
-```bash
-vz present slides.md
-```
-
-Markdown with embedded chart blocks:
-
-````markdown
-```chart
-source: sales.csv
-x: month
-y: revenue
-type: line
-```
-````
-
-Navigate: `h/l` or `←/→`, jump: `g/G`, quit: `q`.
-
-## Input Formats
-
-- CSV (`.csv`, comma-separated)
-- TSV (`.tsv`/`.tab`, tab-separated, auto-detected)
-- JSON (`.json`, array of objects)
-- NDJSON (`.ndjson`/`.jsonl`, newline-delimited JSON)
-- Stdin (`-`), with optional `-f` to force format
 
 ## Gotchas
 

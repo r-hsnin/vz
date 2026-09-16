@@ -18,7 +18,6 @@ LICENSE
 README.md
 RUNBOOK.md
 demo/
-docs/
 fixtures/
 skill/
 src/

@@ -1,6 +1,6 @@
 # Runbook — vz
 
-Operational procedures for developing, releasing, and troubleshooting vz.
+Operational procedures for releasing and troubleshooting vz.
 
 ## Build & Release
 
@@ -63,7 +63,7 @@ If the script fails mid-way (e.g., push succeeded but PR creation failed):
 ```bash
 # Delete the orphan remote branch
 git push origin --delete release/vX.Y.Z
-# Fix the issue (e.g., gh auth login), then re-run
+# Fix the issue (e.g. gh auth login), then re-run
 ./scripts/release.sh vX.Y.Z
 ```
 
@@ -76,20 +76,7 @@ cargo publish             # Publish
 
 ## Quality Checks
 
-Run before every commit:
-
-```bash
-cargo fmt                                    # Format
-cargo clippy --all-targets -- -D warnings    # Lint (zero warnings)
-cargo test                                   # All tests pass
-```
-
-### Expected test results
-
-- ~439 unit tests (in-source `#[cfg(test)]` modules)
-- ~137 integration tests (`tests/integration_test.rs`)
-- ~4 snapshot tests (`tests/snapshot_test.rs`)
-- Total runtime: < 2 seconds
+Run the commands in [CONTRIBUTING.md](CONTRIBUTING.md#available-commands) before every commit.
 
 ## Troubleshooting
 
@@ -97,7 +84,7 @@ cargo test                                   # All tests pass
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `error[E0658]: let chains` | Rust version too old | Update: `rustup update` (requires 1.70+) |
+| `error[E0658]: let chains` | Rust version too old | Update: `rustup update` (requires 1.87+) |
 | `crossterm` compile error | Missing system deps | Linux: ensure `libxcb` or similar available |
 | `ratatui` version mismatch | Lockfile stale | `cargo update` |
 
@@ -130,19 +117,3 @@ Chart source paths resolve relative to the Markdown file's directory. If charts 
 - vz processes data in-memory; files up to ~1GB are fine
 - Type inference samples the first 100 rows
 - No streaming mode yet; the entire file is loaded before rendering
-
-## Dependencies
-
-| Dependency | Version | Purpose |
-|-----------|---------|---------|
-| clap | 4 | CLI argument parsing |
-| clap_complete | 4 | Shell completion generation |
-| ratatui | 0.30 | Terminal UI rendering |
-| crossterm | 0.28 | Terminal manipulation |
-| csv | 1 | CSV/TSV parsing |
-| serde | 1 | Serialization framework |
-| serde_json | 1 | JSON/NDJSON parsing & output |
-| chrono | 0.4 | Date parsing (type inference) |
-| regex | 1 | Pattern matching (type inference) |
-| anyhow | 1 | Error handling |
-| notify | 7 | File system watching (--watch) |

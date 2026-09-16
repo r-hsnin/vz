@@ -8,7 +8,7 @@ CLI BI tool with smart visualization and terminal presentation.
 
 **Convention over Configuration** — data types determine the visualization automatically.
 
-📖 [Documentation](https://r-hsnin.github.io/vz/) · 🤝 [Contributing](CONTRIBUTING.md)
+🤝 [Contributing](CONTRIBUTING.md) · 🏗️ [Design](DESIGN.md)
 
 ## Features
 
@@ -39,8 +39,6 @@ cargo install --path .
 Requires Rust 1.87+.
 
 ## Usage
-
-<!-- AUTO-GENERATED: CLI reference from src/cli/mod.rs -->
 
 ```bash
 # Auto-visualize (infers chart type, renders to stdout)
@@ -168,9 +166,7 @@ vz present slides.md
 | `vz present <FILE>` | Slide presentation with embedded charts |
 | `vz completions <SHELL>` | Generate shell completion scripts |
 
-Supported shells for completions: `bash`, `zsh`, `fish`, `elvish`, `powershell`. See the [Shell Completions guide](https://r-hsnin.github.io/vz/guide/shell-completions) for setup instructions.
-
-<!-- /AUTO-GENERATED -->
+Supported shells for completions: `bash`, `zsh`, `fish`, `elvish`, `powershell`. Generate with `vz completions <SHELL>` and source the output in your shell profile.
 
 ## Directory Mode
 

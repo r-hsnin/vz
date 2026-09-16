@@ -41,8 +41,14 @@ cargo test
 git config core.hooksPath scripts/hooks
 ```
 
-## 参照
+## ドキュメント
 
-- `DESIGN.md` — アーキテクチャ、3 モード（oneshot / explore / present）
-- `RUNBOOK.md` — ビルド・リリース・トラブルシュート
-- `CONTRIBUTING.md` — 開発ガイド
+各文書を内容の単一の真実とし、他文書へは参照を置く。重複を見つけたら所有者へ寄せる。
+
+| 文書 | 役割（単一の真実） | 読む・更新する条件 |
+|---|---|---|
+| `README.md` | 利用者向けの機能・CLI・チャート選択ルール | CLI や挙動を変えた時 |
+| `DESIGN.md` | 設計: モジュール構造・データフロー・設計判断 | 構造を変えた時 |
+| `CONTRIBUTING.md` | 開発手順: setup・コマンド・テスト・ベンチ・PR | 開発参加・テスト追加時 |
+| `RUNBOOK.md` | リリース手順とトラブルシュート | リリース・障害対応時 |
+| `skill/SKILL.md` | エージェントから vz を使う手順 | スキルの提供内容を変えた時 |
