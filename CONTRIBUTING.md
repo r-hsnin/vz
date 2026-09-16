@@ -71,6 +71,23 @@ cargo test --test snapshot_test
 cargo test -- --nocapture
 ```
 
+### Snapshot tests
+
+Rendered output snapshots live in `tests/snapshot_test.rs` (files in
+`tests/snapshots/`). New or changed rendering produces a pending
+`*.snap.new` file and a test failure — this is expected (Red):
+
+1. Run `cargo test --test snapshot_test`
+2. Inspect the pending `tests/snapshots/*.snap.new` files (verify the
+   rendering is correct, not just different)
+3. Accept: rename `*.snap.new` → `*.snap` (or `cargo insta accept`
+   if `cargo-insta` is installed)
+4. Re-run to confirm green
+
+Keep snapshots deterministic: snapshot helpers must pin `NO_COLOR=1` and
+`COLUMNS=80` (see `tests/common/mod.rs::run_vz_stdout`). Verify new
+snapshots render byte-identical output across two runs before accepting.
+
 ### Writing tests
 
 - Integration tests go in per-area targets under `tests/` (`oneshot.rs`,

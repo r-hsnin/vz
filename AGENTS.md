@@ -19,6 +19,7 @@ push 先は `dev`。`origin/main` への直接 push は pre-push hook が阻止�
 
 - 作業前に `docs/GOTCHAS.md` を読む。既知の罠を踏まない
 - TDD で進める。unit テスト（モジュール内 `#[cfg(test)]` / `tests.rs`）と integration テスト（`tests/`）の両方を追加・更新する
+- テスト置き場: unit は対象モジュール直下（大規模は同名 `*_tests.rs` に分離、`tests.rs` 集約は新規不可）。integration は機能別ターゲット（`tests/{oneshot,flags,inputs,output,directory,diff,modes}.rs`）＋共有は `tests/common`・`src/test_helpers` のみ。新規ヘルパーの複写は不可
 - 変更には必ずドキュメントを連動させる（下の文書表の「読む・更新する条件」に従う）
 - 失敗・躓いた点は `docs/GOTCHAS.md` に記す。ただし再現し得るものに限り、単発で今後確実に再現しないものは書かない
 
