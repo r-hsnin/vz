@@ -17,14 +17,24 @@ Three output modes: **One-shot** (default stdout), **Explore** (interactive TUI)
 
 ## Type Inference Rules
 
-| Pattern | Detected Type | Examples |
-|---------|--------------|----------|
-| ISO 8601 / common date formats | `Temporal` | 2024-01-15, 2024/01/15 |
-| Numeric (int or float) | `Quantitative` | 42, 3.14, -100 |
-| Low cardinality (≤ 20 unique in sample) | `Categorical` | "Tokyo", "Osaka" |
-| High cardinality text | `Nominal` | UUIDs, free text |
+Implemented in `infer/detector.rs`. Each value is classified first, then the
+column type is decided by majority vote:
 
-Sampling: first 100 rows for inference, full scan if ambiguous.
+| Value pattern | Detected as | Notes |
+|---------------|-------------|-------|
+| `YYYY-MM-DD` (optional time), `YYYY/MM/DD`, `MM/DD/YYYY`, `DD-Mon-YYYY`, `YYYY-MM` | `Temporal` | Checked before numeric |
+| Numeric after stripping `,` and spaces | `Quantitative` | `1,000`, `$100` do **not** parse → fall through to Nominal |
+| Empty string | `Nominal` (ignored in column vote) | Nulls don't vote |
+| Anything else | `Nominal` | e.g. `45%`, UUIDs, free text |
+
+Column decision (first 100 rows only, empty values excluded):
+
+1. ≥ 80% of sampled values Temporal → `Temporal`
+2. ≥ 80% Quantitative → `Quantitative`
+3. Otherwise by cardinality: ≤ 20 unique values → `Categorical`, else `Nominal`
+
+Only the first 100 rows are sampled; there is no full-scan fallback.
+The same 100-row cap is applied in `pipeline::infer_from_data`.
 
 ## Chart Selection Design
 
@@ -68,5 +78,8 @@ Design guideline: the common case needs no flags (`vz data.csv`), and every over
 2. **No external data engine** — Keep binary small, no Polars/DuckDB dep for v1
 3. **In-memory processing** — v1 targets files that fit in memory (< 1GB)
 4. **Convention-first CLI** — Minimal flags needed for 80% of use cases
-5. **Shared data_builder** — All 3 modes use the same data construction logic to avoid divergence
+5. **Shared data_builder** — All 3 modes build on the same `ChartData`
+   structures from `chart/data_builder.rs` to avoid divergence; each mode keeps
+   only a thin adaptation layer (sorting, truncation, slide wiring, see
+   ARCHITECTURE.md) on top
 6. **Format auto-detection** — Extension first, then content heuristics (tabs vs commas, JSON detection)

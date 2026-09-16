@@ -98,7 +98,10 @@ structures before passing them to `render_chart_data()`:
 ### Change Impact Map
 
 - `loader/` change → affects all modes. Run full integration tests.
-- `filter.rs` change → affects oneshot + explore (present applies via chart block `where:` field).
+- `filter.rs` change → affects single-file oneshot (via `pipeline::render_data`),
+  single-file explore, directory mode, and present chart blocks (`where:` field).
+  Does **not** affect diff mode: neither oneshot diff (`diff::run_diff`) nor
+  explore diff applies `--where`.
 - `infer/` change → affects chart selection + all modes.
 - `chart/selector.rs` change → affects all modes.
 - `chart/data_builder.rs` change → affects oneshot, explore, present.

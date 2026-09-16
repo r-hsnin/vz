@@ -43,7 +43,7 @@ vz data.csv -c region
 
 # Stdin pipe
 cat data.csv | vz -
-kubectl top pods | vz - -f tsv
+kubectl top pods | vz - -f space
 ```
 
 All flags: `vz --help`.

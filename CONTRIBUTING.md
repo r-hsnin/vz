@@ -100,7 +100,11 @@ Test data lives in `fixtures/`:
 - `temperature.csv` — Multi-point temperature measurements
 - `exam_scores.csv` — Numeric exam scores
 - `body_measurements.csv` — Quantitative×Quantitative data
-- `access_log.csv` — Large-ish log-style data (2000 rows)
+- `access_log.csv` — Small log-style data (50 rows)
+- `bom_sales.csv` — Edge case: UTF-8 BOM prefix
+- `diff/` — Diff-mode fixture pairs (`sales_before/after`, `timeseries_*`, `ts_daily_*`, `identical`, `schema_mismatch`)
+- `dir_test/` — Directory-mode cases (`dated`, `case_insensitive`, `empty`, `header_only`, `mixed_extensions`)
+- `fixed_width/` — Space-aligned samples (`kubectl_*`, `df_h`, `ps_aux`, `lsblk`, …)
 - `messy_data.csv` — Edge case: missing values, mixed types
 - `mixed_values.csv` — Edge case: mixed parseable/non-parseable Y values
 - `scores.json` — JSON array format test data
@@ -132,6 +136,7 @@ Benchmark suite (`benches/loading.rs`) covers:
 | `infer_1000` | Type inference (1000 rows) |
 | `infer_10000_rows` | Type inference scaling (10000 rows, sampled) |
 | `pipeline_csv_1000` | Full render pipeline (CSV → chart selection) |
+| `full_pipeline/csv_load_infer_1000` | End-to-end CSV load + infer |
 | `full_pipeline/json_load_infer_1000` | End-to-end JSON load + infer |
 
 Results are stored in `target/criterion/` with HTML reports. After running benchmarks, open `target/criterion/report/index.html` for a visual comparison.

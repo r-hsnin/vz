@@ -63,7 +63,7 @@ vz sales.csv -c city
 cat data.csv | vz -
 
 # Force input format for stdin pipes
-kubectl top pods | vz - -f tsv
+kubectl top pods | vz - -f space
 
 # Fixed-width / space-aligned input (auto-detected from content)
 kubectl top pods | vz - -f space
@@ -193,7 +193,10 @@ vz data/ --no-limit
 ```
 
 Files with matching schemas (same columns, case-insensitive) are automatically merged.
-A `_source` column is added to identify each file's origin, useful for `--color` grouping.
+Two columns are appended to every row: `_source` (file name stem, identifies each
+file's origin, useful for `--color` grouping) and `_file_date` (date extracted
+from the file name like `sales_2024-01-15` → `2024-01-15`; empty when the name
+contains no date).
 Large directories trigger automatic systematic sampling with a warning; use `--no-limit` to override.
 
 ## Diff Mode
