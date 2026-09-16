@@ -1,14 +1,10 @@
 //! Integration tests for vz — end-to-end pipeline tests.
 
-use std::io::Write;
-use std::process::Command;
-use tempfile::NamedTempFile;
+#[path = "common/mod.rs"]
+mod common;
 
-fn vz_binary() -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_vz"));
-    cmd.env("TERM", "dumb");
-    cmd
-}
+use common::vz_binary;
+use std::io::Write;
 
 #[test]
 fn test_basic_csv_renders_chart() {
@@ -24,7 +20,10 @@ fn test_basic_csv_renders_chart() {
         String::from_utf8_lossy(&output.stderr)
     );
     // One-shot mode should render a chart with borders and content
-    assert!(stdout.lines().count() >= 10, "Chart output too short");
+    assert!(
+        stdout.lines().count() >= common::MIN_CHART_LINES,
+        "Chart output too short"
+    );
     // Should contain box-drawing characters from the chart border
     assert!(
         stdout.contains('│') || stdout.contains('─') || stdout.contains('┌'),
@@ -78,7 +77,7 @@ fn test_chart_type_override() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
     // Should render a bar chart (truncated labels + border)
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
     assert!(
         stdout.contains("Tok") || stdout.contains("Osa") || stdout.contains("revenue"),
         "Bar chart content not found:\n{}",
@@ -126,12 +125,13 @@ fn test_no_file_argument_error() {
 
 #[test]
 fn test_csv_with_only_numeric_columns_renders_scatter() {
-    let mut f = NamedTempFile::new().unwrap();
-    writeln!(f, "height,weight,age").unwrap();
-    writeln!(f, "170,65,30").unwrap();
-    writeln!(f, "175,72,28").unwrap();
-    writeln!(f, "180,80,35").unwrap();
-    writeln!(f, "165,58,25").unwrap();
+    let f = common::temp_csv(&[
+        "height,weight,age",
+        "170,65,30",
+        "175,72,28",
+        "180,80,35",
+        "165,58,25",
+    ]);
 
     let output = vz_binary()
         .arg(f.path())
@@ -141,7 +141,7 @@ fn test_csv_with_only_numeric_columns_renders_scatter() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
     // Scatter plot renders a chart with borders
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
     assert!(
         stdout.contains('│') || stdout.contains('─') || stdout.contains("Scatter"),
         "Scatter chart not rendered"
@@ -150,13 +150,7 @@ fn test_csv_with_only_numeric_columns_renders_scatter() {
 
 #[test]
 fn test_csv_single_numeric_column_renders_histogram() {
-    let mut f = NamedTempFile::new().unwrap();
-    writeln!(f, "score").unwrap();
-    writeln!(f, "85").unwrap();
-    writeln!(f, "90").unwrap();
-    writeln!(f, "78").unwrap();
-    writeln!(f, "92").unwrap();
-    writeln!(f, "88").unwrap();
+    let f = common::temp_csv(&["score", "85", "90", "78", "92", "88"]);
 
     let output = vz_binary()
         .arg(f.path())
@@ -166,7 +160,7 @@ fn test_csv_single_numeric_column_renders_histogram() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
     // Histogram renders with bin labels and bars
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
     assert!(
         stdout.contains("Distribution") || stdout.contains("score") || stdout.contains('│'),
         "Histogram not rendered:\n{}",
@@ -176,12 +170,13 @@ fn test_csv_single_numeric_column_renders_histogram() {
 
 #[test]
 fn test_csv_categorical_only_renders_chart() {
-    let mut f = NamedTempFile::new().unwrap();
-    writeln!(f, "department,status").unwrap();
-    writeln!(f, "Engineering,Active").unwrap();
-    writeln!(f, "Sales,Active").unwrap();
-    writeln!(f, "Engineering,Inactive").unwrap();
-    writeln!(f, "Marketing,Active").unwrap();
+    let f = common::temp_csv(&[
+        "department,status",
+        "Engineering,Active",
+        "Sales,Active",
+        "Engineering,Inactive",
+        "Marketing,Active",
+    ]);
 
     let output = vz_binary()
         .arg(f.path())
@@ -205,12 +200,13 @@ fn test_csv_categorical_only_renders_chart() {
 
 #[test]
 fn test_csv_with_empty_values_renders() {
-    let mut f = NamedTempFile::new().unwrap();
-    writeln!(f, "date,value").unwrap();
-    writeln!(f, "2024-01-01,100").unwrap();
-    writeln!(f, "2024-02-01,").unwrap();
-    writeln!(f, "2024-03-01,300").unwrap();
-    writeln!(f, ",400").unwrap();
+    let f = common::temp_csv(&[
+        "date,value",
+        "2024-01-01,100",
+        "2024-02-01,",
+        "2024-03-01,300",
+        ",400",
+    ]);
 
     let output = vz_binary()
         .arg(f.path())
@@ -220,16 +216,17 @@ fn test_csv_with_empty_values_renders() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
     // Should still render a chart despite nulls
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
 }
 
 #[test]
 fn test_csv_with_comma_numbers_renders() {
-    let mut f = NamedTempFile::new().unwrap();
-    writeln!(f, "city,population").unwrap();
-    writeln!(f, "Tokyo,\"13,960,000\"").unwrap();
-    writeln!(f, "Osaka,\"2,753,000\"").unwrap();
-    writeln!(f, "Nagoya,\"2,320,000\"").unwrap();
+    let f = common::temp_csv(&[
+        "city,population",
+        "Tokyo,\"13,960,000\"",
+        "Osaka,\"2,753,000\"",
+        "Nagoya,\"2,320,000\"",
+    ]);
 
     let output = vz_binary()
         .arg(f.path())
@@ -239,7 +236,7 @@ fn test_csv_with_comma_numbers_renders() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
     // Should render a bar chart (labels may be truncated)
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
     assert!(
         stdout.contains("Tok")
             || stdout.contains("Osa")
@@ -268,11 +265,9 @@ fn test_nonexistent_column_hint() {
 
 #[test]
 fn test_large_csv_renders() {
-    let mut f = NamedTempFile::new().unwrap();
-    writeln!(f, "id,value,category").unwrap();
+    let mut rows = vec!["id,value,category".to_string()];
     for i in 0..1000 {
-        writeln!(
-            f,
+        rows.push(format!(
             "{},{},{}",
             i,
             i as f64 * 1.5,
@@ -283,9 +278,9 @@ fn test_large_csv_renders() {
             } else {
                 "C"
             }
-        )
-        .unwrap();
+        ));
     }
+    let f = common::temp_csv(&rows);
 
     let output = vz_binary()
         .arg(f.path())
@@ -295,16 +290,17 @@ fn test_large_csv_renders() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
     // Should handle 1000 rows and render a chart
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
 }
 
 #[test]
 fn test_unicode_column_names_renders() {
-    let mut f = NamedTempFile::new().unwrap();
-    writeln!(f, "日付,都市,売上").unwrap();
-    writeln!(f, "2024-01-01,東京,1000").unwrap();
-    writeln!(f, "2024-02-01,大阪,1500").unwrap();
-    writeln!(f, "2024-03-01,名古屋,800").unwrap();
+    let f = common::temp_csv(&[
+        "日付,都市,売上",
+        "2024-01-01,東京,1000",
+        "2024-02-01,大阪,1500",
+        "2024-03-01,名古屋,800",
+    ]);
 
     let output = vz_binary()
         .arg(f.path())
@@ -314,7 +310,7 @@ fn test_unicode_column_names_renders() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
     // Should render a chart with unicode column names
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
     // The chart title includes column names (may have spaces between wide chars)
     assert!(
         stdout.contains('売') || stdout.contains('日'),
@@ -325,11 +321,15 @@ fn test_unicode_column_names_renders() {
 
 #[test]
 fn test_tsv_input() {
-    let mut f = NamedTempFile::with_suffix(".tsv").unwrap();
-    writeln!(f, "city\trevenue\tprofit").unwrap();
-    writeln!(f, "Tokyo\t1000\t200").unwrap();
-    writeln!(f, "Osaka\t1500\t350").unwrap();
-    writeln!(f, "Nagoya\t800\t150").unwrap();
+    let f = common::temp_csv_with_suffix(
+        ".tsv",
+        &[
+            "city\trevenue\tprofit",
+            "Tokyo\t1000\t200",
+            "Osaka\t1500\t350",
+            "Nagoya\t800\t150",
+        ],
+    );
 
     let output = vz_binary()
         .arg(f.path())
@@ -339,7 +339,7 @@ fn test_tsv_input() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
     // Should render a bar chart with city labels
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
     assert!(
         stdout.contains("Tokyo") || stdout.contains("Osaka") || stdout.contains("Nagoya"),
         "TSV city labels not found:\n{}",
@@ -367,7 +367,7 @@ fn test_stdin_pipe() {
     let output = child.wait_with_output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
 }
 
 #[test]
@@ -404,17 +404,17 @@ fn test_color_column_not_found_errors() {
 
 #[test]
 fn test_json_array_input() {
-    let mut f = NamedTempFile::with_suffix(".json").unwrap();
-    writeln!(
-        f,
-        r#"[
-        {{"date": "2024-01-01", "revenue": 1000}},
-        {{"date": "2024-02-01", "revenue": 1500}},
-        {{"date": "2024-03-01", "revenue": 1200}},
-        {{"date": "2024-04-01", "revenue": 1800}}
-    ]"#
-    )
-    .unwrap();
+    let f = common::temp_csv_with_suffix(
+        ".json",
+        &[
+            "[",
+            "        {\"date\": \"2024-01-01\", \"revenue\": 1000},",
+            "        {\"date\": \"2024-02-01\", \"revenue\": 1500},",
+            "        {\"date\": \"2024-03-01\", \"revenue\": 1200},",
+            "        {\"date\": \"2024-04-01\", \"revenue\": 1800}",
+            "    ]",
+        ],
+    );
 
     let output = vz_binary()
         .arg(f.path())
@@ -427,7 +427,7 @@ fn test_json_array_input() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
     assert!(
         stdout.contains("Line") || stdout.contains("revenue"),
         "JSON array should render a line chart:\n{}",
@@ -437,11 +437,15 @@ fn test_json_array_input() {
 
 #[test]
 fn test_ndjson_input() {
-    let mut f = NamedTempFile::with_suffix(".ndjson").unwrap();
-    writeln!(f, r#"{{"x": 1, "y": 10}}"#).unwrap();
-    writeln!(f, r#"{{"x": 2, "y": 20}}"#).unwrap();
-    writeln!(f, r#"{{"x": 3, "y": 30}}"#).unwrap();
-    writeln!(f, r#"{{"x": 4, "y": 25}}"#).unwrap();
+    let f = common::temp_csv_with_suffix(
+        ".ndjson",
+        &[
+            "{\"x\": 1, \"y\": 10}",
+            "{\"x\": 2, \"y\": 20}",
+            "{\"x\": 3, \"y\": 30}",
+            "{\"x\": 4, \"y\": 25}",
+        ],
+    );
 
     let output = vz_binary()
         .arg(f.path())
@@ -454,7 +458,7 @@ fn test_ndjson_input() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
     assert!(
         stdout.contains("Scatter") || stdout.contains('•') || stdout.contains('│'),
         "NDJSON should render a scatter chart:\n{}",
@@ -488,7 +492,7 @@ fn test_json_stdin_pipe() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
     // Should render a bar chart (categorical×quantitative)
     assert!(
         stdout.contains("Alice") || stdout.contains("Bob") || stdout.contains("score"),
@@ -523,15 +527,13 @@ fn test_ndjson_stdin_pipe() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
 }
 
 #[test]
 fn test_no_color_strips_ansi() {
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_no_color()
         .arg("fixtures/sales.csv")
-        .env("NO_COLOR", "1")
-        .env_remove("FORCE_COLOR")
         .output()
         .expect("Failed to run vz");
 
@@ -549,13 +551,14 @@ fn test_no_color_strips_ansi() {
 
 #[test]
 fn test_skipped_rows_warning() {
-    let mut f = NamedTempFile::new().unwrap();
-    writeln!(f, "city,revenue").unwrap();
-    writeln!(f, "Tokyo,1000").unwrap();
-    writeln!(f, "Osaka,N/A").unwrap();
-    writeln!(f, "Nagoya,2000").unwrap();
-    writeln!(f, "Fukuoka,bad").unwrap();
-    writeln!(f, "Kyoto,1500").unwrap();
+    let f = common::temp_csv(&[
+        "city,revenue",
+        "Tokyo,1000",
+        "Osaka,N/A",
+        "Nagoya,2000",
+        "Fukuoka,bad",
+        "Kyoto,1500",
+    ]);
 
     let output = vz_binary()
         .args([
@@ -737,13 +740,11 @@ fn test_invalid_chart_type_emits_warning() {
 
 #[test]
 fn test_large_dataset_sampling() {
-    use std::io::Write;
-    let mut file = NamedTempFile::new().unwrap();
-    writeln!(file, "x,y").unwrap();
+    let mut rows = vec!["x,y".to_string()];
     for i in 0..10000 {
-        writeln!(file, "{},{}", i, i * 2).unwrap();
+        rows.push(format!("{},{}", i, i * 2));
     }
-    file.flush().unwrap();
+    let file = common::temp_csv(&rows);
 
     let output = vz_binary()
         .arg(file.path())
@@ -760,7 +761,7 @@ fn test_large_dataset_sampling() {
     );
     // Should render successfully
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.lines().count() >= 10);
+    assert!(stdout.lines().count() >= common::MIN_CHART_LINES);
 }
 
 #[test]
@@ -789,9 +790,7 @@ fn test_summary_line_goes_to_stderr() {
 
 #[test]
 fn test_header_only_csv_gives_clear_error() {
-    let mut file = NamedTempFile::new().unwrap();
-    writeln!(file, "x,y").unwrap();
-    file.flush().unwrap();
+    let file = common::temp_csv(&["x,y"]);
 
     let output = vz_binary()
         .arg(file.path())
@@ -839,11 +838,7 @@ fn test_info_flag_shows_column_metadata() {
 
 #[test]
 fn test_no_header_flag_treats_first_row_as_data() {
-    let mut file = NamedTempFile::with_suffix(".csv").unwrap();
-    writeln!(file, "1,10").unwrap();
-    writeln!(file, "2,20").unwrap();
-    writeln!(file, "3,30").unwrap();
-    file.flush().unwrap();
+    let file = common::temp_csv_with_suffix(".csv", &["1,10", "2,20", "3,30"]);
 
     let output = vz_binary()
         .args([file.path().to_str().unwrap(), "--no-header"])
@@ -866,12 +861,8 @@ fn test_no_header_flag_treats_first_row_as_data() {
 
 #[test]
 fn test_numeric_header_auto_detected() {
-    let mut file = NamedTempFile::with_suffix(".csv").unwrap();
     // All-numeric "headers" — should auto-detect as no-header
-    writeln!(file, "1,100").unwrap();
-    writeln!(file, "2,200").unwrap();
-    writeln!(file, "3,300").unwrap();
-    file.flush().unwrap();
+    let file = common::temp_csv_with_suffix(".csv", &["1,100", "2,200", "3,300"]);
 
     let output = vz_binary()
         .arg(file.path())
@@ -917,12 +908,10 @@ fn test_info_flag_shows_statistics() {
 
 #[test]
 fn test_sort_flag_bar_chart() {
-    let mut file = NamedTempFile::with_suffix(".csv").unwrap();
-    writeln!(file, "city,revenue").unwrap();
-    writeln!(file, "Osaka,300").unwrap();
-    writeln!(file, "Tokyo,500").unwrap();
-    writeln!(file, "Nagoya,100").unwrap();
-    file.flush().unwrap();
+    let file = common::temp_csv_with_suffix(
+        ".csv",
+        &["city,revenue", "Osaka,300", "Tokyo,500", "Nagoya,100"],
+    );
 
     // With --sort desc, bars should be ordered by value descending
     let output = vz_binary()
@@ -970,12 +959,15 @@ fn test_sort_invalid_value_gives_error() {
 
 #[test]
 fn test_all_unparseable_y_values_gives_clear_error() {
-    let mut file = NamedTempFile::with_suffix(".csv").unwrap();
-    writeln!(file, "date,revenue").unwrap();
-    writeln!(file, "2024-01-01,N/A").unwrap();
-    writeln!(file, "2024-02-01,missing").unwrap();
-    writeln!(file, "2024-03-01,").unwrap();
-    file.flush().unwrap();
+    let file = common::temp_csv_with_suffix(
+        ".csv",
+        &[
+            "date,revenue",
+            "2024-01-01,N/A",
+            "2024-02-01,missing",
+            "2024-03-01,",
+        ],
+    );
 
     // Force line chart type to exercise the rendering path with unparseable Y
     let output = vz_binary()
@@ -1007,11 +999,14 @@ fn test_all_unparseable_y_values_gives_clear_error() {
 
 #[test]
 fn test_summary_shows_unused_columns() {
-    let mut file = NamedTempFile::with_suffix(".csv").unwrap();
-    writeln!(file, "date,revenue,profit,city").unwrap();
-    writeln!(file, "2024-01-01,100,50,Tokyo").unwrap();
-    writeln!(file, "2024-02-01,200,80,Osaka").unwrap();
-    file.flush().unwrap();
+    let file = common::temp_csv_with_suffix(
+        ".csv",
+        &[
+            "date,revenue,profit,city",
+            "2024-01-01,100,50,Tokyo",
+            "2024-02-01,200,80,Osaka",
+        ],
+    );
 
     let output = vz_binary()
         .arg(file.path())
@@ -1079,8 +1074,7 @@ fn test_bar_type_override_prefers_categorical_x() {
 
 #[test]
 fn test_color_legend_shows_series_mapping() {
-    let bin = env!("CARGO_BIN_EXE_vz");
-    let output = std::process::Command::new(bin)
+    let output = common::vz_command()
         .args(["fixtures/sales.csv", "-c", "city"])
         .output()
         .expect("Failed to run vz");
@@ -1101,8 +1095,7 @@ fn test_color_legend_shows_series_mapping() {
 
 #[test]
 fn test_multi_y_columns() {
-    let bin = env!("CARGO_BIN_EXE_vz");
-    let output = std::process::Command::new(bin)
+    let output = common::vz_command()
         .args(["fixtures/sales.csv", "-y", "revenue,profit"])
         .output()
         .expect("Failed to run vz");
@@ -1126,8 +1119,7 @@ fn test_multi_y_columns() {
 
 #[test]
 fn test_multi_y_with_labels() {
-    let bin = env!("CARGO_BIN_EXE_vz");
-    let output = std::process::Command::new(bin)
+    let output = common::vz_command()
         .args(["fixtures/sales.csv", "-y", "revenue:Rev,profit:Prof"])
         .output()
         .expect("Failed to run vz");
@@ -1151,8 +1143,7 @@ fn test_multi_y_with_labels() {
 
 #[test]
 fn test_heatmap_auto_select() {
-    let bin = env!("CARGO_BIN_EXE_vz");
-    let output = std::process::Command::new(bin)
+    let output = common::vz_command()
         .args(["fixtures/departments.csv"])
         .output()
         .expect("Failed to run vz");
@@ -1181,8 +1172,7 @@ fn test_heatmap_auto_select() {
 
 #[test]
 fn test_heatmap_explicit_type() {
-    let bin = env!("CARGO_BIN_EXE_vz");
-    let output = std::process::Command::new(bin)
+    let output = common::vz_command()
         .args([
             "fixtures/sales.csv",
             "-t",
@@ -1208,12 +1198,10 @@ fn test_heatmap_explicit_type() {
 #[test]
 fn test_format_flag_forces_tsv() {
     // Create a TSV file with .txt extension (would be detected as CSV without --format)
-    let mut tmp = NamedTempFile::with_suffix(".txt").unwrap();
-    writeln!(tmp, "city\trevenue").unwrap();
-    writeln!(tmp, "Tokyo\t1000").unwrap();
-    writeln!(tmp, "Osaka\t2000").unwrap();
+    let tmp =
+        common::temp_csv_with_suffix(".txt", &["city\trevenue", "Tokyo\t1000", "Osaka\t2000"]);
 
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args([tmp.path().to_str().unwrap(), "--format", "tsv"])
         .output()
         .expect("failed to execute");
@@ -1228,11 +1216,9 @@ fn test_format_flag_forces_tsv() {
 
 #[test]
 fn test_format_flag_short() {
-    let mut tmp = NamedTempFile::with_suffix(".dat").unwrap();
-    writeln!(tmp, "city\trevenue").unwrap();
-    writeln!(tmp, "Tokyo\t1000").unwrap();
+    let tmp = common::temp_csv_with_suffix(".dat", &["city\trevenue", "Tokyo\t1000"]);
 
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args([tmp.path().to_str().unwrap(), "-f", "tsv"])
         .output()
         .expect("failed to execute");
@@ -1247,7 +1233,7 @@ fn test_format_flag_short() {
 
 #[test]
 fn test_where_filter_equality() {
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args(["fixtures/sales.csv", "--where", "city=Tokyo"])
         .output()
         .expect("failed to execute");
@@ -1263,7 +1249,7 @@ fn test_where_filter_equality() {
 
 #[test]
 fn test_where_filter_numeric_gt() {
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args(["fixtures/sales.csv", "--where", "revenue>1500"])
         .output()
         .expect("failed to execute");
@@ -1279,7 +1265,7 @@ fn test_where_filter_numeric_gt() {
 
 #[test]
 fn test_where_filter_invalid_column() {
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args(["fixtures/sales.csv", "--where", "missing=x"])
         .output()
         .expect("failed to execute");
@@ -1299,7 +1285,7 @@ fn test_where_filter_invalid_column() {
 
 #[test]
 fn test_where_filter_multiple() {
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args([
             "fixtures/sales.csv",
             "--where",
@@ -1322,7 +1308,7 @@ fn test_where_filter_multiple() {
 
 #[test]
 fn test_top_flag_limits_bars() {
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args([
             "fixtures/sales.csv",
             "-x",
@@ -1351,7 +1337,7 @@ fn test_top_flag_limits_bars() {
 
 #[test]
 fn test_tail_flag_limits_bars() {
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args([
             "fixtures/sales.csv",
             "-x",
@@ -1377,7 +1363,7 @@ fn test_tail_flag_limits_bars() {
 
 #[test]
 fn test_top_flag_cli_parsing() {
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args(["fixtures/sales.csv", "--top", "1", "-t", "bar"])
         .output()
         .expect("failed to execute");
@@ -1388,7 +1374,7 @@ fn test_top_flag_cli_parsing() {
 #[test]
 fn test_stdin_auto_detect_without_dash() {
     use std::process::Stdio;
-    let mut child = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let mut child = common::vz_command()
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -1450,8 +1436,7 @@ fn test_explore_nonexistent_file_errors() {
 
 #[test]
 fn test_present_empty_file_errors() {
-    let mut file = NamedTempFile::with_suffix(".md").unwrap();
-    file.flush().unwrap();
+    let file = common::temp_csv_with_suffix::<&str>(".md", &[]);
 
     let output = vz_binary()
         .args(["present", file.path().to_str().unwrap()])
@@ -1472,9 +1457,7 @@ fn test_present_empty_file_errors() {
 
 #[test]
 fn test_explore_empty_csv_errors() {
-    let mut file = NamedTempFile::with_suffix(".csv").unwrap();
-    writeln!(file).unwrap();
-    file.flush().unwrap();
+    let file = common::temp_csv_with_suffix(".csv", &[""]);
 
     let output = vz_binary()
         .args(["explore", file.path().to_str().unwrap()])
@@ -1660,7 +1643,7 @@ fn test_agg_mean_flag() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     // Should render a bar chart with axis labels
     assert!(
-        stdout.lines().count() >= 10,
+        stdout.lines().count() >= common::MIN_CHART_LINES,
         "Expected chart output with --agg mean, got:\n{}",
         stdout
     );
@@ -1890,12 +1873,8 @@ fn test_output_json_error_format() {
 fn test_malformed_csv_row_warning() {
     // The csv crate with flexible(true) tolerates most malformations.
     // Verify that vz handles edge cases gracefully without crashing.
-    let mut f = NamedTempFile::new().unwrap();
-    writeln!(f, "name,val").unwrap();
-    writeln!(f, "Alice,10").unwrap();
-    writeln!(f, "Bob").unwrap(); // fewer fields
-    writeln!(f, "Charlie,30,extra").unwrap(); // more fields
-    f.flush().unwrap();
+    // Fewer/more fields than the header (flexible mode tolerates them).
+    let f = common::temp_csv(&["name,val", "Alice,10", "Bob", "Charlie,30,extra"]);
 
     let output = vz_binary()
         .args([f.path().to_str().unwrap(), "-o", "json"])
@@ -1916,12 +1895,11 @@ fn test_malformed_csv_row_warning() {
 #[test]
 fn test_sample_flag() {
     // Create a large-ish dataset
-    let mut f = NamedTempFile::new().unwrap();
-    writeln!(f, "x,y").unwrap();
+    let mut rows = vec!["x,y".to_string()];
     for i in 0..1000 {
-        writeln!(f, "{},{}", i, i * 2).unwrap();
+        rows.push(format!("{},{}", i, i * 2));
     }
-    f.flush().unwrap();
+    let f = common::temp_csv(&rows);
 
     let output = vz_binary()
         .args([f.path().to_str().unwrap(), "--sample", "50", "-o", "json"])
@@ -2084,12 +2062,7 @@ fn test_bar_summary_shows_aggregated_values() {
 #[test]
 fn test_bar_skip_warning_blames_x_column() {
     // Create CSV with empty category (X) labels — bar chart should blame X, not Y
-    let mut file = NamedTempFile::new().unwrap();
-    writeln!(file, "city,revenue").unwrap();
-    writeln!(file, "Tokyo,1000").unwrap();
-    writeln!(file, ",500").unwrap(); // empty X label
-    writeln!(file, "Osaka,800").unwrap();
-    file.flush().unwrap();
+    let file = common::temp_csv(&["city,revenue", "Tokyo,1000", ",500", "Osaka,800"]);
 
     let output = vz_binary()
         .args([file.path().to_str().unwrap(), "-t", "bar"])
@@ -2505,11 +2478,7 @@ fn test_watch_flag_accepted_and_rerenders_on_change() {
     use std::time::Duration;
 
     // Create a temporary CSV file
-    let mut tmpfile = NamedTempFile::new().unwrap();
-    writeln!(tmpfile, "x,y").unwrap();
-    writeln!(tmpfile, "a,1").unwrap();
-    writeln!(tmpfile, "b,2").unwrap();
-    tmpfile.flush().unwrap();
+    let tmpfile = common::temp_csv(&["x,y", "a,1", "b,2"]);
 
     let path = tmpfile.path().to_path_buf();
 
@@ -3065,7 +3034,7 @@ fn test_output_markdown_with_bar_chart() {
 #[test]
 fn test_empty_stdin_gives_clear_error() {
     // Empty stdin should say "empty input" not "only headers"
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .arg("-")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -3090,7 +3059,7 @@ fn test_empty_stdin_gives_clear_error() {
 
 #[test]
 fn test_output_table_respects_sort_asc() {
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args([
             "fixtures/sales.csv",
             "-o",
@@ -3118,7 +3087,7 @@ fn test_output_table_respects_sort_asc() {
 
 #[test]
 fn test_output_table_respects_top_flag() {
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args([
             "fixtures/sales.csv",
             "-o",
@@ -3147,7 +3116,7 @@ fn test_output_table_respects_top_flag() {
 
 #[test]
 fn test_output_markdown_respects_top_flag() {
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args([
             "fixtures/sales.csv",
             "-o",
@@ -3176,7 +3145,7 @@ fn test_output_markdown_respects_top_flag() {
 
 #[test]
 fn test_output_markdown_respects_sort_desc() {
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args([
             "fixtures/sales.csv",
             "-o",
@@ -3204,7 +3173,7 @@ fn test_output_markdown_respects_sort_desc() {
 
 #[test]
 fn test_header_only_input_no_duplicate_tip() {
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .arg("-")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -3229,7 +3198,7 @@ fn test_header_only_input_no_duplicate_tip() {
 
 #[test]
 fn test_spark_output_shows_column_context() {
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_command()
         .args(["fixtures/sales.csv", "-o", "spark"])
         .output()
         .expect("Failed to run vz");

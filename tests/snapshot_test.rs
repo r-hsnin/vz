@@ -1,25 +1,12 @@
 //! Snapshot tests for chart output using insta.
 //! These tests capture the exact rendered output and detect visual regressions.
 
-use std::process::Command;
+#[path = "common/mod.rs"]
+mod common;
 
 /// Run vz with NO_COLOR and fixed width, capturing stdout.
 fn run_vz(args: &[&str]) -> String {
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
-        .args(args)
-        .env("NO_COLOR", "1")
-        .env_remove("FORCE_COLOR")
-        .env("COLUMNS", "80")
-        .output()
-        .expect("Failed to run vz");
-
-    assert!(
-        output.status.success(),
-        "vz failed with: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    String::from_utf8(output.stdout).expect("Invalid UTF-8 in output")
+    common::run_vz_stdout(args)
 }
 
 #[test]
@@ -42,10 +29,8 @@ fn snapshot_histogram() {
 
 #[test]
 fn snapshot_json_input() {
-    let output = Command::new(env!("CARGO_BIN_EXE_vz"))
+    let output = common::vz_no_color()
         .arg("-")
-        .env("NO_COLOR", "1")
-        .env_remove("FORCE_COLOR")
         .env("COLUMNS", "80")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
