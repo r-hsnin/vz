@@ -82,7 +82,7 @@ pub struct Cli {
     #[arg(long = "title")]
     pub title: Option<String>,
 
-    /// Output format: text (default), json, table, spark, svg, markdown.
+    /// Output format: text (default), json, table, spark, svg, markdown, html.
     #[arg(short = 'o', long = "output", value_enum)]
     pub output: Option<OutputFormat>,
 

@@ -4464,6 +4464,25 @@ fn test_output_html_with_o_flag() {
 }
 
 #[test]
+fn test_help_lists_html_output_format() {
+    let output = vz_binary()
+        .arg("--help")
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let output_line = stdout
+        .lines()
+        .find(|l| l.contains("Output format"))
+        .expect("--help should describe the output format");
+    assert!(
+        output_line.contains("html"),
+        "--help should document the html output format, got: {}",
+        output_line
+    );
+}
+
+#[test]
 fn test_output_html_no_external_resources() {
     let output = vz_binary()
         .args(["fixtures/sales.csv", "--html"])
