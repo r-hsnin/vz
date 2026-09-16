@@ -56,7 +56,7 @@ git push dev main --tags
 |------|---------|
 | `release-manifest.txt` | Allowlist of files published to origin (default=private) |
 | `scripts/release.sh` | Release script (tag → filter → PR) |
-| `scripts/hooks/pre-push` | Blocks direct push to origin (install: `git config core.hooksPath scripts/hooks`) |
+| lefthook pre-push | Blocks direct push to origin (install with `lefthook install`) |
 
 #### Recovery
 

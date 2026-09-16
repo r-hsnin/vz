@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# pre-push hook — origin への直接 push を阻止
-# release ブランチ (release/*) のみ許可、それ以外は拒否
+# lefthook pre-push — origin への直接 push を阻止
+# release ブランチ (release/*) と tag のみ許可、それ以外は拒否
 #
-# インストール: git config core.hooksPath scripts/hooks
+# 呼び出し: lefthook.yml の pre-push（use_stdin: true）
+# $1: remote 名 / stdin: push 対象の refs
 
 remote="$1"
-# shellcheck disable=SC2034
-url="$2"
 
 # origin 以外は素通り
 if [[ "$remote" != "origin" ]]; then

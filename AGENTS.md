@@ -30,6 +30,10 @@ cargo clippy --all-targets -- -D warnings    # 警告ゼロ
 cargo test
 ```
 
+lefthook 導入済みなら pre-commit（fmt --check / clippy）と pre-push（origin ガード / test）が自動で走る。手動実行は `lefthook run pre-commit`。
+
+依存を変更したら `cargo machete`（要 `cargo install cargo-machete`）で未使用依存を確認する。
+
 ## コミット
 
 - 論理単位ごとにコミットしながら作業を進める（複数の関心事を1コミットに混ぜない）
@@ -47,7 +51,8 @@ cargo test
 ## Hook インストール
 
 ```bash
-git config core.hooksPath scripts/hooks
+bun add -g lefthook    # または npm i -g lefthook
+lefthook install       # 既存 clone に core.hooksPath が残っていれば --reset-hooks-path を付ける
 ```
 
 ## ドキュメント

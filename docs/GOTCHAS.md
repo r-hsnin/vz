@@ -21,6 +21,10 @@ Release procedures live in [RUNBOOK.md](RUNBOOK.md).
 | `crossterm` compile error | Missing system deps | Linux: ensure `libxcb` or similar available |
 | `ratatui` version mismatch | Lockfile stale | `cargo update` |
 
+## Development Setup
+
+- **Git hooks not running:** if `core.hooksPath` points to a custom path (legacy `scripts/hooks` setup), Git ignores lefthook's hooks. Run `lefthook install --reset-hooks-path` once.
+
 ## Runtime Issues
 
 | Symptom | Cause | Fix |
