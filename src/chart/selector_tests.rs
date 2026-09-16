@@ -1,24 +1,11 @@
 use super::*;
-use crate::infer::types::ColumnMeta;
-
-fn make_schema(cols: Vec<(&str, DataType)>) -> Schema {
-    Schema::new(
-        cols.into_iter()
-            .map(|(name, dt)| ColumnMeta {
-                name: name.to_string(),
-                data_type: dt,
-                null_count: 0,
-                sample_size: 100,
-            })
-            .collect(),
-    )
-}
+use crate::test_helpers::make_schema;
 
 // --- Auto selection tests ---
 
 #[test]
 fn test_temporal_quantitative_gives_line() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("date", DataType::Temporal),
         ("revenue", DataType::Quantitative),
     ]);
@@ -30,7 +17,7 @@ fn test_temporal_quantitative_gives_line() {
 
 #[test]
 fn test_categorical_quantitative_gives_bar() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("city", DataType::Categorical),
         ("sales", DataType::Quantitative),
     ]);
@@ -42,7 +29,7 @@ fn test_categorical_quantitative_gives_bar() {
 
 #[test]
 fn test_two_quantitative_gives_scatter() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("height", DataType::Quantitative),
         ("weight", DataType::Quantitative),
     ]);
@@ -54,7 +41,7 @@ fn test_two_quantitative_gives_scatter() {
 
 #[test]
 fn test_single_quantitative_gives_histogram() {
-    let schema = make_schema(vec![("age", DataType::Quantitative)]);
+    let schema = make_schema(&[("age", DataType::Quantitative)]);
     let rec = select_chart(&schema, None, None).unwrap();
     assert_eq!(rec.chart_type, ChartType::Histogram);
     assert_eq!(rec.x_column, "age");
@@ -63,7 +50,7 @@ fn test_single_quantitative_gives_histogram() {
 
 #[test]
 fn test_two_categorical_gives_bar() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("department", DataType::Categorical),
         ("status", DataType::Categorical),
     ]);
@@ -77,7 +64,7 @@ fn test_two_categorical_gives_bar() {
 fn test_temporal_priority_over_categorical() {
     // When both temporal and categorical exist with quantitative,
     // temporal should win (line chart)
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("date", DataType::Temporal),
         ("city", DataType::Categorical),
         ("revenue", DataType::Quantitative),
@@ -92,7 +79,7 @@ fn test_temporal_priority_over_categorical() {
 
 #[test]
 fn test_user_specified_axes() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("date", DataType::Temporal),
         ("city", DataType::Categorical),
         ("revenue", DataType::Quantitative),
@@ -105,7 +92,7 @@ fn test_user_specified_axes() {
 
 #[test]
 fn test_user_specified_nonexistent_column() {
-    let schema = make_schema(vec![("date", DataType::Temporal)]);
+    let schema = make_schema(&[("date", DataType::Temporal)]);
     let rec = select_chart(&schema, Some("nonexistent"), Some("also_bad"));
     assert!(rec.is_err());
     let err = rec.unwrap_err().to_string();
@@ -117,7 +104,7 @@ fn test_user_specified_nonexistent_column() {
 
 #[test]
 fn test_color_column_auto_assigned() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("date", DataType::Temporal),
         ("region", DataType::Categorical),
         ("revenue", DataType::Quantitative),
@@ -128,7 +115,7 @@ fn test_color_column_auto_assigned() {
 
 #[test]
 fn test_no_color_when_categorical_used_as_axis() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("city", DataType::Categorical),
         ("revenue", DataType::Quantitative),
     ]);
@@ -140,7 +127,7 @@ fn test_no_color_when_categorical_used_as_axis() {
 
 #[test]
 fn test_empty_schema_returns_error() {
-    let schema = make_schema(vec![]);
+    let schema = make_schema(&[]);
     let rec = select_chart(&schema, None, None);
     assert!(rec.is_err());
     assert!(rec.unwrap_err().to_string().contains("No columns detected"));
@@ -148,7 +135,7 @@ fn test_empty_schema_returns_error() {
 
 #[test]
 fn test_only_nominal_returns_descriptive_error() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("id", DataType::Nominal),
         ("description", DataType::Nominal),
     ]);
@@ -164,7 +151,7 @@ fn test_only_nominal_returns_descriptive_error() {
 
 #[test]
 fn test_y_only_hint_is_honored() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("date", DataType::Temporal),
         ("city", DataType::Categorical),
         ("revenue", DataType::Quantitative),
@@ -180,7 +167,7 @@ fn test_y_only_hint_is_honored() {
 
 #[test]
 fn test_y_only_hint_with_categorical_x() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("city", DataType::Categorical),
         ("revenue", DataType::Quantitative),
         ("profit", DataType::Quantitative),
@@ -193,7 +180,7 @@ fn test_y_only_hint_with_categorical_x() {
 
 #[test]
 fn test_x_only_hint_is_honored() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("date", DataType::Temporal),
         ("city", DataType::Categorical),
         ("revenue", DataType::Quantitative),
@@ -209,7 +196,7 @@ fn test_x_only_hint_is_honored() {
 
 #[test]
 fn test_x_only_hint_temporal() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("date", DataType::Temporal),
         ("city", DataType::Categorical),
         ("revenue", DataType::Quantitative),
@@ -222,7 +209,7 @@ fn test_x_only_hint_temporal() {
 
 #[test]
 fn test_y_only_hint_nonexistent_column_errors() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("date", DataType::Temporal),
         ("revenue", DataType::Quantitative),
     ]);
@@ -233,7 +220,7 @@ fn test_y_only_hint_nonexistent_column_errors() {
 
 #[test]
 fn test_x_only_hint_nonexistent_column_errors() {
-    let schema = make_schema(vec![
+    let schema = make_schema(&[
         ("date", DataType::Temporal),
         ("revenue", DataType::Quantitative),
     ]);

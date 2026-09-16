@@ -22,3 +22,6 @@ pub mod sparkline;
 pub mod theme;
 pub mod util;
 pub mod watch;
+
+#[cfg(test)]
+mod test_helpers;

@@ -157,16 +157,8 @@ fn trend_from_values(values: &[f64]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chart::selector::ChartRecommendation;
-
-    fn make_recommendation(x: &str, y: Option<&str>, color: Option<&str>) -> ChartRecommendation {
-        ChartRecommendation {
-            chart_type: ChartType::Line,
-            x_column: x.to_string(),
-            y_column: y.map(|s| s.to_string()),
-            color_column: color.map(|s| s.to_string()),
-        }
-    }
+    use crate::chart::selector::ChartType;
+    use crate::test_helpers::make_recommendation;
 
     fn default_params() -> SparkParams {
         SparkParams {
@@ -221,7 +213,7 @@ mod tests {
     #[test]
     fn test_print_spark_no_y_column() {
         // When y_column is None, should print a single block char
-        let rec = make_recommendation("x", None, None);
+        let rec = make_recommendation(ChartType::Line, "x", None, None);
         let headers = vec!["x".to_string(), "y".to_string()];
         let rows = vec![vec!["a".to_string(), "1".to_string()]];
         // Just verify it doesn't panic
@@ -230,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_print_spark_basic_values() {
-        let rec = make_recommendation("date", Some("value"), None);
+        let rec = make_recommendation(ChartType::Line, "date", Some("value"), None);
         let headers = vec!["date".to_string(), "value".to_string()];
         let rows = vec![
             vec!["2024-01".to_string(), "10".to_string()],

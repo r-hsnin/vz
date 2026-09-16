@@ -114,32 +114,11 @@ pub fn parse_y_options(cli: &Cli) -> YOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chart::selector::{ChartRecommendation, ChartType};
+    use crate::chart::selector::ChartType;
     use crate::cli::{AggFunction, Cli};
-    use crate::infer::types::{ColumnMeta, DataType, Schema};
+    use crate::infer::types::DataType;
+    use crate::test_helpers::{make_recommendation, make_schema};
     use clap::Parser;
-
-    fn make_schema(cols: &[(&str, DataType)]) -> Schema {
-        Schema::new(
-            cols.iter()
-                .map(|(name, dt)| ColumnMeta {
-                    name: name.to_string(),
-                    data_type: *dt,
-                    null_count: 0,
-                    sample_size: 10,
-                })
-                .collect(),
-        )
-    }
-
-    fn make_recommendation(x: &str, y: Option<&str>, color: Option<&str>) -> ChartRecommendation {
-        ChartRecommendation {
-            chart_type: ChartType::Bar,
-            x_column: x.to_string(),
-            y_column: y.map(|s| s.to_string()),
-            color_column: color.map(|s| s.to_string()),
-        }
-    }
 
     // --- resolve_input_file ---
 
@@ -169,7 +148,7 @@ mod tests {
             ("city", DataType::Categorical),
             ("revenue", DataType::Quantitative),
         ]);
-        let rec = make_recommendation("city", Some("revenue"), None);
+        let rec = make_recommendation(ChartType::Bar, "city", Some("revenue"), None);
         assert_eq!(effective_agg(&cli, &rec, &schema), AggFunction::Mean);
     }
 
@@ -180,7 +159,7 @@ mod tests {
             ("city", DataType::Categorical),
             ("revenue", DataType::Quantitative),
         ]);
-        let rec = make_recommendation("city", Some("revenue"), None);
+        let rec = make_recommendation(ChartType::Bar, "city", Some("revenue"), None);
         assert_eq!(effective_agg(&cli, &rec, &schema), AggFunction::Sum);
     }
 
@@ -191,7 +170,7 @@ mod tests {
             ("department", DataType::Categorical),
             ("status", DataType::Categorical),
         ]);
-        let rec = make_recommendation("department", Some("status"), None);
+        let rec = make_recommendation(ChartType::Bar, "department", Some("status"), None);
         assert_eq!(effective_agg(&cli, &rec, &schema), AggFunction::Count);
     }
 
@@ -238,7 +217,7 @@ mod tests {
             ("revenue", DataType::Quantitative),
         ]);
         let y_opts = parse_y_options(&cli);
-        let rec = make_recommendation("month", Some("revenue"), None);
+        let rec = make_recommendation(ChartType::Bar, "month", Some("revenue"), None);
         let opts = build_render_options(&cli, &y_opts, &rec, &schema);
         assert_eq!(opts.width, None);
         assert_eq!(opts.height, None);
@@ -280,7 +259,7 @@ mod tests {
             ("profit", DataType::Quantitative),
         ]);
         let y_opts = parse_y_options(&cli);
-        let rec = make_recommendation("city", Some("revenue"), None);
+        let rec = make_recommendation(ChartType::Bar, "city", Some("revenue"), None);
         let opts = build_render_options(&cli, &y_opts, &rec, &schema);
         assert_eq!(opts.width, Some(80));
         assert_eq!(opts.height, Some(20));

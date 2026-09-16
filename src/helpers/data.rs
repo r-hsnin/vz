@@ -81,35 +81,14 @@ pub fn adjust_bar_recommendation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chart::selector::{ChartRecommendation, ChartType};
+    use crate::chart::selector::ChartType;
     use crate::cli::Cli;
-    use crate::infer::types::{ColumnMeta, DataType, Schema};
+    use crate::infer::types::DataType;
     use crate::loader::LoadedData;
+    use crate::test_helpers::{make_recommendation, make_schema};
     use clap::Parser;
 
     use super::super::args::parse_y_options;
-
-    fn make_schema(cols: &[(&str, DataType)]) -> Schema {
-        Schema::new(
-            cols.iter()
-                .map(|(name, dt)| ColumnMeta {
-                    name: name.to_string(),
-                    data_type: *dt,
-                    null_count: 0,
-                    sample_size: 10,
-                })
-                .collect(),
-        )
-    }
-
-    fn make_recommendation(x: &str, y: Option<&str>, color: Option<&str>) -> ChartRecommendation {
-        ChartRecommendation {
-            chart_type: ChartType::Bar,
-            x_column: x.to_string(),
-            y_column: y.map(|s| s.to_string()),
-            color_column: color.map(|s| s.to_string()),
-        }
-    }
 
     // --- apply_filters ---
 
@@ -162,7 +141,7 @@ mod tests {
             ("city", DataType::Categorical),
             ("revenue", DataType::Quantitative),
         ]);
-        let mut rec = make_recommendation("city", Some("revenue"), None);
+        let mut rec = make_recommendation(ChartType::Bar, "city", Some("revenue"), None);
         adjust_bar_recommendation(&mut rec, &schema);
         assert_eq!(rec.x_column, "city");
     }
@@ -173,7 +152,7 @@ mod tests {
             ("x_val", DataType::Quantitative),
             ("y_val", DataType::Quantitative),
         ]);
-        let mut rec = make_recommendation("x_val", Some("y_val"), None);
+        let mut rec = make_recommendation(ChartType::Bar, "x_val", Some("y_val"), None);
         adjust_bar_recommendation(&mut rec, &schema);
         assert_eq!(rec.x_column, "x_val");
     }
@@ -185,7 +164,7 @@ mod tests {
             ("city", DataType::Categorical),
             ("revenue", DataType::Quantitative),
         ]);
-        let mut rec = make_recommendation("date", Some("revenue"), None);
+        let mut rec = make_recommendation(ChartType::Bar, "date", Some("revenue"), None);
         adjust_bar_recommendation(&mut rec, &schema);
         assert_eq!(rec.x_column, "city");
     }
@@ -197,7 +176,7 @@ mod tests {
             ("city", DataType::Categorical),
             ("revenue", DataType::Quantitative),
         ]);
-        let mut rec = make_recommendation("date", Some("revenue"), Some("city"));
+        let mut rec = make_recommendation(ChartType::Bar, "date", Some("revenue"), Some("city"));
         adjust_bar_recommendation(&mut rec, &schema);
         assert_eq!(rec.x_column, "city");
         assert_eq!(rec.color_column, None);
@@ -211,7 +190,7 @@ mod tests {
             ("city", DataType::Categorical),
             ("revenue", DataType::Quantitative),
         ]);
-        let mut rec = make_recommendation("date", Some("revenue"), Some("city"));
+        let mut rec = make_recommendation(ChartType::Bar, "date", Some("revenue"), Some("city"));
         adjust_bar_recommendation(&mut rec, &schema);
         assert_eq!(rec.x_column, "region");
         assert_eq!(rec.color_column, Some("city".to_string()));
