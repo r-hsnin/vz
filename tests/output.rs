@@ -1437,3 +1437,23 @@ fn test_output_html_structure_complete() {
         "Expected default viewBox dimensions"
     );
 }
+
+#[test]
+fn help_shows_examples_legend_and_stream_split() {
+    let output = vz_binary()
+        .arg("--help")
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Examples:"), "missing Examples:\n{stdout}");
+    assert!(
+        stdout.contains("vz sales.csv -x city"),
+        "missing example:\n{stdout}"
+    );
+    assert!(stdout.contains("→ stable"), "missing legend:\n{stdout}");
+    assert!(
+        stdout.contains("summary and warnings go to stderr"),
+        "missing stream split:\n{stdout}"
+    );
+}

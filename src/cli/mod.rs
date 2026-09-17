@@ -9,7 +9,12 @@ use std::path::PathBuf;
 
 /// vz — CLI BI tool with smart visualization and terminal presentation.
 #[derive(Parser, Debug, Clone)]
-#[command(name = "vz", version, about)]
+#[command(
+    name = "vz",
+    version,
+    about,
+    after_help = "Examples:\n  vz sales.csv\n  vz sales.csv -x date -y revenue\n  vz sales.csv -x city -y revenue -t bar --sort desc\n\nSummary: `↑/↓ +N%` trend vs first value (`→ stable` within ±5%), `▁▂▃▄▅▆▇█` 8-point sparkline, `+N:` unused columns.\nOutput: summary and warnings go to stderr, chart goes to stdout."
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,

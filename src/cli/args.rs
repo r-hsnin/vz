@@ -57,8 +57,20 @@ pub fn parse_multi_y_specs(spec: &str) -> Vec<(&str, Option<&str>)> {
 mod tests {
     use super::*;
     use crate::cli::Cli;
-    use clap::Parser;
+    use clap::{CommandFactory, Parser};
     use std::path::PathBuf;
+
+    #[test]
+    fn test_after_help_shows_examples_legend_and_stream_split() {
+        let after = Cli::command().get_after_help().unwrap().to_string();
+        assert!(after.contains("Examples:"), "{after}");
+        assert!(after.contains("vz sales.csv -x city"), "{after}");
+        assert!(after.contains("→ stable"), "{after}");
+        assert!(
+            after.contains("summary and warnings go to stderr"),
+            "{after}"
+        );
+    }
 
     #[test]
     fn test_effective_sort_explicit_sort_takes_priority() {
