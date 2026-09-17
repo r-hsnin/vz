@@ -24,6 +24,8 @@ pub struct DataPoint {
     /// Pixel-space position (same coordinate space as the text grid).
     pub x: f64,
     pub y: f64,
+    /// Series name for multi-series line/scatter marks (`None` for bar/histogram/heatmap).
+    pub series: Option<String>,
 }
 
 /// Render real vector data marks for one chart, in text-grid pixel space.
@@ -52,9 +54,14 @@ pub fn data_marks_svg(
             p.label,
             crate::render::format_number(p.value)
         ));
+        let series_attr = p
+            .series
+            .as_deref()
+            .map(|s| format!(" data-series=\"{}\"", xml_escape(s)))
+            .unwrap_or_default();
         let _ = writeln!(
             out,
-            r#"<circle class="vz-point" cx="{:.1}" cy="{:.1}" r="7" data-label="{}" data-value="{}"><title>{}</title></circle>"#,
+            r#"<circle class="vz-point" cx="{:.1}" cy="{:.1}" r="7" data-label="{}" data-value="{}"{series_attr}><title>{}</title></circle>"#,
             p.x,
             p.y,
             xml_escape(&p.label),
@@ -92,6 +99,12 @@ fn layout_points(
     }
     match chart_data {
         ChartData::Bar(d) => {
+            let min = d
+                .values
+                .iter()
+                .cloned()
+                .fold(0.0_f64, f64::min)
+                .min(-f64::EPSILON);
             let max = d
                 .values
                 .iter()
@@ -99,63 +112,66 @@ fn layout_points(
                 .fold(0.0_f64, f64::max)
                 .max(f64::EPSILON);
             let n = d.labels.len().max(1) as f64;
+            let span = (max - min).max(f64::EPSILON);
             d.labels
                 .iter()
                 .zip(d.values.iter())
                 .enumerate()
                 .map(|(i, (label, &v))| {
                     let cx = plot_x0 + (i as f64 + 0.5) * (plot_x1 - plot_x0) / n;
-                    let frac = (v / max).clamp(0.0, 1.0);
+                    let frac = ((v - min) / span).clamp(0.0, 1.0);
                     let cy = plot_y1 - frac * (plot_y1 - plot_y0);
                     DataPoint {
                         label: label.clone(),
                         value: v,
                         x: cx,
                         y: cy,
+                        series: None,
                     }
                 })
                 .collect()
         }
         ChartData::Line(c) | ChartData::Scatter(c) => {
-            let Some(series) = c.series.first() else {
-                return vec![];
-            };
-            if series.data.is_empty() {
+            if c.series.iter().all(|s| s.data.is_empty()) {
                 return vec![];
             }
-            let (xmin, xmax) = series
-                .data
+            let (xmin, xmax) = c
+                .series
                 .iter()
-                .map(|(x, _)| *x)
+                .flat_map(|s| s.data.iter().map(|(x, _)| *x))
                 .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), x| {
                     (a.min(x), b.max(x))
                 });
-            let (ymin, ymax) = series
-                .data
+            let (ymin, ymax) = c
+                .series
                 .iter()
-                .map(|(_, y)| *y)
+                .flat_map(|s| s.data.iter().map(|(_, y)| *y))
                 .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), y| {
                     (a.min(y), b.max(y))
                 });
             let xspan = (xmax - xmin).max(f64::EPSILON);
             let yspan = (ymax - ymin).max(f64::EPSILON);
             let labels = c.x_labels.clone().unwrap_or_default();
-            let n = series.data.len();
-            series
-                .data
+            c.series
                 .iter()
-                .enumerate()
-                .map(|(i, &(x, y))| {
-                    let cx = plot_x0 + (x - xmin) / xspan * (plot_x1 - plot_x0);
-                    let cy = plot_y1 - (y - ymin) / yspan * (plot_y1 - plot_y0);
-                    let label = labels.get(i).cloned().unwrap_or_else(|| format!("{x}"));
-                    let _ = n;
-                    DataPoint {
-                        label,
-                        value: y,
-                        x: cx,
-                        y: cy,
-                    }
+                .flat_map(|series| {
+                    series
+                        .data
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &(x, y))| {
+                            let cx = plot_x0 + (x - xmin) / xspan * (plot_x1 - plot_x0);
+                            let cy = plot_y1 - (y - ymin) / yspan * (plot_y1 - plot_y0);
+                            let label = labels.get(i).cloned().unwrap_or_else(|| format!("{x}"));
+                            DataPoint {
+                                label,
+                                value: y,
+                                x: cx,
+                                y: cy,
+                                series: Some(series.name.clone()),
+                            }
+                        })
+                        .collect::<Vec<_>>()
                 })
                 .collect()
         }
@@ -181,6 +197,7 @@ fn layout_points(
                         value: *c as f64,
                         x: cx,
                         y: cy,
+                        series: None,
                     }
                 })
                 .collect()
@@ -202,6 +219,7 @@ fn layout_points(
                         value: v,
                         x: plot_x0 + (ci as f64 + 0.5) * (plot_x1 - plot_x0) / cols,
                         y: plot_y0 + (ri as f64 + 0.5) * (plot_y1 - plot_y0) / rows,
+                        series: None,
                     });
                 }
             }
@@ -607,6 +625,73 @@ mod tests {
             marks.matches("vz-point").count(),
             3,
             "one mark per vertex: {marks}"
+        );
+    }
+
+    #[test]
+    fn test_data_marks_multi_series_cover_all_points() {
+        // RED: must fail while layout_points renders the first series only.
+        use crate::render::{Axis, ChartConfig, ChartData, Series};
+        let data = ChartData::Line(ChartConfig {
+            title: None,
+            x_axis: Axis {
+                label: "d".into(),
+                min: 0.0,
+                max: 2.0,
+            },
+            y_axis: Axis {
+                label: "v".into(),
+                min: 0.0,
+                max: 30.0,
+            },
+            series: vec![
+                Series {
+                    name: "a".into(),
+                    data: vec![(0.0, 10.0), (1.0, 20.0)],
+                },
+                Series {
+                    name: "b".into(),
+                    data: vec![(0.0, 5.0), (1.0, 25.0)],
+                },
+            ],
+            x_labels: Some(vec!["x0".into(), "x1".into()]),
+            series_colors: vec![],
+            axis_color: None,
+            label_color: None,
+        });
+        let marks = data_marks_svg(&data, 80, 24);
+        assert_eq!(
+            marks.matches("vz-point").count(),
+            4,
+            "every series vertex needs a mark: {marks}"
+        );
+        assert!(
+            marks.contains("data-series=\"b\""),
+            "series name missing: {marks}"
+        );
+    }
+
+    #[test]
+    fn test_data_marks_bar_negative_values_stay_in_plot() {
+        // RED: must fail while bar layout clamps v/max to [0,1] (negatives
+        // collapse onto the zero line).
+        use crate::render::{BarChartData, ChartData};
+        let data = ChartData::Bar(BarChartData {
+            title: None,
+            labels: vec!["loss".to_string(), "gain".to_string()],
+            values: vec![-50.0, 100.0],
+            y_label: "pnl".to_string(),
+            show_labels: false,
+            series_colors: vec![],
+            axis_color: None,
+        });
+        let pts = layout_points(&data, 80, 24);
+        assert_eq!(pts.len(), 2);
+        assert!(
+            pts[0].y > pts[1].y,
+            "negative bar must sit below positive bar (loss {:?} vs gain {:?})",
+            pts[0],
+            pts[1]
         );
     }
 

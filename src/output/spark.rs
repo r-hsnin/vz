@@ -196,23 +196,9 @@ fn stats_suffix(values: &[f64]) -> String {
 
 /// Compute trend annotation from a slice of values.
 /// Returns arrow + percentage change from first to last value.
+/// Single source of truth lives in [`crate::util::trend_from_slice`].
 fn trend_from_values(values: &[f64]) -> Option<String> {
-    if values.len() < 2 {
-        return None;
-    }
-    let first = values[0];
-    let last = *values.last()?;
-    if first.abs() < f64::EPSILON {
-        return None;
-    }
-    let pct = ((last - first) / first.abs()) * 100.0;
-    if pct > 5.0 {
-        Some(format!("↑ {:+.0}%", pct))
-    } else if pct < -5.0 {
-        Some(format!("↓ {:+.0}%", pct))
-    } else {
-        Some("→ stable".to_string())
-    }
+    crate::util::trend_from_slice(values)
 }
 
 #[cfg(test)]

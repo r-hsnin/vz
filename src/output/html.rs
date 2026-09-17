@@ -85,7 +85,11 @@ svg {{
       el.style.pointerEvents = 'all';
       function labelFor(target) {{
         var title = target.querySelector('title');
-        if (title && title.textContent.trim().length > 0) return title.textContent.trim();
+        if (title && title.textContent.trim().length > 0) {{
+          var series = target.getAttribute('data-series');
+          var t = title.textContent.trim();
+          return series ? series + ' — ' + t : t;
+        }}
         var label = target.getAttribute('data-label') || '';
         var value = target.getAttribute('data-value') || '';
         var s = (label + (value ? ': ' + value : '')).trim();

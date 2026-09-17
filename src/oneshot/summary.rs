@@ -139,19 +139,7 @@ fn trend_annotation(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
     if values.len() < 2 {
         return None;
     }
-    let first = values[0];
-    let last = *values.last()?;
-    if first.abs() < f64::EPSILON {
-        return None;
-    }
-    let pct = ((last - first) / first.abs()) * 100.0;
-    if pct > 5.0 {
-        Some(format!("↑ {:+.0}%", pct))
-    } else if pct < -5.0 {
-        Some(format!("↓ {:+.0}%", pct))
-    } else {
-        Some("→ stable".to_string())
-    }
+    crate::util::trend_from_slice(&values)
 }
 
 /// Generate a sparkline string from numeric values.

@@ -136,6 +136,35 @@ fn strip_unit_suffix(lower: &str) -> Option<(&str, f64)> {
     Some((lower, 1.0))
 }
 
+/// Compute a trend annotation from first→last values.
+/// Returns `↑ +N%` / `↓ -N%` when the endpoint change exceeds ±5%,
+/// `→ stable` inside the band, and `None` for <2 points or a
+/// near-zero start. The denominator is `first.abs()` so a recovery
+/// like `-100 → -50` reports `↑ +50%`, not `↓`.
+/// Single source of truth for summary lines and spark suffixes.
+pub fn trend_label(first: f64, last: f64) -> Option<String> {
+    if first.abs() < f64::EPSILON {
+        return None;
+    }
+    let pct = ((last - first) / first.abs()) * 100.0;
+    if pct > 5.0 {
+        Some(format!("↑ {:+.0}%", pct))
+    } else if pct < -5.0 {
+        Some(format!("↓ {:+.0}%", pct))
+    } else {
+        Some("→ stable".to_string())
+    }
+}
+
+/// Compute a trend annotation from a value slice (needs ≥2 points).
+/// Thin wrapper over [`trend_label`] using first/last endpoints.
+pub fn trend_from_slice(values: &[f64]) -> Option<String> {
+    if values.len() < 2 {
+        return None;
+    }
+    trend_label(values[0], *values.last()?)
+}
+
 /// Compute the minimum and maximum of a slice of f64 values.
 pub fn min_max(values: &[f64]) -> Option<(f64, f64)> {
     let mut min = f64::INFINITY;
@@ -240,6 +269,21 @@ mod tests {
         assert!(parse_number("NaN").is_none());
         assert!(parse_number("inf").is_none());
         assert!(parse_number("-inf").is_none());
+    }
+
+    #[test]
+    fn test_trend_label_up() {
+        // RED: must fail until util::trend_label unifies summary/spark logic.
+        assert_eq!(trend_label(100.0, 200.0).unwrap(), "↑ +100%");
+    }
+
+    #[test]
+    fn test_trend_label_down_stable_zero_negative() {
+        // RED: must fail until util::trend_label unifies summary/spark logic.
+        assert_eq!(trend_label(100.0, 50.0).unwrap(), "↓ -50%");
+        assert_eq!(trend_label(100.0, 103.0).unwrap(), "→ stable");
+        assert!(trend_label(0.0, 100.0).is_none());
+        assert_eq!(trend_label(-100.0, -50.0).unwrap(), "↑ +50%");
     }
 
     #[test]

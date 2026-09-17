@@ -132,7 +132,7 @@ vz present slides.md
 | `-W` | `--width` | Chart width in columns (default: terminal width) |
 | `-H` | `--height` | Chart height in rows (default: 24) |
 | `-I` | `--info` | Show column metadata without rendering a chart |
-| `-w` | `--where` | Filter rows: `col=value`, `col!=value`, `col>value`, `col>=value`, `col<value`, `col<=value` (repeatable) |
+| `-w` | `--where` | Filter rows: `col=value`, `col!=value`, `col>value`, `col>=value`, `col<value`, `col<=value` (repeatable; equality is numeric-aware: `revenue=2000` matches `$2,000`) |
 | `-o` | `--output` | Output format: `text`, `json`, `table`, `spark`, `svg`, `html`, `markdown` |
 | `-Y` | `--all-y` | Plot all quantitative columns as multi-series overlay |
 | | `--no-header` | Treat first row as data (auto-detected if all-numeric) |

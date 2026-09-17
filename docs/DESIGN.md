@@ -23,7 +23,8 @@ column type is decided by majority vote:
 | Value pattern | Detected as | Notes |
 |---------------|-------------|-------|
 | `YYYY-MM-DD` (optional time), `YYYY/MM/DD`, `MM/DD/YYYY`, `DD-Mon-YYYY`, `YYYY-MM` | `Temporal` | Checked before numeric |
-| Display-formatted numbers via `util::parse_number` | `Quantitative` | `1,000`, `$100`, `€50`, `45%` (= 0.45), `10k`, `10GiB`, `(42)` (= -42), `USD 100` all parse → Quantitative. One parser shared by inference, aggregation, series, filters, diff, sparkline, and JSON samples, so a value means the same number on every path. `%` is a fraction (`50%` = 0.5); storage suffixes are decimal except `KiB/MiB/GiB/TiB` (binary) |
+| Display-formatted numbers via `util::parse_number` | `Quantitative` | `1,000`, `$100`, `€50`, `45%` (= 0.45), `10k`, `10GiB`, `(42)` (= -42), `USD 100` all parse → Quantitative. One parser shared by inference, aggregation, series, filters, diff, sparkline, and JSON samples, so a value means the same number on every path. `%` is a fraction (`50%` = 0.5); storage suffixes are decimal except `KiB/MiB/GiB/TiB` (binary). `--where` equality is numeric too (`revenue=2000` matches `$2,000`) |
+| Trend annotation via `util::trend_label`/`trend_from_slice` | `→ stable` band ±5% | Single implementation shared by oneshot summary lines and spark suffixes; denominator is `first.abs()` (`-100 → -50` = `↑ +50%`), near-zero start yields no trend |
 | `NaN`, `inf`, `-inf`, `Infinity` | `Nominal` (excluded from column vote) | `parse_number` returns `None` for non-finite → treated like nulls: skipped in inference, aggregation, and all chart paths |
 | Empty string | `Nominal` (ignored in column vote) | Nulls don't vote |
 | Anything else | `Nominal` | e.g. UUIDs, free text |

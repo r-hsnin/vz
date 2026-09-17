@@ -137,8 +137,24 @@ fn matches_row(row: &[String], col_idx: usize, op: &FilterOp, value: &str) -> bo
     };
 
     match op {
-        FilterOp::Eq => cell == value,
-        FilterOp::NotEq => cell != value,
+        FilterOp::Eq | FilterOp::NotEq => {
+            // Numeric-aware equality: when both sides parse as numbers
+            // ("$2,000" vs "2000", "45%" vs "0.45"), compare numerically.
+            // Non-numeric cells keep exact string semantics, and empty
+            // still matches empty.
+            if let (Some(a), Some(b)) = (
+                crate::util::parse_number(cell),
+                crate::util::parse_number(value),
+            ) {
+                let eq = a == b;
+                return if *op == FilterOp::Eq { eq } else { !eq };
+            }
+            if *op == FilterOp::Eq {
+                cell == value
+            } else {
+                cell != value
+            }
+        }
         FilterOp::Gt | FilterOp::Lt | FilterOp::Gte | FilterOp::Lte => {
             // Numeric comparison via the shared parser ("1,000", "$100",
             // "45%", "10k"), else lexicographic string fallback.
@@ -352,6 +368,49 @@ mod tests {
         assert_eq!(result.rows.len(), 2);
         assert_eq!(result.rows[0][0], "Bob");
         assert_eq!(result.rows[1][0], "Charlie");
+    }
+
+    #[test]
+    fn test_filter_eq_is_numeric_aware() {
+        // RED: must fail while Eq/NotEq compare raw strings ("$2,000" != "2000").
+        let data = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "$2,000".into()],
+                vec!["Osaka".into(), "2000".into()],
+                vec!["Kyoto".into(), "500".into()],
+            ],
+        };
+        let pred = parse_predicate("revenue=2000").unwrap();
+        let result = filter_data(data, &[pred]).unwrap();
+        assert_eq!(result.rows.len(), 2);
+        let pred = parse_predicate("revenue!=2000").unwrap();
+        let data2 = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "$2,000".into()],
+                vec!["Kyoto".into(), "500".into()],
+            ],
+        };
+        let result = filter_data(data2, &[pred]).unwrap();
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0][0], "Kyoto");
+    }
+
+    #[test]
+    fn test_filter_eq_keeps_string_semantics_for_text() {
+        // Non-numeric cells still compare as strings; empty still matches empty.
+        let data = LoadedData {
+            headers: vec!["city".into(), "note".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "".into()],
+                vec!["Osaka".into(), "x".into()],
+            ],
+        };
+        let pred = parse_predicate("note=").unwrap();
+        let result = filter_data(data, &[pred]).unwrap();
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0][0], "Tokyo");
     }
 
     #[test]

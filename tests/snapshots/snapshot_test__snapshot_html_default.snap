@@ -69,9 +69,12 @@ svg {
 <text y="365"><tspan x="0" fill="#cccccc">│2024-01-01                            2024-04-01                    2024-06-01│</tspan></text>
 <text y="381"><tspan x="0" fill="#cccccc">└──────────────────────────────────────────────────────────────────────────────┘</tspan></text>
 <g class="vz-data" fill="#ffffff" fill-opacity="0.0">
-<circle class="vz-point" cx="48.0" cy="360.0" r="7" data-label="2024-01-01" data-value="1000"><title>2024-01-01: 1k</title></circle>
-<circle class="vz-point" cx="340.0" cy="292.8" r="7" data-label="2024-04-01" data-value="1200"><title>2024-04-01: 1.2k</title></circle>
-<circle class="vz-point" cx="632.0" cy="24.0" r="7" data-label="2024-06-01" data-value="2000"><title>2024-06-01: 2k</title></circle>
+<circle class="vz-point" cx="48.0" cy="304.0" r="7" data-label="2024-01-01" data-value="1000" data-series="Tokyo"><title>2024-01-01: 1k</title></circle>
+<circle class="vz-point" cx="281.6" cy="248.0" r="7" data-label="2024-04-01" data-value="1200" data-series="Tokyo"><title>2024-04-01: 1.2k</title></circle>
+<circle class="vz-point" cx="515.2" cy="24.0" r="7" data-label="2024-06-01" data-value="2000" data-series="Tokyo"><title>2024-06-01: 2k</title></circle>
+<circle class="vz-point" cx="164.8" cy="164.0" r="7" data-label="2024-01-01" data-value="1500" data-series="Osaka"><title>2024-01-01: 1.5k</title></circle>
+<circle class="vz-point" cx="632.0" cy="80.0" r="7" data-label="2024-04-01" data-value="1800" data-series="Osaka"><title>2024-04-01: 1.8k</title></circle>
+<circle class="vz-point" cx="398.4" cy="360.0" r="7" data-label="2024-01-01" data-value="800" data-series="Nagoya"><title>2024-01-01: 800</title></circle>
 </g>
 </svg>
 
@@ -93,7 +96,11 @@ svg {
       el.style.pointerEvents = 'all';
       function labelFor(target) {
         var title = target.querySelector('title');
-        if (title && title.textContent.trim().length > 0) return title.textContent.trim();
+        if (title && title.textContent.trim().length > 0) {
+          var series = target.getAttribute('data-series');
+          var t = title.textContent.trim();
+          return series ? series + ' — ' + t : t;
+        }
         var label = target.getAttribute('data-label') || '';
         var value = target.getAttribute('data-value') || '';
         var s = (label + (value ? ': ' + value : '')).trim();
