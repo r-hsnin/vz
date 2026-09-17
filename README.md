@@ -223,6 +223,8 @@ vz q1.csv q2.csv -o json
 Both files must have matching schemas (same column names, case-insensitive).
 Categorical X columns produce a bar chart with ▲/▼ annotations showing per-category change and percentage delta.
 Temporal X columns produce a line chart overlay with before (gray) and after (cyan) series.
+`--where`/`--agg`/`--color` have no effect in diff mode (a warning is printed).
+Non-numeric cells are skipped, never counted as `0`.
 
 ## Output Format
 
