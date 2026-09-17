@@ -59,6 +59,7 @@ pub fn find_similar_files(dir: &Path, target: &str) -> Vec<String> {
         .collect();
 
     // First: find files similar to the target name
+    let prefix: String = target_lower.chars().take(4).collect();
     let similar: Vec<String> = all_data_files
         .iter()
         .filter(|name| {
@@ -68,7 +69,7 @@ pub fn find_similar_files(dir: &Path, target: &str) -> Vec<String> {
                 .zip(name_lower.chars())
                 .take_while(|(a, b)| a == b)
                 .count();
-            shared >= 3 || name_lower.contains(&target_lower[..target_lower.len().min(4)])
+            shared >= 3 || (!prefix.is_empty() && name_lower.contains(&prefix))
         })
         .take(3)
         .cloned()
@@ -108,5 +109,33 @@ mod tests {
         let result = find_similar_files(Path::new("fixtures"), "sales");
         assert!(!result.is_empty());
         assert!(result.iter().any(|f| f.contains("sales")));
+    }
+
+    #[test]
+    fn test_find_similar_files_non_ascii_target_does_not_panic() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("日本語データ.csv"), "a,b\n1,2\n").unwrap();
+        // Shared prefix < 3 chars forces evaluation of the 4-byte prefix slice,
+        // which panics on a byte-wise cut inside a multibyte char.
+        let result = find_similar_files(dir.path(), "zz日本語.csv");
+        assert_eq!(result, vec!["日本語データ.csv".to_string()]);
+    }
+
+    #[test]
+    fn test_find_similar_files_emoji_target_does_not_panic() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("data.csv"), "a\n1\n").unwrap();
+        // "a📊.csv"[..4] cuts inside the emoji on byte-wise slicing.
+        let result = find_similar_files(dir.path(), "a📊.csv");
+        assert_eq!(result, vec!["data.csv".to_string()]);
+    }
+
+    #[test]
+    fn test_find_similar_files_empty_target_matches_nothing_similar() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("data.csv"), "a\n1\n").unwrap();
+        // Empty target must not vacuously match; only the fallback applies.
+        let result = find_similar_files(dir.path(), "");
+        assert_eq!(result, vec!["data.csv".to_string()]);
     }
 }

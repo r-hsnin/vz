@@ -96,6 +96,23 @@ fn test_nonexistent_file_error() {
 }
 
 #[test]
+fn test_nonexistent_non_ascii_file_does_not_panic() {
+    let output = vz_binary()
+        .arg("日本語不存在.csv")
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("panicked"),
+        "suggestion must not panic:\n{}",
+        stderr
+    );
+    assert!(stderr.contains("日本語不存在.csv"));
+}
+
+#[test]
 fn test_no_file_argument_error() {
     use std::process::Stdio;
     // When stdin is a terminal (not pipe), vz should show usage error.
