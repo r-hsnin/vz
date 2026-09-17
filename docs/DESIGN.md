@@ -23,7 +23,8 @@ column type is decided by majority vote:
 | Value pattern | Detected as | Notes |
 |---------------|-------------|-------|
 | `YYYY-MM-DD` (optional time), `YYYY/MM/DD`, `MM/DD/YYYY`, `DD-Mon-YYYY`, `YYYY-MM` | `Temporal` | Checked before numeric |
-| Numeric after stripping `,` and spaces | `Quantitative` | `1,000`, `$100` do **not** parse → fall through to Nominal |
+| Numeric after stripping `,` and spaces | `Quantitative` | `1,000` parses (`, `/space stripped) → Quantitative; `$100`, `45%` do **not** parse → fall through to Nominal |
+| `NaN`, `inf`, `-inf`, `Infinity` | `Nominal` (excluded from column vote) | Parse as `f64` but non-finite → treated like nulls: skipped in inference, aggregation, and all chart paths |
 | Empty string | `Nominal` (ignored in column vote) | Nulls don't vote |
 | Anything else | `Nominal` | e.g. `45%`, UUIDs, free text |
 

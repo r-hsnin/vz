@@ -156,11 +156,13 @@ pub fn build_grouped_series(
         } else {
             row.get(x_idx)
                 .and_then(|v| v.parse::<f64>().ok())
+                .filter(|v| v.is_finite())
                 .unwrap_or(i as f64)
         };
+        // Skip non-finite (NaN/inf): never leak them into axes or series.
         let y = match row.get(y_idx).and_then(|v| v.parse::<f64>().ok()) {
-            Some(v) => v,
-            None => continue,
+            Some(v) if v.is_finite() => v,
+            _ => continue,
         };
 
         if let Some(entry) = groups.iter_mut().find(|(name, _)| name == &group_name) {
@@ -194,9 +196,14 @@ pub fn build_single_series(
             } else {
                 row.get(x_idx)
                     .and_then(|v| v.parse::<f64>().ok())
+                    .filter(|v| v.is_finite())
                     .unwrap_or(i as f64)
             };
-            let y = row.get(y_idx).and_then(|v| v.parse::<f64>().ok())?;
+            // Skip non-finite (NaN/inf): never leak them into axes or series.
+            let y = row
+                .get(y_idx)
+                .and_then(|v| v.parse::<f64>().ok())
+                .filter(|v| v.is_finite())?;
             Some((x, y))
         })
         .collect();
@@ -329,9 +336,11 @@ pub fn build_histogram(
     x_label: String,
     bin_count: Option<usize>,
 ) -> HistogramData {
+    // Skip non-finite (NaN/inf): never leak them into bins or ranges.
     let values: Vec<f64> = rows
         .iter()
         .filter_map(|r| r.get(col_idx).and_then(|v| v.parse().ok()))
+        .filter(|v: &f64| v.is_finite())
         .collect();
 
     HistogramData {

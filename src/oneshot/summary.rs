@@ -129,10 +129,12 @@ fn format_y_part(
 
 /// Compute trend annotation for line/scatter charts.
 /// Returns arrow + percentage change from first to last value.
+/// Non-finite values are skipped before comparing endpoints.
 fn trend_annotation(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
     let values: Vec<f64> = rows
         .iter()
         .filter_map(|r| r.get(y_idx)?.parse::<f64>().ok())
+        .filter(|v| v.is_finite())
         .collect();
     if values.len() < 2 {
         return None;
@@ -159,6 +161,7 @@ fn sparkline(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
     let values: Vec<f64> = rows
         .iter()
         .filter_map(|r| r.get(y_idx)?.parse::<f64>().ok())
+        .filter(|v| v.is_finite())
         .collect();
     if values.len() < 2 {
         return None;
@@ -338,7 +341,7 @@ pub fn unused_columns_hint(
     unused_columns_hint_with_extra(recommendation, headers, &[])
 }
 
-/// Compute min and max of Y values.
+/// Compute min and max of Y values (non-finite values are skipped).
 fn compute_y_stats(rows: &[Vec<String>], y_idx: usize) -> Option<(f64, f64)> {
     let values: Vec<f64> = rows
         .iter()
@@ -346,6 +349,7 @@ fn compute_y_stats(rows: &[Vec<String>], y_idx: usize) -> Option<(f64, f64)> {
             row.get(y_idx)
                 .and_then(|v| v.replace(',', "").parse::<f64>().ok())
         })
+        .filter(|v| v.is_finite())
         .collect();
 
     if values.is_empty() {

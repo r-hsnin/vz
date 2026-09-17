@@ -28,6 +28,8 @@ pub fn detect_value_type(value: &str) -> DataType {
 
 /// Infer column type from a sample of values.
 /// Returns the majority type among non-null values.
+/// Empty and non-finite (`NaN`/`inf`) values are ignored in the vote,
+/// consistent with downstream aggregation skipping them.
 pub fn infer_column_type(values: &[&str]) -> DataType {
     if values.is_empty() {
         return DataType::Nominal;
@@ -36,7 +38,7 @@ pub fn infer_column_type(values: &[&str]) -> DataType {
     let sample: Vec<&str> = values.iter().take(SAMPLE_SIZE).copied().collect();
     let non_empty: Vec<&str> = sample
         .iter()
-        .filter(|v| !v.trim().is_empty())
+        .filter(|v| !v.trim().is_empty() && !is_non_finite_number(v))
         .copied()
         .collect();
 
@@ -111,9 +113,17 @@ fn is_temporal(value: &str) -> bool {
 }
 
 fn is_quantitative(value: &str) -> bool {
-    // Strip common number formatting
+    // Strip common number formatting. Non-finite values (NaN/inf) parse as
+    // f64 but must not vote Quantitative — they are skipped downstream.
     let cleaned: String = value.chars().filter(|c| *c != ',' && *c != ' ').collect();
-    cleaned.parse::<f64>().is_ok()
+    cleaned.parse::<f64>().is_ok_and(|v| v.is_finite())
+}
+
+/// True when the value parses as a non-finite number (NaN/±inf), ignoring
+/// comma/space formatting. Used to exclude such values from the type vote.
+fn is_non_finite_number(value: &str) -> bool {
+    let cleaned: String = value.chars().filter(|c| *c != ',' && *c != ' ').collect();
+    cleaned.parse::<f64>().is_ok_and(|v| !v.is_finite())
 }
 
 #[cfg(test)]
@@ -280,5 +290,27 @@ mod tests {
         assert_eq!(detect_value_type("$100"), DataType::Nominal);
         assert_eq!(detect_value_type("€50"), DataType::Nominal);
         assert_eq!(detect_value_type("¥1000"), DataType::Nominal);
+    }
+
+    #[test]
+    fn test_detect_non_finite_is_nominal() {
+        // NaN/inf parse as f64 but must never vote Quantitative
+        assert_eq!(detect_value_type("NaN"), DataType::Nominal);
+        assert_eq!(detect_value_type("inf"), DataType::Nominal);
+        assert_eq!(detect_value_type("-inf"), DataType::Nominal);
+        assert_eq!(detect_value_type("Infinity"), DataType::Nominal);
+    }
+
+    #[test]
+    fn test_infer_ignores_non_finite_in_vote() {
+        // 2 finite of 2 voting values → Quantitative despite NaN/inf rows
+        let values = vec!["100", "NaN", "inf", "200"];
+        assert_eq!(infer_column_type(&values), DataType::Quantitative);
+    }
+
+    #[test]
+    fn test_infer_all_non_finite_is_nominal() {
+        let values = vec!["NaN", "inf", "-inf"];
+        assert_eq!(infer_column_type(&values), DataType::Nominal);
     }
 }

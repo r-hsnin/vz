@@ -42,6 +42,7 @@ pub fn print_spark(
             let values: Vec<f64> = rows
                 .iter()
                 .filter_map(|r| r.get(xi)?.parse::<f64>().ok())
+                .filter(|v| v.is_finite())
                 .collect();
             if values.is_empty() {
                 println!("{}", recommendation.x_column);
@@ -91,7 +92,10 @@ pub fn print_spark(
         let mut groups: BTreeMap<&str, Vec<f64>> = BTreeMap::new();
         for row in rows {
             let group = row.get(ci).map_or("", |v| v.as_str());
-            let val = row.get(yi).and_then(|v| v.parse::<f64>().ok());
+            let val = row
+                .get(yi)
+                .and_then(|v| v.parse::<f64>().ok())
+                .filter(|v| v.is_finite());
             if let Some(v) = val {
                 groups.entry(group).or_default().push(v);
             }
@@ -104,10 +108,11 @@ pub fn print_spark(
         return;
     }
 
-    // Single sparkline from all Y values in row order
+    // Single sparkline from all Y values in row order (non-finite skipped)
     let values: Vec<f64> = rows
         .iter()
         .filter_map(|r| r.get(yi)?.parse::<f64>().ok())
+        .filter(|v| v.is_finite())
         .collect();
     let spark = make_sparkline(&values);
     let suffix = stats_suffix(&values);

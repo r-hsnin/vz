@@ -830,3 +830,31 @@ fn test_agg_max_hides_nan_group_without_inf() {
         stdout
     );
 }
+
+#[test]
+fn test_line_chart_skips_non_finite_points() {
+    let f = common::temp_csv(&[
+        "date,revenue",
+        "2024-01-01,100",
+        "2024-02-01,NaN",
+        "2024-03-01,inf",
+        "2024-04-01,200",
+    ]);
+    let output = vz_binary()
+        .args([f.path().to_str().unwrap(), "-t", "line"])
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "vz failed: {}", stderr);
+    assert!(
+        !stderr.to_lowercase().contains("inf") && !stderr.to_lowercase().contains("nan"),
+        "non-finite leaked into summary: {}",
+        stderr
+    );
+    assert!(
+        !stdout.to_lowercase().contains("inf"),
+        "non-finite leaked into chart: {}",
+        stdout
+    );
+}

@@ -1501,3 +1501,50 @@ fn test_json_truncated_flag() {
     assert_eq!(v["data"].as_array().unwrap().len(), 100);
     assert_eq!(v["truncated"], true);
 }
+
+#[test]
+fn test_spark_skips_non_finite_values() {
+    let f = common::temp_csv(&[
+        "date,revenue",
+        "2024-01-01,100",
+        "2024-02-01,NaN",
+        "2024-03-01,inf",
+        "2024-04-01,200",
+    ]);
+    let output = common::vz_no_color()
+        .arg(f.path())
+        .arg("-o")
+        .arg("spark")
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.to_lowercase().contains("inf") && !stdout.to_lowercase().contains("nan"),
+        "non-finite leaked into spark output: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_chart_json_series_skips_non_finite_points() {
+    let f = common::temp_csv(&[
+        "date,revenue",
+        "2024-01-01,100",
+        "2024-02-01,NaN",
+        "2024-03-01,inf",
+        "2024-04-01,200",
+    ]);
+    let output = common::vz_no_color()
+        .arg(f.path())
+        .arg("-o")
+        .arg("json")
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let series = v["chart_data"]["series"].as_array().unwrap();
+    let data = series[0]["data"].as_array().unwrap();
+    assert_eq!(data.len(), 2, "non-finite points must be skipped: {}", v);
+    assert!(data.iter().all(|p| p["y"].is_number()));
+}

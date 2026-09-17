@@ -335,3 +335,48 @@ fn test_collect_groups_skips_non_finite() {
     let v = apply_agg(&groups[0].1, AggFunction::Max);
     assert!(v.is_finite() && (v - 50.0).abs() < f64::EPSILON);
 }
+
+#[test]
+fn test_build_single_series_skips_non_finite() {
+    let rows = vec![
+        vec!["2024-01".to_string(), "10".to_string()],
+        vec!["2024-02".to_string(), "NaN".to_string()],
+        vec!["2024-03".to_string(), "inf".to_string()],
+        vec!["2024-04".to_string(), "40".to_string()],
+    ];
+    let series = build_single_series(&rows, 0, 1, true, "v".to_string());
+    assert_eq!(series.data.len(), 2);
+    assert!(series.data.iter().all(|(_, y)| y.is_finite()));
+}
+
+#[test]
+fn test_build_grouped_series_skips_non_finite() {
+    let rows = vec![
+        vec!["2024-01".to_string(), "10".to_string(), "A".to_string()],
+        vec!["2024-02".to_string(), "NaN".to_string(), "A".to_string()],
+        vec!["2024-03".to_string(), "-inf".to_string(), "B".to_string()],
+        vec!["2024-04".to_string(), "40".to_string(), "B".to_string()],
+    ];
+    let series = build_grouped_series(&rows, 0, 1, 2, true);
+    let total: usize = series.iter().map(|s| s.data.len()).sum();
+    assert_eq!(total, 2);
+    assert!(
+        series
+            .iter()
+            .flat_map(|s| s.data.iter())
+            .all(|(x, y)| x.is_finite() && y.is_finite())
+    );
+}
+
+#[test]
+fn test_build_histogram_skips_non_finite() {
+    let rows = vec![
+        vec!["10".to_string()],
+        vec!["NaN".to_string()],
+        vec!["inf".to_string()],
+        vec!["20".to_string()],
+    ];
+    let hist = build_histogram(&rows, 0, None, "v".to_string(), None);
+    assert_eq!(hist.values.len(), 2);
+    assert!(hist.values.iter().all(|v| v.is_finite()));
+}

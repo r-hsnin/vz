@@ -132,11 +132,17 @@ fn build_series_json(
 
     let mut series: Vec<serde_json::Value> = Vec::new();
     let y_name = headers.get(y_idx).cloned().unwrap_or_default();
+    // Non-finite values are skipped: serde_json cannot represent NaN/inf.
     let points: Vec<serde_json::Value> = rows
         .iter()
         .filter_map(|r| {
             let x = r.get(x_idx)?.clone();
-            let y: f64 = r.get(y_idx)?.replace(',', "").parse().ok()?;
+            let y: f64 = r
+                .get(y_idx)?
+                .replace(',', "")
+                .parse()
+                .ok()
+                .filter(|v: &f64| v.is_finite())?;
             Some(json!({"x": x, "y": y}))
         })
         .collect();
@@ -148,7 +154,12 @@ fn build_series_json(
             .iter()
             .filter_map(|r| {
                 let x = r.get(x_idx)?.clone();
-                let y: f64 = r.get(ey)?.replace(',', "").parse().ok()?;
+                let y: f64 = r
+                    .get(ey)?
+                    .replace(',', "")
+                    .parse()
+                    .ok()
+                    .filter(|v: &f64| v.is_finite())?;
                 Some(json!({"x": x, "y": y}))
             })
             .collect();
@@ -173,7 +184,12 @@ fn build_grouped_series_json(
         let group = row.get(color_idx).cloned().unwrap_or_default();
         let point = (|| {
             let x = row.get(x_idx)?.clone();
-            let y: f64 = row.get(y_idx)?.replace(',', "").parse().ok()?;
+            let y: f64 = row
+                .get(y_idx)?
+                .replace(',', "")
+                .parse()
+                .ok()
+                .filter(|v: &f64| v.is_finite())?;
             Some(json!({"x": x, "y": y}))
         })();
         if let Some(pt) = point {
@@ -351,6 +367,23 @@ mod tests {
         assert_eq!(series.len(), 2);
         assert_eq!(series[0]["name"], "A");
         assert_eq!(series[1]["name"], "B");
+    }
+
+    #[test]
+    fn test_build_series_json_skips_non_finite() {
+        let headers = vec!["date".into(), "value".into()];
+        let rows = vec![
+            vec!["2024-01".into(), "100".into()],
+            vec!["2024-02".into(), "NaN".into()],
+            vec!["2024-03".into(), "inf".into()],
+            vec!["2024-04".into(), "200".into()],
+        ];
+        let params = make_params(ChartType::Line);
+        let result = build_series_json(&headers, &rows, 0, 1, &params);
+        let series = result["series"].as_array().unwrap();
+        let data = series[0]["data"].as_array().unwrap();
+        assert_eq!(data.len(), 2);
+        assert!(data.iter().all(|p| p["y"].is_number()));
     }
 
     #[test]

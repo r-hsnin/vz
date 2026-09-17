@@ -342,6 +342,29 @@ assert!(trend_annotation(&rows, 1).is_none());
 }
 
 #[test]
+fn test_trend_annotation_skips_non_finite() {
+let rows = vec![
+    vec!["a".to_string(), "100".to_string()],
+    vec!["b".to_string(), "NaN".to_string()],
+    vec!["c".to_string(), "inf".to_string()],
+    vec!["d".to_string(), "200".to_string()],
+];
+let trend = trend_annotation(&rows, 1).unwrap();
+assert!(trend.contains('↑'), "Expected ↑, got: {}", trend);
+}
+
+#[test]
+fn test_compute_y_stats_skips_non_finite() {
+let rows = vec![
+    vec!["a".to_string(), "NaN".to_string()],
+    vec!["b".to_string(), "10".to_string()],
+    vec!["c".to_string(), "inf".to_string()],
+    vec!["d".to_string(), "30".to_string()],
+];
+assert_eq!(compute_y_stats(&rows, 1), Some((10.0, 30.0)));
+}
+
+#[test]
 fn test_truncate_to_width_short_string() {
 assert_eq!(truncate_to_width("hello", 80), "hello");
 }

@@ -12,7 +12,7 @@ Release procedures live in [RUNBOOK.md](RUNBOOK.md).
 - **TSV detection relies on extension or tab prevalence.** When piping, use `-f tsv` explicitly.
 - **Large datasets (>100k rows):** Use `--sample N` to keep rendering fast.
 - **JSON output includes only the first 100 rows in `data[]`.** The `chart_data` field contains the full aggregated result. JSON sets `"truncated": true` when capped.
-- **NaN/inf are skipped in aggregations and diffs, null in JSON `data[]`.** `--agg max/min` never emits `±inf`; text-only diffs report no entries instead of `0→0`.
+- **NaN/inf are skipped in aggregations, diffs, and every chart path** (line/scatter/histogram/spark/JSON series), and ignored in the type-inference vote like nulls. `--agg max/min` never emits `±inf`; text-only diffs report no entries instead of `0→0`. JSON `data[]` renders them as `null`, while `chart_data` series omit those points.
 - **Diff mode ignores `--where`/`--agg`/`--color`.** A `no effect in diff mode` warning is printed; filter before comparing instead.
 - **Explore/Present require an interactive terminal.** In CI or pipes, use one-shot mode.
 
