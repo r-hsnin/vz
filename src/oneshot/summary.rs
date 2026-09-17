@@ -144,7 +144,7 @@ fn trend_annotation(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
     if first.abs() < f64::EPSILON {
         return None;
     }
-    let pct = ((last - first) / first) * 100.0;
+    let pct = ((last - first) / first.abs()) * 100.0;
     if pct > 5.0 {
         Some(format!("↑ {:+.0}%", pct))
     } else if pct < -5.0 {

@@ -205,7 +205,7 @@ fn trend_from_values(values: &[f64]) -> Option<String> {
     if first.abs() < f64::EPSILON {
         return None;
     }
-    let pct = ((last - first) / first) * 100.0;
+    let pct = ((last - first) / first.abs()) * 100.0;
     if pct > 5.0 {
         Some(format!("↑ {:+.0}%", pct))
     } else if pct < -5.0 {
@@ -363,5 +363,12 @@ mod tests {
     fn test_trend_from_values_zero_start() {
         // Division by zero guard
         assert_eq!(trend_from_values(&[0.0, 100.0]), None);
+    }
+
+    #[test]
+    fn test_trend_from_values_negative_start_improves() {
+        // -100 -> -50 is an improvement, must not report ↓
+        let trend = trend_from_values(&[-100.0, -50.0]).expect("needs trend");
+        assert!(trend.contains('↑'), "Expected ↑, got: {}", trend);
     }
 }

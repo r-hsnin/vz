@@ -182,7 +182,8 @@ fn chart_type_for_pair(x_type: DataType, y_type: DataType) -> ChartType {
 }
 
 /// Warning message when the resolved axis pair has no dedicated chart rule
-/// (a `Nominal` column is involved) and rendering falls back to Bar.
+/// and rendering falls back to Bar (e.g. a `Nominal` column is involved, or
+/// an uncovered pair like Temporal × Temporal).
 /// Returns `None` for first-class pairs, non-Bar charts, or unknown columns.
 /// Batch-mode callers (oneshot, present) print this to stderr; the interactive
 /// explorer stays silent to avoid corrupting the TUI.
@@ -197,15 +198,28 @@ pub fn fallback_warning(
     }
     let x_meta = schema.find_column(x_name)?;
     let y_meta = y_name.and_then(|y| schema.find_column(y))?;
-    if x_meta.data_type == DataType::Nominal || y_meta.data_type == DataType::Nominal {
-        Some(format!(
-            "warning: no chart rule for {} ({}) × {} ({}); falling back to bar. \
-             Hint: use -t to pick a chart type explicitly.",
-            x_meta.name, x_meta.data_type, y_meta.name, y_meta.data_type,
-        ))
-    } else {
-        None
+    if has_chart_rule(x_meta.data_type, y_meta.data_type) {
+        return None;
     }
+    Some(format!(
+        "warning: no chart rule for {} ({}) × {} ({}); falling back to bar. \
+         Hint: use -t to pick a chart type explicitly.",
+        x_meta.name, x_meta.data_type, y_meta.name, y_meta.data_type,
+    ))
+}
+
+/// Whether the axis pair has a dedicated chart rule in [`chart_type_for_pair`].
+/// Must stay in sync with `chart_type_for_pair`: every non-Bar arm is listed.
+fn has_chart_rule(x_type: DataType, y_type: DataType) -> bool {
+    matches!(
+        (x_type, y_type),
+        (DataType::Temporal, DataType::Quantitative)
+            | (DataType::Categorical, DataType::Quantitative)
+            | (DataType::Quantitative, DataType::Quantitative)
+            | (DataType::Categorical, DataType::Categorical)
+            | (DataType::Quantitative, DataType::Temporal)
+            | (DataType::Quantitative, DataType::Categorical)
+    )
 }
 
 /// Auto-select chart based on schema column types.

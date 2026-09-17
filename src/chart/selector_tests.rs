@@ -317,3 +317,19 @@ fn test_fallback_warning_none_for_plain_bar() {
         None
     );
 }
+
+#[test]
+fn test_fallback_warning_for_temporal_pair_fallback() {
+    // (Temporal, Temporal) has no chart rule and falls back to Bar — must warn.
+    let schema = make_schema(&[("start", DataType::Temporal), ("end", DataType::Temporal)]);
+    let rec = select_chart(&schema, Some("start"), Some("end")).unwrap();
+    assert_eq!(rec.chart_type, ChartType::Bar);
+    let warning = fallback_warning(
+        &schema,
+        &rec.x_column,
+        rec.y_column.as_deref(),
+        rec.chart_type,
+    )
+    .expect("catch-all bar fallback must warn");
+    assert!(warning.contains("falling back to bar"), "got: {warning}");
+}

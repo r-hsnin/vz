@@ -354,6 +354,16 @@ assert!(trend.contains('↑'), "Expected ↑, got: {}", trend);
 }
 
 #[test]
+fn test_trend_annotation_negative_start_improves() {
+let rows = vec![
+    vec!["a".to_string(), "-100".to_string()],
+    vec!["b".to_string(), "-50".to_string()],
+];
+let trend = trend_annotation(&rows, 1).unwrap();
+assert!(trend.contains('↑'), "Expected ↑, got: {}", trend);
+}
+
+#[test]
 fn test_compute_y_stats_skips_non_finite() {
 let rows = vec![
     vec!["a".to_string(), "NaN".to_string()],
