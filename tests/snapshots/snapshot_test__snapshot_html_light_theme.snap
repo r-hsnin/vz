@@ -67,7 +67,7 @@ svg {
 <text y="317"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                                                    │</tspan></text>
 <text y="333"><tspan x="0" fill="#cccccc">│500      </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                                                date│</tspan></text>
 <text y="349"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">└────────────────────────────────────────────────────────────────────</tspan><tspan x="632" fill="#cccccc">│</tspan></text>
-<text y="365"><tspan x="0" fill="#cccccc">│2024-01-01            2024-02-01 2024-03-01 2024-04-01 2024-05-01   2024-06-01│</tspan></text>
+<text y="365"><tspan x="0" fill="#cccccc">│2024-01-01                            2024-04-01                    2024-06-01│</tspan></text>
 <text y="381"><tspan x="0" fill="#cccccc">└──────────────────────────────────────────────────────────────────────────────┘</tspan></text>
 </svg>
 
