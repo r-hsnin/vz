@@ -792,3 +792,41 @@ fn test_year_month_temporal_produces_line_chart() {
         stderr
     );
 }
+
+#[test]
+fn test_nan_input_does_not_panic() {
+    let f = common::temp_csv(&[
+        "city,revenue",
+        "Tokyo,NaN",
+        "Osaka,inf",
+        "Nagoya,-inf",
+        "Kyoto,100",
+    ]);
+    let output = vz_binary()
+        .arg(f.path())
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "vz panicked: {}", stderr);
+    assert!(
+        !stderr.contains("panicked"),
+        "panic on NaN input: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_agg_max_hides_nan_group_without_inf() {
+    let f = common::temp_csv(&["c,v", "A,NaN", "B,50"]);
+    let output = vz_binary()
+        .args([f.path().to_str().unwrap(), "--agg", "max", "-o", "table"])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success());
+    assert!(
+        !stdout.contains("inf"),
+        "max of NaN group must not leak inf: {}",
+        stdout
+    );
+}

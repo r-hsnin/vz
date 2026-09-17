@@ -304,3 +304,22 @@ fn test_compute_diff_temporal_single_point() {
     assert_eq!(ts.x_labels, vec!["2024-01-01"]);
     assert!((ts.overall_pct.unwrap() - 100.0).abs() < 0.01);
 }
+
+#[test]
+fn test_compute_diff_skips_non_numeric() {
+    // All-text Y on both sides: no numeric data → no entries (was: 0→0 "+0.0%").
+    let before = make_data(&["city", "name"], &[&["A", "x"], &["B", "y"]]);
+    let after = make_data(&["city", "name"], &[&["A", "x"], &["B", "z"]]);
+    let diff = compute_diff(&before, &after, "city", "name").unwrap();
+    assert!(
+        diff.entries.is_empty(),
+        "text-only diff must not fabricate 0.0 entries: {:?}",
+        diff.entries
+    );
+    // Mixed: unparseable 'foo' contributes no value (B still aggregates).
+    let before = make_data(&["city", "revenue"], &[&["A", "100"], &["B", "200"]]);
+    let after = make_data(&["city", "revenue"], &[&["A", "foo"], &["B", "200"]]);
+    let diff = compute_diff(&before, &after, "city", "revenue").unwrap();
+    let b = diff.entries.iter().find(|e| e.label == "B").unwrap();
+    assert!((b.after - 200.0).abs() < f64::EPSILON);
+}

@@ -168,10 +168,11 @@ fn aggregate_by_category(rows: &[Vec<String>], x_idx: usize, y_idx: usize) -> Ve
     let mut map: Vec<(String, f64)> = Vec::new();
     for row in rows {
         let label = row.get(x_idx).map(|s| s.as_str()).unwrap_or("");
-        let value = row
-            .get(y_idx)
-            .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(0.0);
+        // Skip non-parseable/non-finite cells: never fabricate 0.0 deltas.
+        let value = match row.get(y_idx).and_then(|s| s.parse::<f64>().ok()) {
+            Some(v) if v.is_finite() => v,
+            _ => continue,
+        };
 
         if let Some(entry) = map.iter_mut().find(|(l, _)| l == label) {
             entry.1 += value;

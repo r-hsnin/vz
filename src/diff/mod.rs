@@ -60,6 +60,15 @@ pub struct DiffTimeSeries {
 
 /// Run diff mode: load both files, validate schemas, compute and render diff.
 pub fn run_diff(cli: &Cli, before_path: &Path, after_path: &Path) -> Result<()> {
+    if !cli.filter.is_empty() {
+        eprintln!("warning: --where has no effect in diff mode");
+    }
+    if cli.agg.is_some() {
+        eprintln!("warning: --agg has no effect in diff mode");
+    }
+    if cli.color_col.is_some() {
+        eprintln!("warning: --color has no effect in diff mode");
+    }
     let before = loader::load_data_full(before_path, cli.no_header, format_override(cli))?;
     let after = loader::load_data_full(after_path, cli.no_header, format_override(cli))?;
 

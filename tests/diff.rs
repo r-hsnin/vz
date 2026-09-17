@@ -1083,3 +1083,51 @@ fn test_diff_html_temporal_title() {
         "Expected temporal diff title with filenames"
     );
 }
+
+#[test]
+fn test_diff_text_columns_report_no_fabricated_change() {
+    let before = common::temp_csv(&["city,name", "A,x", "B,y"]);
+    let after = common::temp_csv(&["city,name", "A,x", "B,z"]);
+    let output = vz_binary()
+        .args([
+            before.path().to_str().unwrap(),
+            after.path().to_str().unwrap(),
+            "-y",
+            "name",
+            "-o",
+            "json",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("-100.0"),
+        "text diff must not fabricate -100%: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_diff_ignored_flags_warn() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "-w",
+            "city=Tokyo",
+            "--agg",
+            "mean",
+            "-c",
+            "city",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("no effect in diff mode"),
+        "missing ignored-flag warning: {}",
+        stderr
+    );
+}

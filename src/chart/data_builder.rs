@@ -96,8 +96,9 @@ fn collect_groups(
             1.0
         } else {
             match row.get(y_idx).and_then(|v| v.parse::<f64>().ok()) {
-                Some(v) => v,
-                None => continue,
+                // Skip non-finite (NaN/inf): never leak ±inf sentinels into max/min.
+                Some(v) if v.is_finite() => v,
+                _ => continue,
             }
         };
 

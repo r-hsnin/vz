@@ -320,3 +320,18 @@ fn test_collect_groups_count() {
     assert_eq!(groups[0].0, "X");
     assert_eq!(groups[0].1.len(), 2); // two entries for X
 }
+
+#[test]
+fn test_collect_groups_skips_non_finite() {
+    let rows = vec![
+        vec!["A".to_string(), "NaN".to_string()],
+        vec!["B".to_string(), "50".to_string()],
+        vec!["C".to_string(), "inf".to_string()],
+    ];
+    let (groups, used) = collect_groups(&rows, 0, 1, AggFunction::Max);
+    assert_eq!(used, 1);
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].0, "B");
+    let v = apply_agg(&groups[0].1, AggFunction::Max);
+    assert!(v.is_finite() && (v - 50.0).abs() < f64::EPSILON);
+}
