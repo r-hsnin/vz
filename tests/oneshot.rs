@@ -231,6 +231,34 @@ fn test_color_column_typo_suggests_close_match() {
 }
 
 #[test]
+fn test_narrow_width_does_not_overlap_x_labels() {
+    let rows: Vec<String> = (1..=30)
+        .map(|d| format!("2024-01-{d:02},{d}", d = d))
+        .collect();
+    let rows_ref: Vec<&str> = rows.iter().map(|s| s.as_str()).collect();
+    let mut all: Vec<&str> = vec!["date,revenue"];
+    all.extend(rows_ref);
+    let f = common::temp_csv(&all);
+
+    let output = vz_binary()
+        .args([f.path().to_str().unwrap(), "-W", "60"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("2024-01-01") && stdout.contains("2024-01-30"),
+        "endpoints should survive thinning:\n{}",
+        stdout
+    );
+    assert!(
+        !stdout.contains("2024-01-15"),
+        "middle labels should be thinned at -W 60:\n{}",
+        stdout
+    );
+}
+
+#[test]
 fn test_skipped_rows_warning() {
     let f = common::temp_csv(&[
         "city,revenue",

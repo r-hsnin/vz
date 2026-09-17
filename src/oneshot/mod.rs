@@ -297,18 +297,19 @@ pub(crate) fn fit_labels_to_width(labels: &[String], available_width: usize) -> 
     if labels.is_empty() {
         return vec![];
     }
-    // Small datasets: always show all labels (avoids confusing elision)
-    if labels.len() <= 10 {
-        return labels.to_vec();
-    }
+    // Reserve one label width plus the axis frame so the last label is
+    // never clipped into the border (e.g. `-W 30` showed `024-01-30`
+    // instead of `2024-01-30`). The y-axis gutter and frame consume roughly
+    // one label width on a narrow chart; on wide charts this costs at most
+    // one tick.
     let max_label_width = labels.iter().map(|l| l.len()).max().unwrap_or(1);
-    let labels_that_fit = (available_width / (max_label_width + 2)).max(2);
+    let usable = available_width.saturating_sub(2 * (max_label_width + 2));
+    let labels_that_fit = (usable / (max_label_width + 2)).max(1);
     if labels.len() <= labels_that_fit {
         return labels.to_vec();
     }
     data_builder::pick_evenly(labels, labels_that_fit)
 }
-
 /// Resolve the chart type: use override if given, otherwise use the recommended type.
 pub fn resolve_chart_type(
     recommendation: &ChartRecommendation,
