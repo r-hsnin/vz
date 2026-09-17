@@ -1,6 +1,5 @@
 ---
 source: tests/snapshot_test.rs
-assertion_line: 91
 expression: output
 ---
 <!DOCTYPE html>
@@ -69,6 +68,11 @@ svg {
 <text y="349"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#808080">└────────────────────────────────────────────────────────────────────</tspan><tspan x="632" fill="#cccccc">│</tspan></text>
 <text y="365"><tspan x="0" fill="#cccccc">│2024-01-01                            2024-04-01                    2024-06-01│</tspan></text>
 <text y="381"><tspan x="0" fill="#cccccc">└──────────────────────────────────────────────────────────────────────────────┘</tspan></text>
+<g class="vz-data" fill="#ffffff" fill-opacity="0.0">
+<circle class="vz-point" cx="48.0" cy="360.0" r="7" data-label="2024-01-01" data-value="1000"><title>2024-01-01: 1k</title></circle>
+<circle class="vz-point" cx="340.0" cy="292.8" r="7" data-label="2024-04-01" data-value="1200"><title>2024-04-01: 1.2k</title></circle>
+<circle class="vz-point" cx="632.0" cy="24.0" r="7" data-label="2024-06-01" data-value="2000"><title>2024-06-01: 2k</title></circle>
+</g>
 </svg>
 
 <div class="tooltip" id="tooltip"></div>
@@ -80,22 +84,32 @@ svg {
   var svg = container.querySelector('svg');
   if (!svg) return;
 
-  // Find all tspan elements with text content (potential data labels)
-  var tspans = svg.querySelectorAll('tspan');
-
-  function showTooltip(evt, text) {
-    tooltip.textContent = text;
-    tooltip.style.display = 'block';
-    var rect = container.getBoundingClientRect();
-    tooltip.style.left = (evt.clientX - rect.left + 10) + 'px';
-    tooltip.style.top = (evt.clientY - rect.top - 30) + 'px';
-  }
-
-  function hideTooltip() {
-    tooltip.style.display = 'none';
-  }
-
+  // Prefer real data marks first (<circle class="vz-point"> with
+  // data-label/data-value + <title>); fall back to tspan/rect
+  // heuristics only when no marks exist.
+  if (svg.querySelector('circle.vz-point')) {
+    svg.querySelectorAll('circle.vz-point').forEach(function(el) {
+      el.style.cursor = 'pointer';
+      el.style.pointerEvents = 'all';
+      function labelFor(target) {
+        var title = target.querySelector('title');
+        if (title && title.textContent.trim().length > 0) return title.textContent.trim();
+        var label = target.getAttribute('data-label') || '';
+        var value = target.getAttribute('data-value') || '';
+        var s = (label + (value ? ': ' + value : '')).trim();
+        return s || 'data point';
+      }
+      el.addEventListener('mouseenter', function(e) {
+        showTooltip(e, labelFor(el));
+      });
+      el.addEventListener('mousemove', function(e) {
+        showTooltip(e, labelFor(el));
+      });
+      el.addEventListener('mouseleave', hideTooltip);
+    });
+  } else {
   // Attach hover listeners to tspan elements that contain visible text
+  var tspans = svg.querySelectorAll('tspan');
   tspans.forEach(function(el) {
     var text = el.textContent.trim();
     if (text.length > 0 && text.length < 40) {
@@ -117,18 +131,15 @@ svg {
     if (fill && fill !== '#1e1e1e' && el.getAttribute('width') !== '100%') {
       el.style.cursor = 'pointer';
       el.addEventListener('mouseenter', function(e) {
-        var w = parseFloat(el.getAttribute('width')) || 0;
-        var h = parseFloat(el.getAttribute('height')) || 0;
-        showTooltip(e, Math.round(w) + '\u{00d7}' + Math.round(h));
+        showTooltip(e, 'bar');
       });
       el.addEventListener('mousemove', function(e) {
-        var w = parseFloat(el.getAttribute('width')) || 0;
-        var h = parseFloat(el.getAttribute('height')) || 0;
-        showTooltip(e, Math.round(w) + '\u{00d7}' + Math.round(h));
+        showTooltip(e, 'bar');
       });
       el.addEventListener('mouseleave', hideTooltip);
     }
   });
+  }
 })();
 </script>
 </body>

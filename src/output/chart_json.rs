@@ -174,12 +174,7 @@ fn build_series_json(
         .iter()
         .filter_map(|r| {
             let x = r.get(x_idx)?.clone();
-            let y: f64 = r
-                .get(y_idx)?
-                .replace(',', "")
-                .parse()
-                .ok()
-                .filter(|v: &f64| v.is_finite())?;
+            let y: f64 = r.get(y_idx).and_then(|v| crate::util::parse_number(v))?;
             Some(json!({"x": x, "y": y}))
         })
         .collect();
@@ -191,12 +186,7 @@ fn build_series_json(
             .iter()
             .filter_map(|r| {
                 let x = r.get(x_idx)?.clone();
-                let y: f64 = r
-                    .get(ey)?
-                    .replace(',', "")
-                    .parse()
-                    .ok()
-                    .filter(|v: &f64| v.is_finite())?;
+                let y: f64 = r.get(ey).and_then(|v| crate::util::parse_number(v))?;
                 Some(json!({"x": x, "y": y}))
             })
             .collect();
@@ -221,12 +211,7 @@ fn build_grouped_series_json(
         let group = row.get(color_idx).cloned().unwrap_or_default();
         let point = (|| {
             let x = row.get(x_idx)?.clone();
-            let y: f64 = row
-                .get(y_idx)?
-                .replace(',', "")
-                .parse()
-                .ok()
-                .filter(|v: &f64| v.is_finite())?;
+            let y: f64 = row.get(y_idx).and_then(|v| crate::util::parse_number(v))?;
             Some(json!({"x": x, "y": y}))
         })();
         if let Some(pt) = point {

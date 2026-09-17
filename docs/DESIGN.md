@@ -23,10 +23,10 @@ column type is decided by majority vote:
 | Value pattern | Detected as | Notes |
 |---------------|-------------|-------|
 | `YYYY-MM-DD` (optional time), `YYYY/MM/DD`, `MM/DD/YYYY`, `DD-Mon-YYYY`, `YYYY-MM` | `Temporal` | Checked before numeric |
-| Numeric after stripping `,` and spaces | `Quantitative` | `1,000` parses (`, `/space stripped) → Quantitative; `$100`, `45%` do **not** parse → fall through to Nominal |
-| `NaN`, `inf`, `-inf`, `Infinity` | `Nominal` (excluded from column vote) | Parse as `f64` but non-finite → treated like nulls: skipped in inference, aggregation, and all chart paths |
+| Display-formatted numbers via `util::parse_number` | `Quantitative` | `1,000`, `$100`, `€50`, `45%` (= 0.45), `10k`, `10GiB`, `(42)` (= -42), `USD 100` all parse → Quantitative. One parser shared by inference, aggregation, series, filters, diff, sparkline, and JSON samples, so a value means the same number on every path. `%` is a fraction (`50%` = 0.5); storage suffixes are decimal except `KiB/MiB/GiB/TiB` (binary) |
+| `NaN`, `inf`, `-inf`, `Infinity` | `Nominal` (excluded from column vote) | `parse_number` returns `None` for non-finite → treated like nulls: skipped in inference, aggregation, and all chart paths |
 | Empty string | `Nominal` (ignored in column vote) | Nulls don't vote |
-| Anything else | `Nominal` | e.g. `45%`, UUIDs, free text |
+| Anything else | `Nominal` | e.g. UUIDs, free text |
 
 Column decision (first 100 rows only, empty values excluded):
 

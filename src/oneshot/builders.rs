@@ -132,7 +132,7 @@ pub fn build_histogram_data_with_bins(
         .iter()
         .take(5)
         .filter_map(|r| r.get(axes.x_idx))
-        .filter(|v| v.parse::<f64>().is_ok())
+        .filter(|v| crate::util::parse_number(v).is_some())
         .count();
 
     let use_idx = if x_numeric_count > 0 {

@@ -147,20 +147,18 @@ fn build_data_sample(headers: &[String], rows: &[Vec<String>]) -> Vec<serde_json
             let mut obj = serde_json::Map::new();
             for (i, header) in headers.iter().enumerate() {
                 let val = row.get(i).map(|s| s.as_str()).unwrap_or("");
-                // Try to parse as number for cleaner JSON.
-                // Non-finite values (NaN/inf) become null, never 0.
-                if let Ok(n) = val.parse::<f64>() {
-                    if n.is_finite() {
-                        obj.insert(
-                            header.clone(),
-                            serde_json::Value::Number(
-                                serde_json::Number::from_f64(n)
-                                    .unwrap_or(serde_json::Number::from(0)),
-                            ),
-                        );
-                    } else {
-                        obj.insert(header.clone(), serde_json::Value::Null);
-                    }
+                // Shared numeric parser: "1,000"/"$100"/"45%"/"10k" become
+                // numbers. Non-finite values (NaN/inf) become null, never 0.
+                if let Some(n) = crate::util::parse_number(val) {
+                    obj.insert(
+                        header.clone(),
+                        serde_json::Value::Number(
+                            serde_json::Number::from_f64(n).unwrap_or(serde_json::Number::from(0)),
+                        ),
+                    );
+                } else if val.parse::<f64>().is_ok() {
+                    // Bare f64 that parse_number rejects = non-finite (NaN/inf) → null.
+                    obj.insert(header.clone(), serde_json::Value::Null);
                 } else {
                     obj.insert(header.clone(), serde_json::Value::String(val.to_string()));
                 }
@@ -195,7 +193,10 @@ pub fn compute_column_stats(
 }
 
 fn quantitative_stats(values: &[&str]) -> ColumnStats {
-    let nums: Vec<f64> = values.iter().filter_map(|v| v.parse().ok()).collect();
+    let nums: Vec<f64> = values
+        .iter()
+        .filter_map(|v| crate::util::parse_number(v))
+        .collect();
     if nums.is_empty() {
         return ColumnStats::Empty {};
     }

@@ -54,7 +54,10 @@ pub fn load_space(content: &str, no_header: bool) -> Result<LoadedData> {
 /// Check if a line is all-numeric tokens (indicating headerless data).
 fn headers_are_numeric(line: &str) -> bool {
     let tokens: Vec<&str> = line.split_whitespace().collect();
-    !tokens.is_empty() && tokens.iter().all(|t| t.parse::<f64>().is_ok())
+    !tokens.is_empty()
+        && tokens
+            .iter()
+            .all(|t| crate::util::parse_number(t).is_some())
 }
 
 /// Extract cell values from a data row using pre-computed column boundaries.

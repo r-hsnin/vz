@@ -28,9 +28,14 @@ pub fn pick_evenly(items: &[String], count: usize) -> Vec<String> {
 }
 
 /// Detect if X column values are non-numeric (temporal/categorical strings).
-/// Samples up to 5 values to determine.
+/// Samples up to 5 values to determine. Uses the shared numeric parser so
+/// "$100"/"45%"/"1,000" count as numeric, matching inference.
 pub fn is_non_numeric(values: &[String]) -> bool {
-    !values.is_empty() && values.iter().take(5).all(|s| s.parse::<f64>().is_err())
+    !values.is_empty()
+        && values
+            .iter()
+            .take(5)
+            .all(|s| crate::util::parse_number(s).is_none())
 }
 
 /// Compute unique X values in order of first appearance.
@@ -95,7 +100,7 @@ fn collect_groups(
         let value = if agg == AggFunction::Count {
             1.0
         } else {
-            match row.get(y_idx).and_then(|v| v.parse::<f64>().ok()) {
+            match row.get(y_idx).and_then(|v| crate::util::parse_number(v)) {
                 // Skip non-finite (NaN/inf): never leak ±inf sentinels into max/min.
                 Some(v) if v.is_finite() => v,
                 _ => continue,
@@ -155,12 +160,12 @@ pub fn build_grouped_series(
             unique_x.iter().position(|v| *v == x_val).unwrap_or(i) as f64
         } else {
             row.get(x_idx)
-                .and_then(|v| v.parse::<f64>().ok())
+                .and_then(|v| crate::util::parse_number(v))
                 .filter(|v| v.is_finite())
                 .unwrap_or(i as f64)
         };
         // Skip non-finite (NaN/inf): never leak them into axes or series.
-        let y = match row.get(y_idx).and_then(|v| v.parse::<f64>().ok()) {
+        let y = match row.get(y_idx).and_then(|v| crate::util::parse_number(v)) {
             Some(v) if v.is_finite() => v,
             _ => continue,
         };
@@ -195,14 +200,14 @@ pub fn build_single_series(
                 i as f64
             } else {
                 row.get(x_idx)
-                    .and_then(|v| v.parse::<f64>().ok())
+                    .and_then(|v| crate::util::parse_number(v))
                     .filter(|v| v.is_finite())
                     .unwrap_or(i as f64)
             };
             // Skip non-finite (NaN/inf): never leak them into axes or series.
             let y = row
                 .get(y_idx)
-                .and_then(|v| v.parse::<f64>().ok())
+                .and_then(|v| crate::util::parse_number(v))
                 .filter(|v| v.is_finite())?;
             Some((x, y))
         })
@@ -339,7 +344,7 @@ pub fn build_histogram(
     // Skip non-finite (NaN/inf): never leak them into bins or ranges.
     let values: Vec<f64> = rows
         .iter()
-        .filter_map(|r| r.get(col_idx).and_then(|v| v.parse().ok()))
+        .filter_map(|r| r.get(col_idx).and_then(|v| crate::util::parse_number(v)))
         .filter(|v: &f64| v.is_finite())
         .collect();
 

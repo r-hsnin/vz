@@ -173,7 +173,26 @@ pub fn render_chart_to_buffer(
     area: Rect,
     buf: &mut Buffer,
 ) {
-    use crate::render::{ChartData, render_chart_data};
+    use crate::render::render_chart_data;
+
+    let chart_data =
+        build_chart_data_for_svg(chart_type, recommendation, headers, rows, opts, area);
+
+    render_chart_data(&chart_data, area, buf);
+}
+
+/// Build the `ChartData` for a chart without rendering it.
+/// Shared by `render_chart_to_buffer` (text path) and the SVG exporter
+/// (which needs the data twice: once for the grid, once for vector marks).
+pub fn build_chart_data_for_svg(
+    chart_type: ChartType,
+    recommendation: &ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &RenderOptions<'_>,
+    area: Rect,
+) -> crate::render::ChartData {
+    use crate::render::ChartData;
 
     let mut chart_data = match chart_type {
         ChartType::Line | ChartType::Scatter => {
@@ -191,7 +210,7 @@ pub fn render_chart_to_buffer(
         chart_data.set_title(title.clone());
     }
 
-    render_chart_data(&chart_data, area, buf);
+    chart_data
 }
 
 fn build_line_scatter_chart(
@@ -364,7 +383,7 @@ fn count_skipped_y_rows(
     rows.iter()
         .filter(|row| {
             row.get(idx)
-                .map(|v| v.trim().parse::<f64>().is_err())
+                .map(|v| crate::util::parse_number(v.trim()).is_none())
                 .unwrap_or(true)
         })
         .count()

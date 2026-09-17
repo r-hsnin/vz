@@ -76,22 +76,32 @@ svg {{
   var svg = container.querySelector('svg');
   if (!svg) return;
 
-  // Find all tspan elements with text content (potential data labels)
-  var tspans = svg.querySelectorAll('tspan');
-
-  function showTooltip(evt, text) {{
-    tooltip.textContent = text;
-    tooltip.style.display = 'block';
-    var rect = container.getBoundingClientRect();
-    tooltip.style.left = (evt.clientX - rect.left + 10) + 'px';
-    tooltip.style.top = (evt.clientY - rect.top - 30) + 'px';
-  }}
-
-  function hideTooltip() {{
-    tooltip.style.display = 'none';
-  }}
-
+  // Prefer real data marks first (<circle class="vz-point"> with
+  // data-label/data-value + <title>); fall back to tspan/rect
+  // heuristics only when no marks exist.
+  if (svg.querySelector('circle.vz-point')) {{
+    svg.querySelectorAll('circle.vz-point').forEach(function(el) {{
+      el.style.cursor = 'pointer';
+      el.style.pointerEvents = 'all';
+      function labelFor(target) {{
+        var title = target.querySelector('title');
+        if (title && title.textContent.trim().length > 0) return title.textContent.trim();
+        var label = target.getAttribute('data-label') || '';
+        var value = target.getAttribute('data-value') || '';
+        var s = (label + (value ? ': ' + value : '')).trim();
+        return s || 'data point';
+      }}
+      el.addEventListener('mouseenter', function(e) {{
+        showTooltip(e, labelFor(el));
+      }});
+      el.addEventListener('mousemove', function(e) {{
+        showTooltip(e, labelFor(el));
+      }});
+      el.addEventListener('mouseleave', hideTooltip);
+    }});
+  }} else {{
   // Attach hover listeners to tspan elements that contain visible text
+  var tspans = svg.querySelectorAll('tspan');
   tspans.forEach(function(el) {{
     var text = el.textContent.trim();
     if (text.length > 0 && text.length < 40) {{
@@ -113,18 +123,15 @@ svg {{
     if (fill && fill !== '{bg_color}' && el.getAttribute('width') !== '100%') {{
       el.style.cursor = 'pointer';
       el.addEventListener('mouseenter', function(e) {{
-        var w = parseFloat(el.getAttribute('width')) || 0;
-        var h = parseFloat(el.getAttribute('height')) || 0;
-        showTooltip(e, Math.round(w) + '\u{{00d7}}' + Math.round(h));
+        showTooltip(e, 'bar');
       }});
       el.addEventListener('mousemove', function(e) {{
-        var w = parseFloat(el.getAttribute('width')) || 0;
-        var h = parseFloat(el.getAttribute('height')) || 0;
-        showTooltip(e, Math.round(w) + '\u{{00d7}}' + Math.round(h));
+        showTooltip(e, 'bar');
       }});
       el.addEventListener('mouseleave', hideTooltip);
     }}
   }});
+  }}
 }})();
 </script>
 </body>
@@ -223,6 +230,26 @@ mod tests {
         let html = wrap_svg_in_html(SAMPLE_SVG, "Test", "#1e1e1e");
         assert!(html.contains("mouseenter"));
         assert!(html.contains("mouseleave"));
+    }
+
+    #[test]
+    fn test_tooltip_prefers_vz_point_data() {
+        // RED: tooltip must read real data (data-label/data-value/<title>),
+        // not tspan glyph geometry. Must fail until the JS is rewritten.
+        let svg_with_points = r##"<svg xmlns="http://www.w3.org/2000/svg"><g class="vz-data"><circle class="vz-point" cx="10" cy="10" r="7" data-label="Tokyo" data-value="4200"><title>Tokyo: 4.2k</title></circle></g><text><tspan>4k│████</tspan></text></svg>"##;
+        let html = wrap_svg_in_html(svg_with_points, "Test", "#1e1e1e");
+        assert!(
+            html.contains("vz-point"),
+            "JS must target .vz-point marks: {html}"
+        );
+        assert!(
+            html.contains("data-label") || html.contains("getAttribute"),
+            "JS must read data-label for tooltip text"
+        );
+        assert!(
+            !html.contains("Math.round(w)"),
+            "JS must not show rect geometry as tooltip: {html}"
+        );
     }
 
     #[test]

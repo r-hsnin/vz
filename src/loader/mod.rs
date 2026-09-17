@@ -170,7 +170,10 @@ fn load_delimited(content: &str, delimiter: u8, no_header: bool) -> Result<Loade
 
 /// Check if all header values parse as numbers (indicating they're probably data, not headers).
 fn headers_are_numeric(headers: &[String]) -> bool {
-    !headers.is_empty() && headers.iter().all(|h| h.parse::<f64>().is_ok())
+    !headers.is_empty()
+        && headers
+            .iter()
+            .all(|h| crate::util::parse_number(h).is_some())
 }
 
 /// Load delimited data treating ALL rows as data (no header row).

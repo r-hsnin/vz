@@ -133,7 +133,7 @@ fn format_y_part(
 fn trend_annotation(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
     let values: Vec<f64> = rows
         .iter()
-        .filter_map(|r| r.get(y_idx)?.parse::<f64>().ok())
+        .filter_map(|r| r.get(y_idx).and_then(|v| crate::util::parse_number(v)))
         .filter(|v| v.is_finite())
         .collect();
     if values.len() < 2 {
@@ -160,7 +160,7 @@ fn trend_annotation(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
 fn sparkline(rows: &[Vec<String>], y_idx: usize) -> Option<String> {
     let values: Vec<f64> = rows
         .iter()
-        .filter_map(|r| r.get(y_idx)?.parse::<f64>().ok())
+        .filter_map(|r| r.get(y_idx).and_then(|v| crate::util::parse_number(v)))
         .filter(|v| v.is_finite())
         .collect();
     if values.len() < 2 {
@@ -345,10 +345,7 @@ pub fn unused_columns_hint(
 fn compute_y_stats(rows: &[Vec<String>], y_idx: usize) -> Option<(f64, f64)> {
     let values: Vec<f64> = rows
         .iter()
-        .filter_map(|row| {
-            row.get(y_idx)
-                .and_then(|v| v.replace(',', "").parse::<f64>().ok())
-        })
+        .filter_map(|row| row.get(y_idx).and_then(|v| crate::util::parse_number(v)))
         .filter(|v| v.is_finite())
         .collect();
 

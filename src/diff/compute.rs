@@ -169,7 +169,7 @@ fn aggregate_by_category(rows: &[Vec<String>], x_idx: usize, y_idx: usize) -> Ve
     for row in rows {
         let label = row.get(x_idx).map(|s| s.as_str()).unwrap_or("");
         // Skip non-parseable/non-finite cells: never fabricate 0.0 deltas.
-        let value = match row.get(y_idx).and_then(|s| s.parse::<f64>().ok()) {
+        let value = match row.get(y_idx).and_then(|s| crate::util::parse_number(s)) {
             Some(v) if v.is_finite() => v,
             _ => continue,
         };

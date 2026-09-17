@@ -19,9 +19,10 @@ CLI BI tool with smart visualization and terminal presentation.
 - **Explore mode** — Interactive TUI with vim-style navigation
 - **Present mode** — Terminal slides with embedded charts from Markdown
 - **Diff mode** — Compare two files side-by-side with ▲/▼ annotations
-- **HTML export** — Self-contained interactive HTML with hover tooltips
+- **HTML export** — Self-contained interactive HTML with hover tooltips showing real data values
 - **Directory mode** — Auto-combine files with matching schemas
 - **Fixed-width input** — Parse space-aligned output (kubectl, df, ps)
+- **Formatted numbers** — `1,000`, `$100`, `45%`, `10k`, `10GiB` all parse as numbers on every path (charts, filters, stats, JSON)
 - **Zero-config** — Just `vz data.csv` and you're done
 
 ## Install
@@ -75,10 +76,10 @@ vz data.tsv
 # Show column metadata instead of chart
 vz sales.csv --info
 
-# Export chart as SVG image
+# Export chart as SVG image (text grid + real vector data marks with tooltips)
 vz sales.csv --svg > chart.svg
 
-# Export as interactive HTML
+# Export as interactive HTML (tooltips show real label: value from data marks)
 vz data.csv --html > chart.html
 
 # Compare two files (diff mode)
@@ -259,7 +260,7 @@ revenue  ▁▂▃▅▇  (100–500) ↑ +400%
 | Categorical | Categorical | Heatmap |
 | Nominal | *any* | Bar (fallback, warns on stderr) |
 
-When axes are specified in reverse order (e.g. Quantitative × Temporal), vz automatically assigns the correct chart type. Pairs involving a `Nominal` column (free text, `$100`, `45%`) fall back to Bar with a `falling back to bar` warning; other unmatched combinations default to Bar silently.
+When axes are specified in reverse order (e.g. Quantitative × Temporal), vz automatically assigns the correct chart type. Pairs involving a `Nominal` column (free text, UUIDs) fall back to Bar with a `falling back to bar` warning; other unmatched combinations default to Bar silently.
 
 ## Explore Mode Keybindings
 

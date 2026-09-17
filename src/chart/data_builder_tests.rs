@@ -72,6 +72,32 @@ fn test_aggregate_bar_with_non_parseable() {
 }
 
 #[test]
+fn test_aggregate_bar_parses_formatted_numbers() {
+    // Shared numeric parser: "1,000", "$100", "45%", "10k" all aggregate.
+    // RED: must fail before the parse_number swap in collect_groups.
+    let rows = vec![
+        vec!["A".into(), "1,000".into()],
+        vec!["A".into(), "$500".into()],
+        vec!["B".into(), "50%".into()],
+        vec!["B".into(), "10k".into()],
+    ];
+    let (data, used) = aggregate_bar(&rows, 0, 1, None, "y".into(), AggFunction::Sum);
+    assert_eq!(used, 4, "all formatted values must aggregate, none skipped");
+    let a = data.labels.iter().position(|l| l == "A").unwrap();
+    let b = data.labels.iter().position(|l| l == "B").unwrap();
+    assert!(
+        (data.values[a] - 1500.0).abs() < 1e-9,
+        "got {}",
+        data.values[a]
+    );
+    assert!(
+        (data.values[b] - 10000.5).abs() < 1e-9,
+        "got {}",
+        data.values[b]
+    );
+}
+
+#[test]
 fn test_aggregate_bar_mean() {
     let rows = vec![
         vec!["Tokyo".into(), "1000".into()],

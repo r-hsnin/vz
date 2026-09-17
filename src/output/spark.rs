@@ -45,7 +45,7 @@ pub fn print_spark(
         if let Some(xi) = x_idx {
             let values: Vec<f64> = rows
                 .iter()
-                .filter_map(|r| r.get(xi)?.parse::<f64>().ok())
+                .filter_map(|r| r.get(xi).and_then(|v| crate::util::parse_number(v)))
                 .filter(|v| v.is_finite())
                 .collect();
             if values.is_empty() {
@@ -115,7 +115,7 @@ pub fn print_spark(
             let group = row.get(ci).map_or("", |v| v.as_str());
             let val = row
                 .get(yi)
-                .and_then(|v| v.parse::<f64>().ok())
+                .and_then(|v| crate::util::parse_number(v))
                 .filter(|v| v.is_finite());
             if let Some(v) = val {
                 groups.entry(group).or_default().push(v);
@@ -133,7 +133,7 @@ pub fn print_spark(
     // plus one line per extra Y column.
     let values: Vec<f64> = rows
         .iter()
-        .filter_map(|r| r.get(yi)?.parse::<f64>().ok())
+        .filter_map(|r| r.get(yi).and_then(|v| crate::util::parse_number(v)))
         .filter(|v| v.is_finite())
         .collect();
     print_series_spark(y_name, &values, rows.len());
@@ -141,7 +141,7 @@ pub fn print_spark(
         if let Some(eyi) = data_builder::column_index(headers, extra) {
             let extra_values: Vec<f64> = rows
                 .iter()
-                .filter_map(|r| r.get(eyi)?.parse::<f64>().ok())
+                .filter_map(|r| r.get(eyi).and_then(|v| crate::util::parse_number(v)))
                 .filter(|v| v.is_finite())
                 .collect();
             print_series_spark(extra, &extra_values, rows.len());

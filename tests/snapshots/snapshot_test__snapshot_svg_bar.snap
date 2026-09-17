@@ -1,6 +1,5 @@
 ---
 source: tests/snapshot_test.rs
-assertion_line: 85
 expression: output
 ---
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 384" width="640" height="384">
@@ -30,4 +29,9 @@ expression: output
 <text y="349"><tspan x="0" fill="#808080">  0│</tspan><tspan x="32" fill="#4ec9b0">████████4.2k████████</tspan><tspan x="192" fill="#cccccc"> </tspan><tspan x="200" fill="#dcdcaa">████████3.3k████████</tspan><tspan x="360" fill="#cccccc"> </tspan><tspan x="368" fill="#6a9955">████████800█████████</tspan><tspan x="528" fill="#cccccc">             │</tspan></text>
 <text y="365"><tspan x="0" fill="#cccccc">           Tokyo                Osaka                Nagoya                    │</tspan></text>
 <text y="381"><tspan x="0" fill="#cccccc">    ───────────────────────────────────────────────────────────────────────────┘</tspan></text>
+<g class="vz-data" fill="#ffffff" fill-opacity="0.0">
+<circle class="vz-point" cx="145.3" cy="24.0" r="7" data-label="Tokyo" data-value="4200"><title>Tokyo: 4.2k</title></circle>
+<circle class="vz-point" cx="340.0" cy="96.0" r="7" data-label="Osaka" data-value="3300"><title>Osaka: 3.3k</title></circle>
+<circle class="vz-point" cx="534.7" cy="296.0" r="7" data-label="Nagoya" data-value="800"><title>Nagoya: 800</title></circle>
+</g>
 </svg>

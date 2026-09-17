@@ -140,8 +140,12 @@ fn matches_row(row: &[String], col_idx: usize, op: &FilterOp, value: &str) -> bo
         FilterOp::Eq => cell == value,
         FilterOp::NotEq => cell != value,
         FilterOp::Gt | FilterOp::Lt | FilterOp::Gte | FilterOp::Lte => {
-            // Try numeric comparison first, fall back to string
-            if let (Ok(a), Ok(b)) = (cell.parse::<f64>(), value.parse::<f64>()) {
+            // Numeric comparison via the shared parser ("1,000", "$100",
+            // "45%", "10k"), else lexicographic string fallback.
+            if let (Some(a), Some(b)) = (
+                crate::util::parse_number(cell),
+                crate::util::parse_number(value),
+            ) {
                 match op {
                     FilterOp::Gt => a > b,
                     FilterOp::Lt => a < b,
@@ -348,5 +352,23 @@ mod tests {
         assert_eq!(result.rows.len(), 2);
         assert_eq!(result.rows[0][0], "Bob");
         assert_eq!(result.rows[1][0], "Charlie");
+    }
+
+    #[test]
+    fn test_filter_numeric_comparison_parses_formatted() {
+        // Shared numeric parser: comma/currency cells compare numerically.
+        // RED: must fail while matches_row uses f64::parse directly.
+        let data = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "1,000".into()],
+                vec!["Osaka".into(), "$2,000".into()],
+                vec!["Kyoto".into(), "500".into()],
+            ],
+        };
+        let pred = parse_predicate("revenue>1500").unwrap();
+        let result = filter_data(data, &[pred]).unwrap();
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0][0], "Osaka");
     }
 }

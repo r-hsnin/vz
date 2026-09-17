@@ -240,7 +240,7 @@ impl ExploreApp {
             .iter()
             .map(|row| {
                 row.get(self.selected_y)
-                    .and_then(|v| v.parse::<f64>().ok())
+                    .and_then(|v| crate::util::parse_number(v))
                     .unwrap_or(0.0)
             })
             .collect()

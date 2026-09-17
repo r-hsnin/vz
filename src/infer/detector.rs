@@ -113,16 +113,20 @@ fn is_temporal(value: &str) -> bool {
 }
 
 fn is_quantitative(value: &str) -> bool {
-    // Strip common number formatting. Non-finite values (NaN/inf) parse as
-    // f64 but must not vote Quantitative — they are skipped downstream.
-    let cleaned: String = value.chars().filter(|c| *c != ',' && *c != ' ').collect();
-    cleaned.parse::<f64>().is_ok_and(|v| v.is_finite())
+    // Single numeric parser shared with every chart/filter/stats path:
+    // "1,000", "$100", "45%", "10k", "10GiB" all vote Quantitative.
+    // Non-finite values (NaN/inf) must not vote Quantitative — they are
+    // skipped downstream. `detect_value_type` keeps them Nominal.
+    crate::util::parse_number(value).is_some()
 }
 
-/// True when the value parses as a non-finite number (NaN/±inf), ignoring
-/// comma/space formatting. Used to exclude such values from the type vote.
 fn is_non_finite_number(value: &str) -> bool {
-    let cleaned: String = value.chars().filter(|c| *c != ',' && *c != ' ').collect();
+    // parse_number already returns None for NaN/inf, so detect them
+    // directly here: strip formatting and check for a non-finite f64.
+    let cleaned: String = value
+        .chars()
+        .filter(|c| *c != ',' && *c != ' ' && *c != '_' && *c != '\'')
+        .collect();
     cleaned.parse::<f64>().is_ok_and(|v| !v.is_finite())
 }
 
@@ -277,19 +281,23 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_percentage_string_is_nominal() {
-        // "45%" contains non-numeric char '%', should NOT be quantitative
-        assert_eq!(detect_value_type("45%"), DataType::Nominal);
-        assert_eq!(detect_value_type("100%"), DataType::Nominal);
-        assert_eq!(detect_value_type("0.5%"), DataType::Nominal);
+    fn test_detect_percentage_string_is_quantitative_fraction() {
+        // "45%" parses to 0.45 via the shared numeric parser — it is data,
+        // not free text. (Breaking change: was Nominal before parse unification.)
+        assert_eq!(detect_value_type("45%"), DataType::Quantitative);
+        assert_eq!(detect_value_type("100%"), DataType::Quantitative);
+        assert_eq!(detect_value_type("0.5%"), DataType::Quantitative);
     }
 
     #[test]
-    fn test_detect_currency_string_is_nominal() {
-        // "$100" and "€50" contain currency symbols, should NOT be quantitative
-        assert_eq!(detect_value_type("$100"), DataType::Nominal);
-        assert_eq!(detect_value_type("€50"), DataType::Nominal);
-        assert_eq!(detect_value_type("¥1000"), DataType::Nominal);
+    fn test_detect_currency_string_is_quantitative() {
+        // "$100" means 100 everywhere now (inference, charts, filters, stats).
+        // (Breaking change: was Nominal before parse unification.)
+        assert_eq!(detect_value_type("$100"), DataType::Quantitative);
+        assert_eq!(detect_value_type("€50"), DataType::Quantitative);
+        assert_eq!(detect_value_type("¥1000"), DataType::Quantitative);
+        assert_eq!(detect_value_type("1,000"), DataType::Quantitative);
+        assert_eq!(detect_value_type("10k"), DataType::Quantitative);
     }
 
     #[test]
