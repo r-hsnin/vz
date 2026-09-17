@@ -124,7 +124,7 @@ vz present slides.md
 |------|------|-------------|
 | `FILE` | — | Input file (CSV/TSV/JSON/NDJSON). Use `-` for stdin |
 | `-x` | `--x-col` | Column for X axis |
-| `-y` | `--y-col` | Column(s) for Y axis. Comma-separated, supports `col:Label` override |
+| `-y` | `--y-col` | Column(s) for Y axis. Comma-separated, supports `col:Label` override. Unknown names (including 2nd+ columns) are an error with a `Did you mean` hint |
 | `-t` | `--type` | Override chart type: `line`, `bar`, `scatter`, `histogram`, `heatmap` |
 | `-c` | `--color` | Color/group-by column for multi-series |
 | `-f` | `--format` | Force input format: `csv`, `tsv`, `json`, `ndjson`, `space` |

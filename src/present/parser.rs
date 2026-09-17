@@ -310,6 +310,10 @@ fn parse_table_row(line: &str) -> Vec<String> {
 }
 
 /// Parse chart block key-value pairs.
+///
+/// Unknown `type`/`sort`/`agg` values and unparsable `top`/`bins`/`height`
+/// are ignored (auto-infer applies) but emit a stderr warning so typos like
+/// `type: barr` don't mis-chart silently. Unknown keys are ignored silently.
 pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
     let mut source = String::new();
     let mut chart_type = None;
@@ -338,7 +342,12 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
                         "scatter" => Some(ChartType::Scatter),
                         "histogram" => Some(ChartType::Histogram),
                         "heatmap" => Some(ChartType::Heatmap),
-                        _ => None,
+                        _ => {
+                            eprintln!(
+                                "warning: unknown chart type '{value}' — expected one of line, bar, scatter, histogram, heatmap. Using auto-inferred type."
+                            );
+                            None
+                        }
                     }
                 }
                 "x" => x_col = Some(value),
@@ -350,7 +359,12 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
                     sort = match value.to_lowercase().as_str() {
                         "desc" => Some(crate::cli::SortOrder::Desc),
                         "asc" => Some(crate::cli::SortOrder::Asc),
-                        _ => None,
+                        _ => {
+                            eprintln!(
+                                "warning: unknown sort '{value}' — expected desc or asc. Ignoring."
+                            );
+                            None
+                        }
                     }
                 }
                 "agg" => {
@@ -360,17 +374,46 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
                         "count" => Some(crate::cli::AggFunction::Count),
                         "max" => Some(crate::cli::AggFunction::Max),
                         "min" => Some(crate::cli::AggFunction::Min),
-                        _ => None,
+                        _ => {
+                            eprintln!(
+                                "warning: unknown agg '{value}' — expected sum, mean, count, max, or min. Ignoring."
+                            );
+                            None
+                        }
                     }
                 }
                 "top" => {
-                    top = value.parse::<usize>().ok();
+                    top = match value.parse::<usize>() {
+                        Ok(n) => Some(n),
+                        Err(_) => {
+                            eprintln!(
+                                "warning: invalid top '{value}' — expected a positive integer. Ignoring."
+                            );
+                            None
+                        }
+                    };
                 }
                 "bins" => {
-                    bins = value.parse::<usize>().ok();
+                    bins = match value.parse::<usize>() {
+                        Ok(n) => Some(n),
+                        Err(_) => {
+                            eprintln!(
+                                "warning: invalid bins '{value}' — expected a positive integer. Ignoring."
+                            );
+                            None
+                        }
+                    };
                 }
                 "height" => {
-                    height = value.parse::<u16>().ok();
+                    height = match value.parse::<u16>() {
+                        Ok(n) => Some(n),
+                        Err(_) => {
+                            eprintln!(
+                                "warning: invalid height '{value}' — expected a positive integer. Ignoring."
+                            );
+                            None
+                        }
+                    };
                 }
                 "diff" => diff = Some(value),
                 _ => {}

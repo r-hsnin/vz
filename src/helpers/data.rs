@@ -37,6 +37,7 @@ pub fn build_recommendation(
         .as_deref()
         .map(|s| crate::cli::parse_column_spec(s).0);
     let mut recommendation = chart::select_chart(schema, x_hint, y_opts.hint.as_deref())?;
+    validate_extra_y_columns(schema, y_opts)?;
 
     if cli.chart_type == Some(cli::ChartTypeArg::Bar) && cli.x_col.is_none() {
         adjust_bar_recommendation(&mut recommendation, schema);
@@ -60,6 +61,28 @@ pub fn build_recommendation(
     }
 
     Ok(recommendation)
+}
+
+/// Validate extra `-y` columns against the schema.
+///
+/// The primary `-y` column is validated by [`chart::select_chart`]; extra
+/// columns were previously dropped silently, so `vz f.csv -y revenue,revnue`
+/// rendered a single series without a word. Unknown names are an error with
+/// a `Did you mean` hint instead.
+fn validate_extra_y_columns(schema: &Schema, y_opts: &YOptions) -> Result<()> {
+    let available: Vec<String> = schema.columns.iter().map(|c| c.name.clone()).collect();
+    for (col, _) in &y_opts.extra_columns {
+        if schema.find_column(col).is_none() {
+            let suggestion =
+                crate::diagnostics::suggest_column(&available, col).map(|s| s.as_str().to_string());
+            let suffix = crate::diagnostics::format_column_suffix(suggestion.as_deref(), col);
+            anyhow::bail!(
+                "Column '{col}' not found. Available columns: {}{suffix}",
+                available.join(", "),
+            );
+        }
+    }
+    Ok(())
 }
 
 /// When user overrides to bar chart, prefer a categorical column for X-axis.
@@ -238,8 +261,7 @@ mod tests {
 
     #[test]
     fn build_recommendation_extra_y_clears_color() {
-        let cli =
-            Cli::try_parse_from(["vz", "data.csv", "-x", "month", "-y", "revenue,profit"]).unwrap();
+        let cli = Cli::try_parse_from(["vz", "data.csv", "-y", "revenue,profit"]).unwrap();
         let schema = make_schema(&[
             ("month", DataType::Temporal),
             ("revenue", DataType::Quantitative),
@@ -248,5 +270,23 @@ mod tests {
         let y_opts = parse_y_options(&cli);
         let rec = build_recommendation(&cli, &schema, &y_opts).unwrap();
         assert_eq!(rec.color_column, None);
+    }
+
+    #[test]
+    fn build_recommendation_unknown_extra_y_errors_with_hint() {
+        let cli = Cli::try_parse_from(["vz", "data.csv", "-y", "revenue,revnue"]).unwrap();
+        let schema = make_schema(&[
+            ("month", DataType::Temporal),
+            ("revenue", DataType::Quantitative),
+        ]);
+        let y_opts = parse_y_options(&cli);
+        let err = build_recommendation(&cli, &schema, &y_opts)
+            .expect_err("typo'd extra-y must not be silently dropped");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("revnue"),
+            "error must name the bad column: {msg}"
+        );
+        assert!(msg.contains("revenue"), "error must hint the fix: {msg}");
     }
 }

@@ -879,3 +879,18 @@ fn test_nominal_pair_fallback_warns() {
         stderr
     );
 }
+
+#[test]
+fn test_unknown_extra_y_column_errors_with_hint() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-y", "revenue,revnue"])
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("revnue") && stderr.contains("Did you mean 'revenue'?"),
+        "Expected extra-y typo error with hint, got: {stderr}"
+    );
+}

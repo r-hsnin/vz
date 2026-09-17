@@ -43,12 +43,14 @@ pub fn print_chart_json(
         Some(recommendation),
     );
 
-    let x_idx = data_builder::column_index(headers, &recommendation.x_column).unwrap_or(0);
-    let y_idx = recommendation
-        .y_column
-        .as_ref()
-        .and_then(|y| data_builder::column_index(headers, y))
-        .unwrap_or(x_idx);
+    let axes = data_builder::ResolvedAxes::from_explicit(
+        Some(&recommendation.x_column),
+        recommendation.y_column.as_deref(),
+        recommendation.color_column.as_deref(),
+        headers,
+    )?;
+    let x_idx = axes.x_idx;
+    let y_idx = axes.y_idx;
 
     let chart_data = build_chart_data(headers, rows, x_idx, y_idx, params);
 
