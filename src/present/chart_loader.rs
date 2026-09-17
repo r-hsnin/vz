@@ -234,7 +234,8 @@ pub fn load_chart_data(
         block.y_col.as_deref(),
         block.color_col.as_deref(),
         headers,
-    );
+    )
+    .with_context(|| format!("Invalid chart block (source: {})", block.source))?;
     build_chart_data_for_type(chart_type, block, rows, &axes, theme)
 }
 

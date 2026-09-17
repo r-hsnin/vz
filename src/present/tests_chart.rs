@@ -303,3 +303,29 @@ fn test_parse_inline_spans_empty_bold_markers() {
     let reconstructed: String = spans.iter().map(|s| s.content.as_ref()).collect();
     assert_eq!(reconstructed, "before  after");
 }
+
+#[test]
+fn test_load_chart_data_unknown_x_column_errors() {
+    let block = ChartBlock {
+        source: "sales.csv".to_string(),
+        chart_type: Some(ChartType::Line),
+        x_col: Some("dat".to_string()),
+        y_col: Some("revenue".to_string()),
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
+        bins: None,
+        height: None,
+        diff: None,
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let err = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark())
+        .expect_err("typo'd x must fail instead of mis-charting column 0");
+    let msg = format!("{err:?}");
+    assert!(msg.contains("dat"), "error must name the bad column: {msg}");
+    assert!(msg.contains("date"), "error must suggest the fix: {msg}");
+}

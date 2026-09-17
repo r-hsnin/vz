@@ -359,6 +359,7 @@ pub fn column_index(headers: &[String], name: &str) -> Option<usize> {
 
 /// Resolved column indices and labels for chart rendering.
 /// Shared across oneshot, explore, and present modes.
+#[derive(Debug)]
 pub struct ResolvedAxes {
     pub x_idx: usize,
     pub y_idx: usize,
@@ -369,32 +370,33 @@ pub struct ResolvedAxes {
 
 impl ResolvedAxes {
     /// Resolve axes from explicit column names (used by present mode / chart blocks).
+    /// Unknown names are an error with a `Did you mean` hint — never silently
+    /// fall back to the first columns (that mis-charted typos without a word).
     pub fn from_explicit(
         x_col: Option<&str>,
         y_col: Option<&str>,
         color_col: Option<&str>,
         headers: &[String],
-    ) -> Self {
-        let x_idx = x_col
-            .and_then(|name| column_index(headers, name))
-            .unwrap_or(0);
-        let y_idx = y_col
-            .and_then(|name| column_index(headers, name))
+    ) -> anyhow::Result<Self> {
+        let x_idx = resolve_named_column(headers, x_col, "x")?.unwrap_or(0);
+        let y_idx = resolve_named_column(headers, y_col, "y")?
             .unwrap_or(1.min(headers.len().saturating_sub(1)));
-        let color_idx = color_col.and_then(|name| column_index(headers, name));
+        let color_idx = resolve_named_column(headers, color_col, "color")?;
         let x_label = headers.get(x_idx).cloned().unwrap_or_default();
         let y_label = headers.get(y_idx).cloned().unwrap_or_default();
 
-        Self {
+        Ok(Self {
             x_idx,
             y_idx,
             color_idx,
             x_label,
             y_label,
-        }
+        })
     }
 
     /// Resolve axes from a ChartRecommendation (used by oneshot/explore).
+    /// The recommendation comes from [`crate::chart::select_chart`], which already
+    /// validated the names against the same headers, so this cannot fail.
     pub fn from_recommendation(
         x_column: &str,
         y_column: Option<&str>,
@@ -402,7 +404,28 @@ impl ResolvedAxes {
         headers: &[String],
     ) -> Self {
         Self::from_explicit(Some(x_column), y_column, color_column, headers)
+            .expect("selector-validated columns must exist in headers")
     }
+}
+
+/// Resolve one named column reference: `None` stays unset, an unknown name errors.
+fn resolve_named_column(
+    headers: &[String],
+    name: Option<&str>,
+    role: &str,
+) -> anyhow::Result<Option<usize>> {
+    let Some(name) = name else {
+        return Ok(None);
+    };
+    column_index(headers, name).map(Some).ok_or_else(|| {
+        let suggestion =
+            crate::diagnostics::suggest_column(headers, name).map(|s| s.as_str().to_string());
+        let suffix = crate::diagnostics::format_column_suffix(suggestion.as_deref(), name);
+        anyhow::anyhow!(
+            "Unknown {role} column '{name}'. Available columns: {}{suffix}",
+            headers.join(", "),
+        )
+    })
 }
 
 /// Build multiple series from multiple Y columns, sharing the same X axis.

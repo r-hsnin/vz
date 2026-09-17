@@ -256,7 +256,8 @@ fn test_build_heatmap_data_single_cell() {
 #[test]
 fn test_resolved_axes_from_explicit() {
     let headers = vec!["city".into(), "revenue".into(), "region".into()];
-    let axes = ResolvedAxes::from_explicit(Some("city"), Some("revenue"), Some("region"), &headers);
+    let axes = ResolvedAxes::from_explicit(Some("city"), Some("revenue"), Some("region"), &headers)
+        .expect("known columns must resolve");
     assert_eq!(axes.x_idx, 0);
     assert_eq!(axes.y_idx, 1);
     assert_eq!(axes.color_idx, Some(2));
@@ -267,7 +268,8 @@ fn test_resolved_axes_from_explicit() {
 #[test]
 fn test_resolved_axes_from_explicit_defaults() {
     let headers = vec!["date".into(), "value".into()];
-    let axes = ResolvedAxes::from_explicit(None, None, None, &headers);
+    let axes =
+        ResolvedAxes::from_explicit(None, None, None, &headers).expect("empty refs must resolve");
     assert_eq!(axes.x_idx, 0);
     assert_eq!(axes.y_idx, 1);
     assert_eq!(axes.color_idx, None);
@@ -287,9 +289,39 @@ fn test_resolved_axes_from_recommendation() {
 #[test]
 fn test_resolved_axes_single_column() {
     let headers = vec!["values".into()];
-    let axes = ResolvedAxes::from_explicit(None, None, None, &headers);
+    let axes =
+        ResolvedAxes::from_explicit(None, None, None, &headers).expect("empty refs must resolve");
     assert_eq!(axes.x_idx, 0);
     assert_eq!(axes.y_idx, 0); // min(1, len-1) = min(1, 0) = 0
+}
+
+#[test]
+fn test_resolved_axes_unknown_x_errors_with_hint() {
+    let headers = vec!["city".to_string(), "revenue".to_string()];
+    let err = ResolvedAxes::from_explicit(Some("ctiy"), None, None, &headers)
+        .expect_err("typo'd x must not fall back silently");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("ctiy"),
+        "error must name the bad column: {msg}"
+    );
+    assert!(msg.contains("city"), "error must hint the fix: {msg}");
+}
+
+#[test]
+fn test_resolved_axes_unknown_y_errors() {
+    let headers = vec!["city".to_string(), "revenue".to_string()];
+    let err = ResolvedAxes::from_explicit(None, Some("profit"), None, &headers)
+        .expect_err("unknown y must not fall back silently");
+    assert!(err.to_string().contains("profit"));
+}
+
+#[test]
+fn test_resolved_axes_unknown_color_errors() {
+    let headers = vec!["city".to_string(), "revenue".to_string()];
+    let err = ResolvedAxes::from_explicit(None, None, Some("citi"), &headers)
+        .expect_err("typo'd color must not be silently dropped");
+    assert!(err.to_string().contains("citi"));
 }
 
 #[test]
