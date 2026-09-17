@@ -858,3 +858,24 @@ fn test_line_chart_skips_non_finite_points() {
         stdout
     );
 }
+
+#[test]
+fn test_nominal_pair_fallback_warns() {
+    // High-cardinality free text → Nominal Y; explicit pair falls back to Bar.
+    let mut rows = vec!["item,note".to_string()];
+    for i in 0..25 {
+        rows.push(format!("item{},note number {} free text", i % 3, i));
+    }
+    let f = common::temp_csv(&rows);
+    let output = vz_binary()
+        .args([f.path().to_str().unwrap(), "-x", "item", "-y", "note"])
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "vz failed: {}", stderr);
+    assert!(
+        stderr.contains("falling back to bar"),
+        "expected fallback warning, got: {}",
+        stderr
+    );
+}

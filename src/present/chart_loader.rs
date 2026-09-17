@@ -253,7 +253,18 @@ fn infer_chart_type_from_data(
     let schema = crate::infer::infer_schema(&h_refs, &row_refs);
     let x_hint = block.x_col.as_deref();
     let y_hint = block.y_col.as_deref();
-    crate::chart::select_chart(&schema, x_hint, y_hint)
+    let recommendation = crate::chart::select_chart(&schema, x_hint, y_hint);
+    if let Ok(ref rec) = recommendation
+        && let Some(warning) = crate::chart::selector::fallback_warning(
+            &schema,
+            &rec.x_column,
+            rec.y_column.as_deref(),
+            rec.chart_type,
+        )
+    {
+        eprintln!("{warning}");
+    }
+    recommendation
         .map(|rec| rec.chart_type)
         .unwrap_or(ChartType::Line)
 }

@@ -181,6 +181,33 @@ fn chart_type_for_pair(x_type: DataType, y_type: DataType) -> ChartType {
     }
 }
 
+/// Warning message when the resolved axis pair has no dedicated chart rule
+/// (a `Nominal` column is involved) and rendering falls back to Bar.
+/// Returns `None` for first-class pairs, non-Bar charts, or unknown columns.
+/// Batch-mode callers (oneshot, present) print this to stderr; the interactive
+/// explorer stays silent to avoid corrupting the TUI.
+pub fn fallback_warning(
+    schema: &Schema,
+    x_name: &str,
+    y_name: Option<&str>,
+    chart_type: ChartType,
+) -> Option<String> {
+    if chart_type != ChartType::Bar {
+        return None;
+    }
+    let x_meta = schema.find_column(x_name)?;
+    let y_meta = y_name.and_then(|y| schema.find_column(y))?;
+    if x_meta.data_type == DataType::Nominal || y_meta.data_type == DataType::Nominal {
+        Some(format!(
+            "warning: no chart rule for {} ({}) × {} ({}); falling back to bar. \
+             Hint: use -t to pick a chart type explicitly.",
+            x_meta.name, x_meta.data_type, y_meta.name, y_meta.data_type,
+        ))
+    } else {
+        None
+    }
+}
+
 /// Auto-select chart based on schema column types.
 fn auto_select(schema: &Schema) -> Result<ChartRecommendation> {
     let temporal_cols = schema.columns_of_type(DataType::Temporal);

@@ -258,3 +258,62 @@ fn test_x_only_hint_nonexistent_column_errors() {
     assert!(rec.is_err());
     assert!(rec.unwrap_err().to_string().contains("nonexistent"));
 }
+
+// --- Fallback warning tests ---
+
+#[test]
+fn test_fallback_warning_for_nominal_pair() {
+    let schema = make_schema(&[
+        ("item", DataType::Categorical),
+        ("price", DataType::Nominal),
+    ]);
+    let rec = select_chart(&schema, Some("item"), Some("price")).unwrap();
+    assert_eq!(rec.chart_type, ChartType::Bar);
+    let warning = fallback_warning(
+        &schema,
+        &rec.x_column,
+        rec.y_column.as_deref(),
+        rec.chart_type,
+    )
+    .expect("nominal pair must warn");
+    assert!(warning.contains("falling back to bar"), "got: {warning}");
+    assert!(warning.contains("price"), "got: {warning}");
+}
+
+#[test]
+fn test_fallback_warning_none_for_first_class_pair() {
+    let schema = make_schema(&[
+        ("date", DataType::Temporal),
+        ("revenue", DataType::Quantitative),
+    ]);
+    let rec = select_chart(&schema, Some("date"), Some("revenue")).unwrap();
+    assert_eq!(rec.chart_type, ChartType::Line);
+    assert_eq!(
+        fallback_warning(
+            &schema,
+            &rec.x_column,
+            rec.y_column.as_deref(),
+            rec.chart_type
+        ),
+        None
+    );
+}
+
+#[test]
+fn test_fallback_warning_none_for_plain_bar() {
+    let schema = make_schema(&[
+        ("city", DataType::Categorical),
+        ("revenue", DataType::Quantitative),
+    ]);
+    let rec = select_chart(&schema, Some("city"), Some("revenue")).unwrap();
+    assert_eq!(rec.chart_type, ChartType::Bar);
+    assert_eq!(
+        fallback_warning(
+            &schema,
+            &rec.x_column,
+            rec.y_column.as_deref(),
+            rec.chart_type
+        ),
+        None
+    );
+}

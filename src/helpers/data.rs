@@ -42,6 +42,15 @@ pub fn build_recommendation(
         adjust_bar_recommendation(&mut recommendation, schema);
     }
 
+    if let Some(warning) = chart::selector::fallback_warning(
+        schema,
+        &recommendation.x_column,
+        recommendation.y_column.as_deref(),
+        recommendation.chart_type,
+    ) {
+        eprintln!("{warning}");
+    }
+
     if let Some(ref color) = cli.color_col {
         recommendation.color_column = Some(color.clone());
     }

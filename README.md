@@ -257,8 +257,9 @@ revenue  ▁▂▃▅▇  (100–500) ↑ +400%
 | Quantitative | Quantitative | Scatter |
 | Single Quantitative | — | Histogram |
 | Categorical | Categorical | Heatmap |
+| Nominal | *any* | Bar (fallback, warns on stderr) |
 
-When axes are specified in reverse order (e.g. Quantitative × Temporal), vz automatically assigns the correct chart type. Unmatched combinations default to Bar.
+When axes are specified in reverse order (e.g. Quantitative × Temporal), vz automatically assigns the correct chart type. Pairs involving a `Nominal` column (free text, `$100`, `45%`) fall back to Bar with a `falling back to bar` warning; other unmatched combinations default to Bar silently.
 
 ## Explore Mode Keybindings
 
