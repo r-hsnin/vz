@@ -273,7 +273,7 @@ When axes are specified in reverse order (e.g. Quantitative × Temporal), vz aut
 | `a` | Cycle aggregation (sum/mean/count/max/min) |
 | `y` | Show equivalent oneshot command |
 | `d` / `Tab` | Toggle between chart and data table view |
-| `1`-`4` | Force chart type (Line/Bar/Scatter/Histogram) |
+| `1`-`5` | Force chart type (Line/Bar/Scatter/Histogram/Heatmap) |
 | `0` | Auto chart type (reset) |
 | `?` | Show/hide help overlay |
 | `q` / `Esc` | Quit |

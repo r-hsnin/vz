@@ -71,6 +71,7 @@ impl ExploreApp {
             KeyCode::Char('2') => self.chart_type_override = Some(ChartType::Bar),
             KeyCode::Char('3') => self.chart_type_override = Some(ChartType::Scatter),
             KeyCode::Char('4') => self.chart_type_override = Some(ChartType::Histogram),
+            KeyCode::Char('5') => self.chart_type_override = Some(ChartType::Heatmap),
             KeyCode::Char('0') => self.chart_type_override = None,
             KeyCode::Char('c') => self.cycle_color_column(),
             KeyCode::Char('y') => self.yank_command(),

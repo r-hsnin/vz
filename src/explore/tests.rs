@@ -52,6 +52,13 @@ fn test_chart_type_override() {
 }
 
 #[test]
+fn test_chart_type_heatmap_key() {
+    let mut app = make_test_app();
+    app.handle_key(KeyCode::Char('5'));
+    assert_eq!(app.effective_chart_type(), ChartType::Heatmap);
+}
+
+#[test]
 fn test_chart_type_reset_to_auto() {
     let mut app = make_test_app();
     app.handle_key(KeyCode::Char('3'));
