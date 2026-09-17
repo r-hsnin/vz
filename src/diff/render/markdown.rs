@@ -122,3 +122,24 @@ pub(super) fn print_diff_line_markdown(
         println!("\n*Overall: {}*", marker);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_change_covers_all_branches() {
+        assert_eq!(format_change(Some(25.0), 5.0), "▲ +25%");
+        assert_eq!(format_change(Some(-10.0), -2.0), "▼ -10%");
+        assert_eq!(format_change(Some(0.0), 0.0), "─ 0%");
+        assert_eq!(format_change(None, 1500.0), "▲ +1.5k");
+        assert_eq!(format_change(None, -3.0), "▼ -3");
+        assert_eq!(format_change(None, 0.0), "─");
+    }
+
+    #[test]
+    fn escape_cell_escapes_pipes() {
+        assert_eq!(escape_cell("a|b"), "a\\|b");
+        assert_eq!(escape_cell("plain"), "plain");
+    }
+}

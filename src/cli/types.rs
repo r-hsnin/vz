@@ -99,3 +99,23 @@ pub enum ThemeArg {
     /// Maximum visibility, colorblind-friendly.
     HighContrast,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::chart::selector::ChartType;
+
+    #[test]
+    fn chart_type_arg_converts_all_variants() {
+        let cases = [
+            (ChartTypeArg::Line, ChartType::Line),
+            (ChartTypeArg::Bar, ChartType::Bar),
+            (ChartTypeArg::Scatter, ChartType::Scatter),
+            (ChartTypeArg::Histogram, ChartType::Histogram),
+            (ChartTypeArg::Heatmap, ChartType::Heatmap),
+        ];
+        for (arg, expected) in cases {
+            assert_eq!(arg.to_chart_type(), expected);
+        }
+    }
+}

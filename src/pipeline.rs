@@ -217,3 +217,57 @@ fn print_chart_json(
         &params,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn loaded(headers: &[&str], rows: &[&[&str]]) -> LoadedData {
+        LoadedData {
+            headers: headers.iter().map(|s| s.to_string()).collect(),
+            rows: rows
+                .iter()
+                .map(|r| r.iter().map(|s| s.to_string()).collect())
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn validate_loaded_data_empty() {
+        let data = loaded(&[], &[]);
+        let err = validate_loaded_data(&data, &PathBuf::from("in.csv"), &[], 0).unwrap_err();
+        assert!(err.to_string().contains("is empty"), "{err}");
+    }
+
+    #[test]
+    fn validate_loaded_data_all_filtered_out() {
+        let data = loaded(&["a"], &[]);
+        let err = validate_loaded_data(&data, &PathBuf::from("in.csv"), &["a>1".to_string()], 5)
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("No rows remain after filtering"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn validate_loaded_data_headers_only() {
+        let data = loaded(&["a", "b"], &[]);
+        let err = validate_loaded_data(&data, &PathBuf::from("in.csv"), &[], 0).unwrap_err();
+        assert!(err.to_string().contains("only headers"), "{err}");
+    }
+
+    #[test]
+    fn validate_loaded_data_blank_headers_treated_as_empty() {
+        let data = loaded(&["", ""], &[]);
+        let err = validate_loaded_data(&data, &PathBuf::from("in.csv"), &[], 0).unwrap_err();
+        assert!(err.to_string().contains("is empty"), "{err}");
+    }
+
+    #[test]
+    fn validate_loaded_data_ok_with_rows() {
+        let data = loaded(&["a"], &[&["1"]]);
+        assert!(validate_loaded_data(&data, &PathBuf::from("in.csv"), &[], 1).is_ok());
+    }
+}
