@@ -301,6 +301,32 @@ fn test_ndjson_input() {
 }
 
 #[test]
+fn test_ndjson_invalid_line_reports_line_number() {
+    let f = common::temp_csv_with_suffix(
+        ".ndjson",
+        &[
+            "{\"x\": 1, \"y\": 10}",
+            "{\"x\": 2, \"y\": 20}",
+            "not json",
+            "{\"x\": 4, \"y\": 25}",
+        ],
+    );
+
+    let output = vz_binary()
+        .arg(f.path())
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("line 3"),
+        "stderr should name the bad line:\n{}",
+        stderr
+    );
+}
+
+#[test]
 fn test_json_stdin_pipe() {
     use std::process::Stdio;
 

@@ -157,6 +157,30 @@ fn test_load_ndjson_with_empty_lines() {
 }
 
 #[test]
+fn test_load_ndjson_invalid_line_reports_line_number() {
+    let content = "{\"a\": 1}\n{\"a\": 2}\nnot json\n{\"a\": 4}\n";
+    let err = load_ndjson(content).unwrap_err();
+    let msg = format!("{:#}", err);
+    assert!(
+        msg.contains("line 3"),
+        "error should name the line: {}",
+        msg
+    );
+}
+
+#[test]
+fn test_load_ndjson_invalid_line_counts_blank_lines() {
+    let content = "{\"a\": 1}\n\nnot json\n";
+    let err = load_ndjson(content).unwrap_err();
+    let msg = format!("{:#}", err);
+    assert!(
+        msg.contains("line 3"),
+        "error should use physical line: {}",
+        msg
+    );
+}
+
+#[test]
 fn test_load_ndjson_with_strings() {
     let content =
         "{\"city\": \"Tokyo\", \"pop\": 14000000}\n{\"city\": \"Osaka\", \"pop\": 2750000}\n";

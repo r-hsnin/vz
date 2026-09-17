@@ -214,12 +214,15 @@ fn load_json_array(content: &str) -> Result<LoadedData> {
 
 /// Load NDJSON (newline-delimited JSON) — one JSON object per line.
 fn load_ndjson(content: &str) -> Result<LoadedData> {
-    let objects: Vec<serde_json::Value> = content
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(serde_json::from_str)
-        .collect::<std::result::Result<Vec<_>, _>>()
-        .context("Failed to parse NDJSON")?;
+    let mut objects = Vec::new();
+    for (idx, line) in content.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let value: serde_json::Value = serde_json::from_str(line)
+            .with_context(|| format!("Failed to parse NDJSON at line {}", idx + 1))?;
+        objects.push(value);
+    }
     objects_to_tabular(objects)
 }
 
