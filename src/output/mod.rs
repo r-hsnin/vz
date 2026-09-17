@@ -25,6 +25,8 @@ pub struct InfoOutput {
     pub recommendation: Option<RecommendationOutput>,
     /// First N rows of data as array of objects (for agent inspection).
     pub data: Vec<serde_json::Value>,
+    /// True when `data` was capped at DATA_SAMPLE_LIMIT (rows > data.len()).
+    pub truncated: bool,
 }
 
 /// Column metadata in JSON output.
@@ -93,6 +95,7 @@ pub fn build_info_output(
         rows: data.rows.len(),
         columns,
         recommendation: rec,
+        truncated: data.rows.len() > DATA_SAMPLE_LIMIT,
         data: build_data_sample(&data.headers, &data.rows),
     }
 }
@@ -117,15 +120,20 @@ fn build_data_sample(headers: &[String], rows: &[Vec<String>]) -> Vec<serde_json
             let mut obj = serde_json::Map::new();
             for (i, header) in headers.iter().enumerate() {
                 let val = row.get(i).map(|s| s.as_str()).unwrap_or("");
-                // Try to parse as number for cleaner JSON
+                // Try to parse as number for cleaner JSON.
+                // Non-finite values (NaN/inf) become null, never 0.
                 if let Ok(n) = val.parse::<f64>() {
-                    obj.insert(
-                        header.clone(),
-                        serde_json::Value::Number(
-                            serde_json::Number::from_f64(n)
-                                .unwrap_or_else(|| serde_json::Number::from(0)),
-                        ),
-                    );
+                    if n.is_finite() {
+                        obj.insert(
+                            header.clone(),
+                            serde_json::Value::Number(
+                                serde_json::Number::from_f64(n)
+                                    .unwrap_or(serde_json::Number::from(0)),
+                            ),
+                        );
+                    } else {
+                        obj.insert(header.clone(), serde_json::Value::Null);
+                    }
                 } else {
                     obj.insert(header.clone(), serde_json::Value::String(val.to_string()));
                 }
@@ -382,6 +390,39 @@ mod tests {
         // This must not panic — NaN/Infinity should be handled
         let json = serde_json::to_string_pretty(&output);
         assert!(json.is_ok(), "Serialization failed: {:?}", json.err());
+    }
+
+    #[test]
+    fn test_build_data_sample_non_finite_becomes_null() {
+        let sample = build_data_sample(
+            &["city".into(), "revenue".into()],
+            &[
+                vec!["Tokyo".into(), "NaN".into()],
+                vec!["Osaka".into(), "inf".into()],
+                vec!["Kyoto".into(), "100".into()],
+            ],
+        );
+        assert!(sample[0]["revenue"].is_null(), "NaN must not become 0");
+        assert!(sample[1]["revenue"].is_null(), "inf must not become 0");
+        assert_eq!(sample[2]["revenue"], 100.0);
+    }
+
+    #[test]
+    fn test_info_output_truncated_flag() {
+        let data = LoadedData {
+            headers: vec!["x".into()],
+            rows: (0..150).map(|i| vec![format!("{}", i)]).collect(),
+        };
+        let schema = Schema::new(vec![ColumnMeta {
+            name: "x".into(),
+            data_type: DataType::Quantitative,
+            null_count: 0,
+            sample_size: 150,
+        }]);
+        let output = build_info_output("big.csv", &data, &schema, None);
+        assert!(output.truncated);
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["truncated"], true);
     }
 
     #[test]

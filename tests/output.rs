@@ -1457,3 +1457,47 @@ fn help_shows_examples_legend_and_stream_split() {
         "missing stream split:\n{stdout}"
     );
 }
+
+#[test]
+fn test_json_non_finite_becomes_null_not_zero() {
+    let f = common::temp_csv(&["city,revenue", "Tokyo,NaN", "Osaka,inf", "Kyoto,100"]);
+    let output = common::vz_no_color()
+        .arg(f.path())
+        .arg("-o")
+        .arg("json")
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let data = v["data"].as_array().unwrap();
+    assert!(
+        data[0]["revenue"].is_null(),
+        "NaN must be null, got {}",
+        data[0]["revenue"]
+    );
+    assert!(
+        data[1]["revenue"].is_null(),
+        "inf must be null, got {}",
+        data[1]["revenue"]
+    );
+}
+
+#[test]
+fn test_json_truncated_flag() {
+    let mut rows = vec!["date,revenue".to_string()];
+    for i in 0..150 {
+        rows.push(format!("2024-01-{:02},{}", (i % 28) + 1, 1000 + i));
+    }
+    let f = common::temp_csv(&rows);
+    let output = common::vz_no_color()
+        .arg(f.path())
+        .arg("-o")
+        .arg("json")
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(v["rows"], 150);
+    assert_eq!(v["data"].as_array().unwrap().len(), 100);
+    assert_eq!(v["truncated"], true);
+}
