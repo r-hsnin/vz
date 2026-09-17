@@ -273,13 +273,11 @@ mod tests {
 
     #[test]
     fn test_trend_label_up() {
-        // RED: must fail until util::trend_label unifies summary/spark logic.
         assert_eq!(trend_label(100.0, 200.0).unwrap(), "↑ +100%");
     }
 
     #[test]
     fn test_trend_label_down_stable_zero_negative() {
-        // RED: must fail until util::trend_label unifies summary/spark logic.
         assert_eq!(trend_label(100.0, 50.0).unwrap(), "↓ -50%");
         assert_eq!(trend_label(100.0, 103.0).unwrap(), "→ stable");
         assert!(trend_label(0.0, 100.0).is_none());

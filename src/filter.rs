@@ -372,7 +372,6 @@ mod tests {
 
     #[test]
     fn test_filter_eq_is_numeric_aware() {
-        // RED: must fail while Eq/NotEq compare raw strings ("$2,000" != "2000").
         let data = LoadedData {
             headers: vec!["city".into(), "revenue".into()],
             rows: vec![
@@ -416,7 +415,6 @@ mod tests {
     #[test]
     fn test_filter_numeric_comparison_parses_formatted() {
         // Shared numeric parser: comma/currency cells compare numerically.
-        // RED: must fail while matches_row uses f64::parse directly.
         let data = LoadedData {
             headers: vec!["city".into(), "revenue".into()],
             rows: vec![

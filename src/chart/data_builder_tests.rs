@@ -74,7 +74,6 @@ fn test_aggregate_bar_with_non_parseable() {
 #[test]
 fn test_aggregate_bar_parses_formatted_numbers() {
     // Shared numeric parser: "1,000", "$100", "45%", "10k" all aggregate.
-    // RED: must fail before the parse_number swap in collect_groups.
     let rows = vec![
         vec!["A".into(), "1,000".into()],
         vec!["A".into(), "$500".into()],

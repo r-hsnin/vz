@@ -238,8 +238,8 @@ mod tests {
 
     #[test]
     fn test_tooltip_prefers_vz_point_data() {
-        // RED: tooltip must read real data (data-label/data-value/<title>),
-        // not tspan glyph geometry. Must fail until the JS is rewritten.
+        // Tooltip reads real data (data-label/data-value/<title>),
+        // not tspan glyph geometry.
         let svg_with_points = r##"<svg xmlns="http://www.w3.org/2000/svg"><g class="vz-data"><circle class="vz-point" cx="10" cy="10" r="7" data-label="Tokyo" data-value="4200"><title>Tokyo: 4.2k</title></circle></g><text><tspan>4k│████</tspan></text></svg>"##;
         let html = wrap_svg_in_html(svg_with_points, "Test", "#1e1e1e");
         assert!(

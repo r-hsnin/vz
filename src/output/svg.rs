@@ -75,8 +75,10 @@ pub fn data_marks_svg(
 
 /// Compute pixel-space data positions for every plotted datum.
 /// Bar: one point per category, centered in its slot, height ∝ value.
-/// Line/Scatter: one point per vertex (first series only — overlay series
-/// share the same axes; multi-series tooltips come from the primary).
+/// Line/Scatter: one point per vertex of every series, positioned on the
+/// union axis span. Labels come from the shared `x_labels` by per-series
+/// index, so overlaid series with missing points can mislabel tooltips
+/// (see GOTCHAS).
 /// Histogram: one point per bin at (bin_center, count).
 /// Heatmap: one point per cell at (col, row) with the cell count.
 fn layout_points(
@@ -565,7 +567,6 @@ mod tests {
 
     #[test]
     fn test_data_marks_bar_carries_labels_and_values() {
-        // RED: no vector overlay exists yet — must fail until data_marks_svg lands.
         use crate::render::{BarChartData, ChartData};
         let data = ChartData::Bar(BarChartData {
             title: None,
@@ -630,7 +631,6 @@ mod tests {
 
     #[test]
     fn test_data_marks_multi_series_cover_all_points() {
-        // RED: must fail while layout_points renders the first series only.
         use crate::render::{Axis, ChartConfig, ChartData, Series};
         let data = ChartData::Line(ChartConfig {
             title: None,
@@ -673,8 +673,7 @@ mod tests {
 
     #[test]
     fn test_data_marks_bar_negative_values_stay_in_plot() {
-        // RED: must fail while bar layout clamps v/max to [0,1] (negatives
-        // collapse onto the zero line).
+        // Bar layout spans min..max so negatives sit below positives.
         use crate::render::{BarChartData, ChartData};
         let data = ChartData::Bar(BarChartData {
             title: None,
