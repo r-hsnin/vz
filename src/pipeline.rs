@@ -139,10 +139,10 @@ fn dispatch_output(
 ) -> Result<()> {
     match cli.output {
         Some(cli::OutputFormat::Table) => {
-            output::table::print_table(recommendation, headers, rows, cli)?;
+            output::table::print_table(recommendation, headers, rows, cli, schema)?;
         }
         Some(cli::OutputFormat::Spark) => {
-            print_spark(recommendation, headers, rows, cli, schema);
+            print_spark(recommendation, headers, rows, cli, schema, y_opts);
         }
         Some(cli::OutputFormat::Svg) => {
             let opts = build_render_options(cli, y_opts, recommendation, schema);
@@ -170,6 +170,7 @@ fn print_spark(
     rows: &[Vec<String>],
     cli: &Cli,
     schema: &Schema,
+    y_opts: &YOptions,
 ) {
     let params = output::spark::SparkParams {
         chart_type_override: cli.chart_type,
@@ -178,6 +179,11 @@ fn print_spark(
         limit: cli.top.or(cli.tail),
         color_col: cli.color_col.clone(),
         bins: cli.bins,
+        extra_y_columns: y_opts
+            .extra_columns
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect(),
     };
     output::spark::print_spark(recommendation, headers, rows, &params);
 }
@@ -217,6 +223,8 @@ fn print_chart_json(
         extra_y_columns: y_opts.extra_columns.clone(),
         color_column: cli.color_col.clone(),
         bins: cli.bins,
+        filters: cli.filter.clone(),
+        sample: cli.sample,
     };
     output::chart_json::print_chart_json(
         file,

@@ -60,6 +60,33 @@ pub struct RecommendationOutput {
     pub color: Option<String>,
 }
 
+/// The resolved query that produced `chart_data`: every knob that changes
+/// the numbers, so agents can reproduce or audit the result.
+#[derive(Debug, Serialize)]
+pub struct QueryOutput {
+    /// Chart type actually rendered (`-t` override applied).
+    pub chart_type: String,
+    pub x: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub extra_y: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// Aggregation applied to bar charts (sum/mean/count/max/min).
+    pub agg: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bins: Option<usize>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub filters: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sample: Option<usize>,
+}
+
 /// Build JSON info output from schema and data.
 pub fn build_info_output(
     file: &str,

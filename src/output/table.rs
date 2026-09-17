@@ -5,7 +5,13 @@ use anyhow::Result;
 use crate::chart;
 use crate::chart::data_builder;
 use crate::cli;
+use crate::helpers::effective_agg;
+use crate::infer::types::Schema;
 use crate::oneshot;
+use crate::render::format_number;
+
+/// Maximum data rows printed before truncation (mirrors the JSON 100-row cap).
+pub const TABLE_ROW_LIMIT: usize = 100;
 
 /// Print data as a formatted text table, respecting chart type for aggregation.
 pub fn print_table(
@@ -13,6 +19,7 @@ pub fn print_table(
     headers: &[String],
     rows: &[Vec<String>],
     cli: &cli::Cli,
+    schema: &Schema,
 ) -> Result<()> {
     let x_idx = data_builder::column_index(headers, &recommendation.x_column);
     let y_idx = recommendation
@@ -26,7 +33,7 @@ pub fn print_table(
     if chart_type == chart::selector::ChartType::Bar
         && let (Some(xi), Some(yi)) = (x_idx, y_idx)
     {
-        let agg = cli.agg.unwrap_or(cli::AggFunction::Sum);
+        let agg = effective_agg(cli, recommendation, schema);
         let y_label = recommendation.y_column.as_deref().unwrap_or("value");
         let (mut bar_data, _) =
             data_builder::aggregate_bar(rows, xi, yi, None, y_label.to_string(), agg);
@@ -34,15 +41,21 @@ pub fn print_table(
         crate::oneshot::builders::truncate_bar_data(&mut bar_data, cli.top.or(cli.tail));
         print_two_col_values(
             &recommendation.x_column,
-            y_label,
+            &agg_header(y_label, agg),
             &bar_data.labels,
             &bar_data.values,
         );
         return Ok(());
     }
 
-    // For other chart types: show all columns (users expect full data view)
-    print_all_columns(headers, rows);
+    // For other chart types: show all columns (users expect full data view).
+    // sort/top only apply to bar charts — warn instead of silently ignoring.
+    warn_non_bar_limits(chart_type, cli);
+    print_all_columns(
+        headers,
+        rows,
+        cli.top.or(cli.tail).or(Some(TABLE_ROW_LIMIT)),
+    );
     Ok(())
 }
 
@@ -58,12 +71,48 @@ fn print_two_col_values(x_label: &str, y_label: &str, labels: &[String], values:
     println!("{:<col_w$}  {:>val_w$}", x_label, y_label);
     println!("{:-<col_w$}  {:-<val_w$}", "", "");
     for (label, value) in labels.iter().zip(values.iter()) {
-        println!("{:<col_w$}  {:>val_w$.2}", label, value);
+        println!("{:<col_w$}  {:>val_w$}", label, format_number(*value));
     }
 }
 
-/// Print all columns as a table (fallback when x/y columns can't be determined).
-pub fn print_all_columns(headers: &[String], rows: &[Vec<String>]) {
+/// Header for an aggregated column: `revenue` for sum, `mean(revenue)` otherwise.
+pub fn agg_header(y_label: &str, agg: cli::AggFunction) -> String {
+    match agg {
+        cli::AggFunction::Sum => y_label.to_string(),
+        cli::AggFunction::Mean => format!("mean({y_label})"),
+        cli::AggFunction::Count => format!("count({y_label})"),
+        cli::AggFunction::Max => format!("max({y_label})"),
+        cli::AggFunction::Min => format!("min({y_label})"),
+    }
+}
+
+/// Warn when row-limiting flags are used with a chart type that ignores them.
+fn warn_non_bar_limits(chart_type: chart::selector::ChartType, cli: &cli::Cli) {
+    use crate::chart::selector::ChartType;
+    if cli.top.or(cli.tail).is_some() && !matches!(chart_type, ChartType::Bar) {
+        eprintln!(
+            "warning: --top/--tail has no effect on {} tables (only applies to bar charts); showing first {} rows",
+            chart_type, TABLE_ROW_LIMIT
+        );
+    } else if matches!(
+        cli.sort,
+        Some(cli::SortOrder::Desc) | Some(cli::SortOrder::Asc)
+    ) && !matches!(chart_type, ChartType::Bar)
+    {
+        eprintln!(
+            "warning: --sort has no effect on {} tables (only applies to bar charts)",
+            chart_type
+        );
+    }
+}
+
+/// Print all columns as a table, truncated to `limit` rows with a count footer.
+pub fn print_all_columns(headers: &[String], rows: &[Vec<String>], limit: Option<usize>) {
+    let total = rows.len();
+    let shown: &[Vec<String>] = match limit {
+        Some(n) => &rows[..rows.len().min(n)],
+        None => rows,
+    };
     let widths: Vec<usize> = headers
         .iter()
         .enumerate()
@@ -80,7 +129,7 @@ pub fn print_all_columns(headers: &[String], rows: &[Vec<String>]) {
         print!("{:-<width$}  ", "", width = w);
     }
     println!();
-    for row in rows {
+    for row in shown {
         for (i, val) in row.iter().enumerate() {
             if i > 0 {
                 print!("  ");
@@ -92,6 +141,13 @@ pub fn print_all_columns(headers: &[String], rows: &[Vec<String>]) {
             );
         }
         println!();
+    }
+    if shown.len() < total {
+        eprintln!(
+            "info: showing {}/{} rows (use --top N, --sample N, or -o json for full data)",
+            shown.len(),
+            total
+        );
     }
 }
 

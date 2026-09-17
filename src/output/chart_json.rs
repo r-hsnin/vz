@@ -24,6 +24,8 @@ pub struct ChartJsonParams {
     pub extra_y_columns: Vec<(String, Option<String>)>,
     pub color_column: Option<String>,
     pub bins: Option<usize>,
+    pub filters: Vec<String>,
+    pub sample: Option<usize>,
 }
 
 /// Print chart data as JSON (metadata + chart_data field).
@@ -53,14 +55,47 @@ pub fn print_chart_json(
     let y_idx = axes.y_idx;
 
     let chart_data = build_chart_data(headers, rows, x_idx, y_idx, params);
+    let query = super::QueryOutput {
+        chart_type: params.chart_type.to_string().to_lowercase(),
+        x: recommendation.x_column.clone(),
+        y: recommendation.y_column.clone(),
+        extra_y: params
+            .extra_y_columns
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect(),
+        color: params.color_column.clone(),
+        agg: agg_name(params.agg).to_string(),
+        sort: params.sort.map(|s| match s {
+            SortOrder::Desc => "desc".to_string(),
+            SortOrder::Asc => "asc".to_string(),
+            SortOrder::None => "none".to_string(),
+        }),
+        limit: params.limit,
+        bins: params.bins,
+        filters: params.filters.clone(),
+        sample: params.sample,
+    };
 
     let mut output_value = serde_json::to_value(&output)?;
     if let serde_json::Value::Object(ref mut map) = output_value {
         map.insert("chart_data".to_string(), chart_data);
+        map.insert("query".to_string(), serde_json::to_value(&query)?);
     }
 
     println!("{}", serde_json::to_string_pretty(&output_value)?);
     Ok(())
+}
+
+/// Lowercase aggregation name for the query record.
+fn agg_name(agg: AggFunction) -> &'static str {
+    match agg {
+        AggFunction::Sum => "sum",
+        AggFunction::Mean => "mean",
+        AggFunction::Count => "count",
+        AggFunction::Max => "max",
+        AggFunction::Min => "min",
+    }
 }
 
 /// Build the chart_data JSON value based on chart type.
@@ -221,6 +256,8 @@ mod tests {
             extra_y_columns: vec![],
             color_column: None,
             bins: None,
+            filters: vec![],
+            sample: None,
         }
     }
 
@@ -258,6 +295,8 @@ mod tests {
             extra_y_columns: vec![],
             color_column: None,
             bins: None,
+            filters: vec![],
+            sample: None,
         };
         let result = build_bar_json(&rows, 0, 1, &params);
         let categories = result["categories"].as_array().unwrap();
@@ -320,6 +359,8 @@ mod tests {
             extra_y_columns: vec![("profit".into(), None)],
             color_column: None,
             bins: None,
+            filters: vec![],
+            sample: None,
         };
         let result = build_series_json(&headers, &rows, 0, 1, &params);
         let series = result["series"].as_array().unwrap();
@@ -362,6 +403,8 @@ mod tests {
             extra_y_columns: vec![],
             color_column: Some("city".into()),
             bins: None,
+            filters: vec![],
+            sample: None,
         };
         let result = build_series_json(&headers, &rows, 0, 1, &params);
         assert_eq!(result["type"], "scatter");

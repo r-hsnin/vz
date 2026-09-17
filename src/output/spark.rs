@@ -18,7 +18,11 @@ pub struct SparkParams {
     pub limit: Option<usize>,
     pub color_col: Option<String>,
     pub bins: Option<usize>,
+    pub extra_y_columns: Vec<String>,
 }
+
+/// Maximum raw points rendered into a single sparkline (sampled beyond this).
+pub const SPARK_MAX_POINTS: usize = 200;
 
 /// Print sparkline output: single-line, grouped, or aggregated for bar charts.
 pub fn print_spark(
@@ -68,7 +72,9 @@ pub fn print_spark(
         return;
     };
 
-    // For bar charts, aggregate values by category then sparkline
+    // For bar charts, aggregate values by category then sparkline.
+    // Bar categories have no time order, so an endpoint trend (↑/↓) would be
+    // a sorting artifact — show range only.
     if chart_type == ChartType::Bar
         && let Some(xi) = x_idx
     {
@@ -80,8 +86,23 @@ pub fn print_spark(
             bar_data.values.truncate(n);
         }
         let spark = make_sparkline(&bar_data.values);
-        let suffix = stats_suffix(&bar_data.values);
+        let suffix = range_suffix(&bar_data.values);
         println!("{y_name}  {spark}{suffix}");
+        // Extra Y columns share the same X grouping: one line each.
+        for extra in &params.extra_y_columns {
+            if let Some(eyi) = data_builder::column_index(headers, extra) {
+                let (mut extra_data, _) =
+                    data_builder::aggregate_bar(rows, xi, eyi, None, String::new(), params.agg);
+                oneshot::builders::sort_bar_data(&mut extra_data, params.sort);
+                if let Some(n) = params.limit {
+                    extra_data.labels.truncate(n);
+                    extra_data.values.truncate(n);
+                }
+                let spark = make_sparkline(&extra_data.values);
+                let suffix = range_suffix(&extra_data.values);
+                println!("{extra}  {spark}{suffix}");
+            }
+        }
         return;
     }
 
@@ -108,15 +129,50 @@ pub fn print_spark(
         return;
     }
 
-    // Single sparkline from all Y values in row order (non-finite skipped)
+    // Single sparkline from all Y values in row order (non-finite skipped),
+    // plus one line per extra Y column.
     let values: Vec<f64> = rows
         .iter()
         .filter_map(|r| r.get(yi)?.parse::<f64>().ok())
         .filter(|v| v.is_finite())
         .collect();
-    let spark = make_sparkline(&values);
-    let suffix = stats_suffix(&values);
-    println!("{y_name}  {spark}{suffix}");
+    print_series_spark(y_name, &values, rows.len());
+    for extra in &params.extra_y_columns {
+        if let Some(eyi) = data_builder::column_index(headers, extra) {
+            let extra_values: Vec<f64> = rows
+                .iter()
+                .filter_map(|r| r.get(eyi)?.parse::<f64>().ok())
+                .filter(|v| v.is_finite())
+                .collect();
+            print_series_spark(extra, &extra_values, rows.len());
+        }
+    }
+}
+
+/// Print one `name  spark  (range) trend` line, sampling long series and
+/// reporting skipped non-finite values so log consumers see a stable 1-line contract.
+fn print_series_spark(name: &str, values: &[f64], total_rows: usize) {
+    let sampled: Vec<f64> = if values.len() > SPARK_MAX_POINTS {
+        sparkline::sample_values(values, SPARK_MAX_POINTS)
+    } else {
+        values.to_vec()
+    };
+    let spark = make_sparkline(&sampled);
+    let suffix = stats_suffix(values);
+    let skipped = total_rows.saturating_sub(values.len());
+    if skipped > 0 {
+        println!("{name}  {spark}{suffix} ({skipped} skipped)");
+    } else {
+        println!("{name}  {spark}{suffix}");
+    }
+}
+
+/// Range-only suffix (no trend): for bar aggregations where endpoints are
+/// category order, not time.
+fn range_suffix(values: &[f64]) -> String {
+    util::min_max(values)
+        .map(|(min, max)| format!("  ({}–{})", format_number(min), format_number(max)))
+        .unwrap_or_default()
 }
 
 /// Generate a sparkline string from values.
@@ -173,6 +229,7 @@ mod tests {
             limit: None,
             color_col: None,
             bins: None,
+            extra_y_columns: vec![],
         }
     }
 

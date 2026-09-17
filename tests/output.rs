@@ -1320,13 +1320,13 @@ fn test_output_markdown_bar_aggregated_values() {
         stdout
     );
     assert!(
-        stdout.contains("| Tokyo | 4200 |"),
-        "Expected Tokyo sum 4200, got: {}",
+        stdout.contains("| Tokyo | 4.2k |"),
+        "Expected Tokyo sum 4.2k, got: {}",
         stdout
     );
     assert!(
-        stdout.contains("| Osaka | 3300 |"),
-        "Expected Osaka sum 3300, got: {}",
+        stdout.contains("| Osaka | 3.3k |"),
+        "Expected Osaka sum 3.3k, got: {}",
         stdout
     );
     assert!(
@@ -1547,4 +1547,197 @@ fn test_chart_json_series_skips_non_finite_points() {
     let data = series[0]["data"].as_array().unwrap();
     assert_eq!(data.len(), 2, "non-finite points must be skipped: {}", v);
     assert!(data.iter().all(|p| p["y"].is_number()));
+}
+
+#[test]
+fn test_output_table_count_agg_auto_for_categorical_y() {
+    // departments.csv has two categorical columns; -t bar must auto-count
+    // (same effective_agg path as chart rendering), not sum garbage.
+    let output = vz_binary()
+        .args(["fixtures/departments.csv", "-t", "bar", "-o", "table"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("count("),
+        "Expected count() agg header, got:\n{}",
+        stdout
+    );
+    assert!(
+        stdout.contains("Engineering") && stdout.contains('3'),
+        "Expected Engineering count 3, got:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn test_output_table_truncates_large_data() {
+    let f = common::temp_csv_with_suffix(".csv", &{
+        let mut rows = vec!["x,y".to_string()];
+        rows.extend((0..150).map(|i| format!("a{i},{i}")));
+        rows
+    });
+    let output = vz_binary()
+        .args([f.path().to_str().unwrap(), "-o", "table"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // header + separator + 100 rows
+    assert_eq!(
+        stdout.lines().count(),
+        102,
+        "Expected truncation to 100 rows, got {} lines",
+        stdout.lines().count()
+    );
+    assert!(
+        stderr.contains("showing 100/150 rows"),
+        "Expected truncation notice on stderr, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_output_table_warns_on_top_for_non_bar() {
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-t",
+            "line",
+            "-o",
+            "table",
+            "--top",
+            "2",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--top/--tail has no effect"),
+        "Expected top-ignore warning, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_output_markdown_escapes_pipe_cells() {
+    let f = common::temp_csv_with_suffix(".csv", &["a,b", "\"x|y\",2", "q,3"]);
+    let output = vz_binary()
+        .args([f.path().to_str().unwrap(), "-o", "markdown"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("x\\|y"),
+        "Expected escaped pipe cell, got:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn test_spark_multi_y_emits_one_line_per_series() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-y", "revenue,profit", "-o", "spark"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 2, "Expected 2 spark lines, got:\n{}", stdout);
+    assert!(lines[0].starts_with("revenue"), "First line: {}", lines[0]);
+    assert!(lines[1].starts_with("profit"), "Second line: {}", lines[1]);
+}
+
+#[test]
+fn test_spark_bar_has_no_trend_arrow() {
+    // Bar categories have no time order; endpoint trend would mislead.
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-t",
+            "bar",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "-o",
+            "spark",
+            "--sort",
+            "desc",
+            "--top",
+            "2",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains('↑') && !stdout.contains('↓'),
+        "Bar spark must not show trend arrow, got: {}",
+        stdout
+    );
+    assert!(stdout.contains("(3.3k–4.2k)"), "Range: {}", stdout);
+}
+
+#[test]
+fn test_json_query_provenance_records_overrides() {
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "-t",
+            "bar",
+            "--agg",
+            "mean",
+            "--sort",
+            "desc",
+            "--top",
+            "2",
+            "-o",
+            "json",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let q = &v["query"];
+    assert_eq!(q["chart_type"], "bar", "query: {}", q);
+    assert_eq!(q["agg"], "mean", "query: {}", q);
+    assert_eq!(q["sort"], "desc", "query: {}", q);
+    assert_eq!(q["limit"], 2, "query: {}", q);
+    assert_eq!(q["x"], "city", "query: {}", q);
+    assert_eq!(q["y"], "revenue", "query: {}", q);
+}
+
+#[test]
+fn test_json_query_records_extra_y_and_filters() {
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-y",
+            "revenue,profit",
+            "-w",
+            "revenue>1000",
+            "-o",
+            "json",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let q = &v["query"];
+    assert_eq!(q["extra_y"], serde_json::json!(["profit"]), "query: {}", q);
+    assert_eq!(
+        q["filters"],
+        serde_json::json!(["revenue>1000"]),
+        "query: {}",
+        q
+    );
 }

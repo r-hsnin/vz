@@ -151,7 +151,7 @@ pub struct HeatmapData {
 }
 
 /// Format a number concisely for tick labels.
-pub(crate) fn format_number(val: f64) -> String {
+pub fn format_number(val: f64) -> String {
     let abs = val.abs();
     if abs >= 1_000_000_000_000.0 {
         format_with_suffix(val / 1_000_000_000_000.0, "T")
