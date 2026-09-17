@@ -7,6 +7,7 @@ Release procedures live in [RUNBOOK.md](RUNBOOK.md).
 
 - **No file argument shows help.** Always pass a file or `-` for stdin.
 - **Bar chart aggregates by default (sum).** Use `--agg mean` if you want averages.
+- **Filter values starting with `>`, `<`, `=`, `!` are rejected.** A doubled operator like `-w "revenue>>100"` fails loudly instead of silently matching nothing. Empty values (`-w "city="`) still match empty cells.
 - **Column names are case-sensitive.** Check with `vz data.csv --info`.
 - **TSV detection relies on extension or tab prevalence.** When piping, use `-f tsv` explicitly.
 - **Large datasets (>100k rows):** Use `--sample N` to keep rendering fast.

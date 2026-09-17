@@ -24,6 +24,18 @@ pub enum FilterOp {
     Lte,
 }
 
+/// Reject values that start with an operator character, e.g. `revenue>>100`.
+/// An empty value stays valid (`city=` matches empty cells).
+fn reject_operator_led_value(expr: &str, val: &str) -> Result<()> {
+    if val.starts_with(['>', '<', '=', '!']) {
+        anyhow::bail!(
+            "Invalid filter expression: '{expr}'. Value '{val}' starts with an operator. \
+             Hint: use a single operator, e.g. col=value, col!=value, col>value, col<value, col>=value, col<=value."
+        );
+    }
+    Ok(())
+}
+
 /// Parse a filter expression like "city=Tokyo" or "revenue>1000".
 pub fn parse_predicate(expr: &str) -> Result<Predicate> {
     // Try multi-char operators first
@@ -38,6 +50,7 @@ pub fn parse_predicate(expr: &str) -> Result<Predicate> {
             if col.is_empty() {
                 anyhow::bail!("Invalid filter: missing column name in '{expr}'");
             }
+            reject_operator_led_value(expr, &val)?;
             return Ok(Predicate {
                 column: col,
                 op,
@@ -57,6 +70,7 @@ pub fn parse_predicate(expr: &str) -> Result<Predicate> {
             if col.is_empty() {
                 anyhow::bail!("Invalid filter: missing column name in '{expr}'");
             }
+            reject_operator_led_value(expr, &val)?;
             return Ok(Predicate {
                 column: col,
                 op,
@@ -183,6 +197,36 @@ mod tests {
     fn test_parse_predicate_invalid() {
         assert!(parse_predicate("noop").is_err());
         assert!(parse_predicate("=value").is_err());
+    }
+
+    #[test]
+    fn test_parse_predicate_rejects_doubled_operators() {
+        for expr in [
+            "revenue>>100",
+            "revenue<<100",
+            "revenue==100",
+            "city=!Tokyo",
+            "age>==18",
+        ] {
+            let err = parse_predicate(expr).unwrap_err();
+            let msg = format!("{:#}", err);
+            assert!(
+                msg.contains("single operator"),
+                "expr {expr} should bail loudly: {msg}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_predicate_allows_empty_value_and_embedded_equals() {
+        // `city=` matches empty cells (legitimate); `=` inside a value is data.
+        let p = parse_predicate("city=").unwrap();
+        assert_eq!(p.value, "");
+        let p = parse_predicate("note=a=b").unwrap();
+        assert_eq!(p.column, "note");
+        assert_eq!(p.value, "a=b");
+        let p = parse_predicate("note=~foo").unwrap();
+        assert_eq!(p.value, "~foo");
     }
 
     #[test]

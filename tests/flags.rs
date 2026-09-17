@@ -140,6 +140,31 @@ fn test_where_filter_invalid_column() {
 }
 
 #[test]
+fn test_where_filter_doubled_operator_bails_loudly() {
+    let output = common::vz_command()
+        .args(["fixtures/sales.csv", "--where", "revenue>>100"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(!output.status.success());
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        combined.contains("single operator"),
+        "Expected loud operator error, got: '{}'",
+        combined
+    );
+    assert!(
+        !combined.contains("No rows remain"),
+        "Must not silently filter everything, got: '{}'",
+        combined
+    );
+}
+
+#[test]
 fn test_where_filter_multiple() {
     let output = common::vz_command()
         .args([
