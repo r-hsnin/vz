@@ -69,15 +69,15 @@ pub fn select_chart(
 /// Validate that a column exists in the schema, returning a descriptive error if not.
 fn validate_column<'a>(schema: &'a Schema, name: &str) -> Result<&'a ColumnMeta> {
     schema.find_column(name).ok_or_else(|| {
+        let available: Vec<String> = schema.columns.iter().map(|c| c.name.clone()).collect();
+        let suggestion =
+            crate::diagnostics::suggest_column(&available, name).map(|s| s.as_str().to_string());
+        let suffix = crate::diagnostics::format_column_suffix(suggestion.as_deref(), name);
         anyhow::anyhow!(
-            "Column '{}' not found. Available columns: {}",
+            "Column '{}' not found. Available columns: {}{}",
             name,
-            schema
-                .columns
-                .iter()
-                .map(|c| c.name.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
+            available.join(", "),
+            suffix
         )
     })
 }

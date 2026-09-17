@@ -94,10 +94,15 @@ pub(super) fn resolve_x_column(
     if let Some(ref x) = cli.x_col {
         let (col, _) = crate::cli::parse_column_spec(x);
         if !data.headers.iter().any(|h| h == col) {
-            bail!(
-                "X column '{}' not found. Available: {}",
+            let suffix = crate::diagnostics::format_column_suffix(
+                crate::diagnostics::suggest_column(&data.headers, col).as_deref(),
                 col,
-                data.headers.join(", ")
+            );
+            bail!(
+                "X column '{}' not found. Available: {}{}",
+                col,
+                data.headers.join(", "),
+                suffix
             );
         }
         return Ok(col.to_string());
@@ -117,10 +122,15 @@ pub(super) fn resolve_y_column(
     if let Some(ref y) = cli.y_col {
         let (col, _) = crate::cli::parse_column_spec(y);
         if !data.headers.iter().any(|h| h == col) {
-            bail!(
-                "Y column '{}' not found. Available: {}",
+            let suffix = crate::diagnostics::format_column_suffix(
+                crate::diagnostics::suggest_column(&data.headers, col).as_deref(),
                 col,
-                data.headers.join(", ")
+            );
+            bail!(
+                "Y column '{}' not found. Available: {}{}",
+                col,
+                data.headers.join(", "),
+                suffix
             );
         }
         return Ok(col.to_string());
@@ -227,5 +237,41 @@ mod tests {
         assert!(is_temporal_column(&schema, "date"));
         assert!(!is_temporal_column(&schema, "city"));
         assert!(!is_temporal_column(&schema, "missing"));
+    }
+
+    #[test]
+    fn resolve_x_column_suggests_close_match() {
+        use crate::cli::Cli;
+        use clap::Parser;
+        let schema = make_schema(&[
+            ("date", DataType::Temporal),
+            ("revenue", DataType::Quantitative),
+        ]);
+        let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-x", "revnue"]).unwrap();
+        let data = crate::loader::LoadedData {
+            headers: headers(&["date", "revenue"]),
+            rows: vec![],
+        };
+        let err = resolve_x_column(&cli, &data, &schema).unwrap_err();
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("Did you mean 'revenue'?"), "{msg}");
+    }
+
+    #[test]
+    fn resolve_y_column_marks_case_sensitivity() {
+        use crate::cli::Cli;
+        use clap::Parser;
+        let schema = make_schema(&[
+            ("date", DataType::Temporal),
+            ("revenue", DataType::Quantitative),
+        ]);
+        let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-y", "Revenue"]).unwrap();
+        let data = crate::loader::LoadedData {
+            headers: headers(&["date", "revenue"]),
+            rows: vec![],
+        };
+        let err = resolve_y_column(&cli, &data, &schema, "date").unwrap_err();
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("case-sensitive"), "{msg}");
     }
 }

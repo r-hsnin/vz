@@ -47,15 +47,7 @@ pub fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
     validate_loaded_data(&data, file, &cli.filter, pre_filter_count)?;
 
     // Validate -c column exists in the loaded data
-    if let Some(ref color_col) = cli.color_col
-        && !data.headers.iter().any(|h| h == color_col)
-    {
-        anyhow::bail!(
-            "Color column '{}' not found. Available columns: {}",
-            color_col,
-            data.headers.join(", ")
-        );
-    }
+    validate_color_column(&data.headers, cli.color_col.as_deref())?;
 
     let schema = infer_from_data(&data);
 
@@ -112,6 +104,25 @@ fn validate_loaded_data(
         anyhow::bail!(
             "No data rows found in '{}'. The file appears to contain only headers.",
             file.display(),
+        );
+    }
+    Ok(())
+}
+
+/// Validate the `-c` color column against loaded headers, with typo hints.
+pub(crate) fn validate_color_column(headers: &[String], color_col: Option<&str>) -> Result<()> {
+    if let Some(color_col) = color_col
+        && !headers.iter().any(|h| h == color_col)
+    {
+        let suffix = crate::diagnostics::format_column_suffix(
+            crate::diagnostics::suggest_column(headers, color_col).as_deref(),
+            color_col,
+        );
+        anyhow::bail!(
+            "Color column '{}' not found. Available columns: {}{}",
+            color_col,
+            headers.join(", "),
+            suffix
         );
     }
     Ok(())
@@ -269,5 +280,23 @@ mod tests {
     fn validate_loaded_data_ok_with_rows() {
         let data = loaded(&["a"], &[&["1"]]);
         assert!(validate_loaded_data(&data, &PathBuf::from("in.csv"), &[], 1).is_ok());
+    }
+
+    #[test]
+    fn validate_color_column_ok_for_known_column() {
+        let headers = vec!["city".to_string(), "revenue".to_string()];
+        assert!(validate_color_column(&headers, Some("city")).is_ok());
+        assert!(validate_color_column(&headers, None).is_ok());
+    }
+
+    #[test]
+    fn validate_color_column_suggests_close_match() {
+        let headers = vec!["city".to_string(), "revenue".to_string()];
+        let err = validate_color_column(&headers, Some("ctiy")).unwrap_err();
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("Did you mean 'city'?"), "{msg}");
+        let err = validate_color_column(&headers, Some("City")).unwrap_err();
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("case-sensitive"), "{msg}");
     }
 }

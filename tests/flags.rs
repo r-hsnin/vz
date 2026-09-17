@@ -140,6 +140,26 @@ fn test_where_filter_invalid_column() {
 }
 
 #[test]
+fn test_where_filter_column_typo_suggests_close_match() {
+    let output = common::vz_command()
+        .args(["fixtures/sales.csv", "--where", "ctiy=Tokyo"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(!output.status.success());
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        combined.contains("Did you mean 'city'?"),
+        "Expected filter column suggestion, got: '{}'",
+        combined
+    );
+}
+
+#[test]
 fn test_where_filter_doubled_operator_bails_loudly() {
     let output = common::vz_command()
         .args(["fixtures/sales.csv", "--where", "revenue>>100"])

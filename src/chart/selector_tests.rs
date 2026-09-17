@@ -100,6 +100,36 @@ fn test_user_specified_nonexistent_column() {
     assert!(err.contains("Available columns: date"));
 }
 
+#[test]
+fn test_nonexistent_column_suggests_close_match() {
+    let schema = make_schema(&[
+        ("date", DataType::Temporal),
+        ("revenue", DataType::Quantitative),
+    ]);
+    let err = select_chart(&schema, Some("date"), Some("revnue"))
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("Did you mean 'revenue'?"),
+        "expected suggestion, got: {err}"
+    );
+}
+
+#[test]
+fn test_nonexistent_column_marks_case_sensitivity() {
+    let schema = make_schema(&[
+        ("date", DataType::Temporal),
+        ("revenue", DataType::Quantitative),
+    ]);
+    let err = select_chart(&schema, Some("date"), Some("Revenue"))
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("Did you mean 'revenue'? Note: column names are case-sensitive."),
+        "expected case note, got: {err}"
+    );
+}
+
 // --- Color column tests ---
 
 #[test]

@@ -98,10 +98,15 @@ pub fn filter_data(data: LoadedData, predicates: &[Predicate]) -> Result<LoadedD
                 .iter()
                 .position(|h| h == &p.column)
                 .with_context(|| {
+                    let suffix = crate::diagnostics::format_column_suffix(
+                        crate::diagnostics::suggest_column(&data.headers, &p.column).as_deref(),
+                        &p.column,
+                    );
                     format!(
-                        "Filter column '{}' not found. Available columns: {}",
+                        "Filter column '{}' not found. Available columns: {}{}",
                         p.column,
-                        data.headers.join(", ")
+                        data.headers.join(", "),
+                        suffix
                     )
                 })?;
             Ok((idx, &p.op, p.value.as_str()))
@@ -269,6 +274,18 @@ mod tests {
         };
         let pred = parse_predicate("missing=x").unwrap();
         assert!(filter_data(data, &[pred]).is_err());
+    }
+
+    #[test]
+    fn test_filter_data_invalid_column_suggests_close_match() {
+        let data = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![vec!["Tokyo".into(), "1000".into()]],
+        };
+        let pred = parse_predicate("ctiy=Tokyo").unwrap();
+        let err = filter_data(data, &[pred]).unwrap_err();
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("Did you mean 'city'?"), "{msg}");
     }
 
     #[test]

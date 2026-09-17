@@ -155,6 +155,36 @@ fn test_nonexistent_column_hint() {
 }
 
 #[test]
+fn test_column_typo_suggests_close_match() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-x", "date", "-y", "revnue"])
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Did you mean 'revenue'?"),
+        "Expected column suggestion, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_column_case_typo_marks_case_sensitivity() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-x", "date", "-y", "Revenue"])
+        .output()
+        .expect("Failed to run vz");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Did you mean 'revenue'?") && stderr.contains("case-sensitive"),
+        "Expected case-sensitivity note, got: {stderr}"
+    );
+}
+
+#[test]
 fn test_color_column_produces_multi_series() {
     let output = vz_binary()
         .args(["fixtures/sales.csv", "-c", "city"])
@@ -183,6 +213,20 @@ fn test_color_column_not_found_errors() {
         stderr.contains("Color column 'nonexistent' not found"),
         "Expected color column not found error, got: {}",
         stderr
+    );
+}
+
+#[test]
+fn test_color_column_typo_suggests_close_match() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-c", "City"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Did you mean 'city'?") && stderr.contains("case-sensitive"),
+        "Expected color suggestion with case note, got: {stderr}"
     );
 }
 

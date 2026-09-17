@@ -82,6 +82,71 @@ pub fn find_similar_files(dir: &Path, target: &str) -> Vec<String> {
     all_data_files.into_iter().take(3).collect()
 }
 
+/// Suggest the closest column name for a typo'd column reference.
+///
+/// Prefers a case-insensitive match first (headers are case-sensitive, so
+/// `Revenue` vs `revenue` deserves a hint), then falls back to an edit
+/// distance of at most 2 on lowercased names. Returns `None` for exact
+/// matches, empty inputs, or distant names.
+pub fn suggest_column(available: &[String], target: &str) -> Option<String> {
+    if target.is_empty() || available.is_empty() {
+        return None;
+    }
+    if available.iter().any(|c| c == target) {
+        return None;
+    }
+    if let Some(case_match) = available.iter().find(|c| c.eq_ignore_ascii_case(target)) {
+        return Some(case_match.clone());
+    }
+    let target_lower = target.to_lowercase();
+    let mut best: Option<(usize, usize, &String)> = None;
+    for cand in available {
+        let dist = levenshtein(&target_lower, &cand.to_lowercase());
+        if dist > 2 {
+            continue;
+        }
+        let key = (dist, cand.chars().count());
+        if best.is_none_or(|(d, n, _)| key < (d, n)) {
+            best = Some((dist, cand.chars().count(), cand));
+        }
+    }
+    best.map(|(_, _, cand)| cand.clone())
+}
+
+/// Format the `Did you mean ...?` suffix for column-not-found errors.
+/// Appends a case-sensitivity note when the target only differs by case.
+pub fn format_column_suffix(suggestion: Option<&str>, target: &str) -> String {
+    match suggestion {
+        Some(s) if s.eq_ignore_ascii_case(target) && s != target => {
+            format!(" Did you mean '{s}'? Note: column names are case-sensitive.")
+        }
+        Some(s) => format!(" Did you mean '{s}'?"),
+        None => String::new(),
+    }
+}
+
+/// Edit distance over chars (self-contained; avoids a new dependency).
+fn levenshtein(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    if a.is_empty() {
+        return b.len();
+    }
+    if b.is_empty() {
+        return a.len();
+    }
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    for (i, &ca) in a.iter().enumerate() {
+        let mut curr = vec![i + 1];
+        for (j, &cb) in b.iter().enumerate() {
+            let cost = usize::from(ca != cb);
+            curr.push((prev[j] + cost).min((curr[j] + 1).min(prev[j + 1] + 1)));
+        }
+        prev = curr;
+    }
+    prev[b.len()]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,5 +202,45 @@ mod tests {
         // Empty target must not vacuously match; only the fallback applies.
         let result = find_similar_files(dir.path(), "");
         assert_eq!(result, vec!["data.csv".to_string()]);
+    }
+
+    #[test]
+    fn test_suggest_column_exact_match() {
+        let available = ["date".to_string(), "city".to_string()];
+        assert_eq!(suggest_column(&available, "date"), None);
+        assert_eq!(suggest_column(&available, ""), None);
+        assert_eq!(suggest_column(&[], "date"), None);
+    }
+
+    #[test]
+    fn test_suggest_column_prefers_case_match() {
+        let available = ["date".to_string(), "revenue".to_string()];
+        assert_eq!(
+            suggest_column(&available, "Revenue"),
+            Some("revenue".to_string())
+        );
+    }
+
+    #[test]
+    fn test_suggest_column_typo_within_distance_two() {
+        let available = ["date".to_string(), "revenue".to_string()];
+        assert_eq!(
+            suggest_column(&available, "revnue"),
+            Some("revenue".to_string())
+        );
+        assert_eq!(suggest_column(&available, "zzzz"), None);
+    }
+
+    #[test]
+    fn test_format_column_suffix_marks_case_sensitivity() {
+        assert_eq!(
+            format_column_suffix(Some("revenue"), "Revenue"),
+            " Did you mean 'revenue'? Note: column names are case-sensitive."
+        );
+        assert_eq!(
+            format_column_suffix(Some("revenue"), "revnue"),
+            " Did you mean 'revenue'?"
+        );
+        assert_eq!(format_column_suffix(None, "zzzz"), "");
     }
 }
