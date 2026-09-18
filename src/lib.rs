@@ -12,6 +12,7 @@ pub mod filter;
 pub mod helpers;
 pub mod infer;
 pub mod info;
+pub mod insights;
 pub mod loader;
 pub mod oneshot;
 pub mod output;

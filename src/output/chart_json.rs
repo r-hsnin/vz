@@ -81,6 +81,21 @@ pub fn print_chart_json(
     if let serde_json::Value::Object(ref mut map) = output_value {
         map.insert("chart_data".to_string(), chart_data);
         map.insert("query".to_string(), serde_json::to_value(&query)?);
+        map.insert(
+            "insights".to_string(),
+            serde_json::to_value(crate::insights::insights_json(
+                &crate::insights::InsightRequest {
+                    chart_type: params.chart_type,
+                    x_column: &recommendation.x_column,
+                    y_column: recommendation.y_column.as_deref(),
+                    color_column: params.color_column.as_deref(),
+                    headers,
+                    rows,
+                    agg: params.agg,
+                    bins: params.bins,
+                },
+            ))?,
+        );
     }
 
     println!("{}", serde_json::to_string_pretty(&output_value)?);

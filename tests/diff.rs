@@ -5,6 +5,52 @@ mod common;
 use common::vz_binary;
 
 #[test]
+fn test_diff_insights_names_biggest_mover() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("💡 Biggest change: Tokyo grew from 1k to 1.2k (+20%)."),
+        "expected diff insight, got: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("💡 2 improved, 1 declined."),
+        "expected tally, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_diff_json_has_insights() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "-o",
+            "json",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let insights = v["insights"].as_array().expect("insights must be an array");
+    assert!(
+        insights
+            .iter()
+            .any(|s| s.as_str().unwrap_or("").contains("Tokyo grew")),
+        "expected insight in diff JSON, got: {}",
+        v["insights"]
+    );
+}
+
+#[test]
 fn test_diff_two_positional_files_bar() {
     let output = vz_binary()
         .args([

@@ -33,6 +33,16 @@ pub(super) fn print_diff_summary(diff: &DiffResult, before_path: &Path, after_pa
         overall,
         diff.entries.len(),
     );
+
+    for line in crate::insights::diff_insights(
+        &diff
+            .entries
+            .iter()
+            .map(|e| (e.label.clone(), e.before, e.after, e.pct_change))
+            .collect::<Vec<_>>(),
+    ) {
+        eprintln!("💡 {line}");
+    }
 }
 
 /// Print a diff-aware bar chart with ▲/▼ direction markers.

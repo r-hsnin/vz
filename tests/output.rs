@@ -1741,3 +1741,117 @@ fn test_json_query_records_extra_y_and_filters() {
         q
     );
 }
+
+#[test]
+fn test_insights_line_on_stderr() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("💡 revenue rose 80% overall (1k → 1.8k)."),
+        "expected line insight, got: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("💡 Peaked at 2k (2024-05-01)"),
+        "expected extremes, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_insights_bar_names_leader() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-x", "city", "-y", "revenue"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("💡 Tokyo leads with 4.2k (51% of total)."),
+        "expected bar insight, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_insights_histogram_and_heatmap() {
+    let hist = vz_binary()
+        .args(["fixtures/sales.csv", "-t", "histogram", "-y", "revenue"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(hist.status.success());
+    let stderr = String::from_utf8_lossy(&hist.stderr);
+    assert!(
+        stderr.contains("💡 Most revenue values"),
+        "expected histogram insight, got: {}",
+        stderr
+    );
+
+    let heat = vz_binary()
+        .args(["fixtures/departments.csv"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(heat.status.success());
+    let stderr = String::from_utf8_lossy(&heat.stderr);
+    assert!(
+        stderr.contains("💡 Most common combo: Marketing × Active"),
+        "expected heatmap insight, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_insights_silent_for_single_point() {
+    use std::io::Write;
+    let mut f = tempfile::NamedTempFile::with_suffix(".csv").unwrap();
+    writeln!(f, "date,revenue\n2024-01,100").unwrap();
+    let output = vz_binary()
+        .arg(f.path())
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("💡"),
+        "single point must stay silent, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_json_insights_field_matches_stderr() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-o", "json"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let insights = v["insights"].as_array().expect("insights must be an array");
+    assert!(
+        insights
+            .iter()
+            .any(|s| s.as_str().unwrap_or("").contains("rose 80%")),
+        "expected insight in JSON, got: {}",
+        v["insights"]
+    );
+}
+
+#[test]
+fn test_insights_no_ansi_when_piped() {
+    let output = vz_binary()
+        .args(["fixtures/sales.csv"])
+        .env_remove("FORCE_COLOR")
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("\x1b["),
+        "insights must not add ANSI when piped, got: {:?}",
+        stderr
+    );
+}

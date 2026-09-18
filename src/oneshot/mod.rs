@@ -85,6 +85,17 @@ pub fn render_oneshot(
         series_colors: &opts.theme.series_colors,
     });
 
+    crate::insights::print_insights(&crate::insights::InsightRequest {
+        chart_type,
+        x_column: &recommendation.x_column,
+        y_column: recommendation.y_column.as_deref(),
+        color_column: recommendation.color_column.as_deref(),
+        headers,
+        rows,
+        agg: opts.agg,
+        bins: opts.bins,
+    });
+
     warn_incompatible_flags(chart_type, opts);
 
     let area = Rect::new(0, 0, width, height);
