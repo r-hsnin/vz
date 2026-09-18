@@ -17,16 +17,32 @@ use crate::output;
 
 /// Infer schema from loaded data (eliminates boilerplate in multiple call sites).
 ///
-/// Only passes the first [`SAMPLE_SIZE`](crate::infer::detector::SAMPLE_SIZE)
-/// rows to inference. This avoids allocating a full `Vec<Vec<&str>>` for large datasets.
+/// Samples rows evenly across the whole dataset (head + tail) instead of only
+/// the first [`SAMPLE_SIZE`](crate::infer::detector::SAMPLE_SIZE) rows, so a
+/// file whose leading rows are all one type (e.g. 100 dates followed by 100
+/// garbage strings) infers the same as the reversed file. Avoids allocating
+/// a full `Vec<Vec<&str>>` for large datasets by capping sampled rows.
 pub fn infer_from_data(data: &LoadedData) -> Schema {
     use crate::infer::detector::SAMPLE_SIZE;
     let headers: Vec<&str> = data.headers.iter().map(|s| s.as_str()).collect();
-    let row_limit = data.rows.len().min(SAMPLE_SIZE);
-    let rows: Vec<Vec<&str>> = data.rows[..row_limit]
-        .iter()
-        .map(|r| r.iter().map(|s| s.as_str()).collect())
-        .collect();
+    let rows: Vec<Vec<&str>> = if data.rows.len() <= SAMPLE_SIZE {
+        data.rows
+            .iter()
+            .map(|r| r.iter().map(|s| s.as_str()).collect())
+            .collect()
+    } else {
+        // Evenly spaced indices covering head→tail (first and last always kept).
+        let step = (data.rows.len() - 1) as f64 / (SAMPLE_SIZE - 1) as f64;
+        (0..SAMPLE_SIZE)
+            .map(|i| {
+                let idx = (step * i as f64).round() as usize;
+                data.rows[idx.min(data.rows.len() - 1)]
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect()
+            })
+            .collect()
+    };
     infer::infer_schema(&headers, &rows)
 }
 
@@ -306,5 +322,39 @@ mod tests {
         let err = validate_color_column(&headers, Some("City")).unwrap_err();
         let msg = format!("{:#}", err);
         assert!(msg.contains("case-sensitive"), "{msg}");
+    }
+
+    fn big_loaded(first_type_dates: bool) -> LoadedData {
+        // 200 rows: half dates, half garbage — order decides which half the
+        // old head-only sampler saw. Even sampling must infer identically.
+        let mut rows: Vec<Vec<String>> = Vec::new();
+        let mut date_rows: Vec<Vec<String>> = (0..100)
+            .map(|i| vec!["2024-01-01".to_string(), i.to_string()])
+            .collect();
+        let mut junk_rows: Vec<Vec<String>> = (0..100)
+            .map(|i| vec![format!("not-a-date-{i}"), i.to_string()])
+            .collect();
+        if first_type_dates {
+            rows.append(&mut date_rows);
+            rows.append(&mut junk_rows);
+        } else {
+            rows.append(&mut junk_rows);
+            rows.append(&mut date_rows);
+        }
+        LoadedData {
+            headers: vec!["d".to_string(), "v".to_string()],
+            rows,
+        }
+    }
+
+    #[test]
+    fn infer_from_data_is_order_independent() {
+        let fwd = infer_from_data(&big_loaded(true));
+        let rev = infer_from_data(&big_loaded(false));
+        assert_eq!(
+            fwd.columns[0].data_type, rev.columns[0].data_type,
+            "head ({:?}) vs tail ({:?}) order must not change inference",
+            fwd.columns[0].data_type, rev.columns[0].data_type
+        );
     }
 }
