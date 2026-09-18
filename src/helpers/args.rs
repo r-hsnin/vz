@@ -43,6 +43,7 @@ pub fn effective_agg(
     // When bar chart is forced, Y was auto-inferred (not explicit), and Y is not numeric,
     // default to Count. This handles the case where both columns are categorical
     // (e.g., departments.csv with department + status).
+    // Self-aggregation (`-x city` alone → x=y=city) also counts rows per category.
     if cli.chart_type == Some(cli::ChartTypeArg::Bar) && cli.y_col.is_none() {
         let y_is_categorical = recommendation
             .y_column
@@ -53,6 +54,22 @@ pub fn effective_agg(
         if y_is_categorical {
             return cli::AggFunction::Count;
         }
+    }
+
+    // Categorical X with no quantitative Y (incl. `-x city` alone):
+    // count rows per category (matches the README "count auto-applied" claim).
+    if cli.y_col.is_none()
+        && let Some(x_name) = cli
+            .x_col
+            .as_deref()
+            .map(|s| crate::cli::parse_column_spec(s).0)
+        && let Some(x_meta) = schema.find_column(x_name)
+        && x_meta.data_type == crate::infer::types::DataType::Categorical
+        && schema
+            .columns_of_type(crate::infer::types::DataType::Quantitative)
+            .is_empty()
+    {
+        return cli::AggFunction::Count;
     }
 
     cli::AggFunction::Sum

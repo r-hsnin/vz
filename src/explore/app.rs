@@ -133,7 +133,9 @@ impl ExploreApp {
     }
 
     /// Cycle through categorical columns for color grouping.
-    /// None → first categorical → second categorical → … → None (off)
+    /// None → first categorical → second categorical → … → None (off).
+    /// Has no effect on bar chart data (grouped bars are not implemented);
+    /// the summary legend only — switching while on Bar reports that.
     fn cycle_color_column(&mut self) {
         let categoricals: Vec<usize> = self
             .schema
@@ -164,6 +166,10 @@ impl ExploreApp {
                 }
             }
         };
+        if self.selected_color.is_some() && self.effective_chart_type() == ChartType::Bar {
+            self.status_message =
+                Some("color set (legend only — bar data stays aggregated)".to_string());
+        }
     }
 
     /// Cycle sort order: None → Desc → Asc → None.

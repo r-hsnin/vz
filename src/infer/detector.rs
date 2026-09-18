@@ -94,7 +94,7 @@ fn unique_values(values: &[&str]) -> usize {
 fn is_temporal(value: &str) -> bool {
     use std::sync::LazyLock;
 
-    static TEMPORAL_PATTERNS: LazyLock<[regex::Regex; 5]> = LazyLock::new(|| {
+    static TEMPORAL_PATTERNS: LazyLock<[regex::Regex; 9]> = LazyLock::new(|| {
         [
             // YYYY-MM-DD (with optional time)
             regex::Regex::new(r"^\d{4}-\d{2}-\d{2}").expect("valid temporal regex"),
@@ -104,6 +104,23 @@ fn is_temporal(value: &str) -> bool {
             regex::Regex::new(r"^\d{2}/\d{2}/\d{4}").expect("valid temporal regex"),
             // DD-Mon-YYYY
             regex::Regex::new(r"^\d{2}-[A-Za-z]{3}-\d{4}").expect("valid temporal regex"),
+            // DD.MM.YYYY (EU dotted)
+            regex::Regex::new(r"^\d{2}\.\d{2}\.\d{4}").expect("valid temporal regex"),
+            // Mon DD, YYYY / Month DD, YYYY ("Jan 15, 2024", "January 15, 2024")
+            regex::Regex::new(
+                r"^(?i)(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]* \d{1,2}, \d{4}",
+            )
+            .expect("valid temporal regex"),
+            // Mon DD YYYY without comma ("Jan 15 2024" — unquoted CSV can't hold the comma form)
+            regex::Regex::new(
+                r"^(?i)(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]* \d{1,2} \d{4}",
+            )
+            .expect("valid temporal regex"),
+            // DD Mon YYYY ("15 Jan 2024")
+            regex::Regex::new(
+                r"^\d{1,2} (?i)(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]* \d{4}",
+            )
+            .expect("valid temporal regex"),
             // YYYY-MM (year-month only)
             regex::Regex::new(r"^\d{4}-\d{2}$").expect("valid temporal regex"),
         ]
@@ -154,6 +171,21 @@ mod tests {
     #[test]
     fn test_detect_us_date() {
         assert_eq!(detect_value_type("01/15/2024"), DataType::Temporal);
+    }
+
+    #[test]
+    fn test_detect_eu_dotted_date() {
+        assert_eq!(detect_value_type("15.01.2024"), DataType::Temporal);
+        assert_eq!(detect_value_type("02.12.2023"), DataType::Temporal);
+    }
+
+    #[test]
+    fn test_detect_month_name_dates() {
+        assert_eq!(detect_value_type("Jan 15, 2024"), DataType::Temporal);
+        assert_eq!(detect_value_type("January 15, 2024"), DataType::Temporal);
+        assert_eq!(detect_value_type("Jan 15 2024"), DataType::Temporal);
+        assert_eq!(detect_value_type("15 Jan 2024"), DataType::Temporal);
+        assert_eq!(detect_value_type("15 January 2024"), DataType::Temporal);
     }
 
     #[test]

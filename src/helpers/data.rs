@@ -60,7 +60,23 @@ pub fn build_recommendation(
         recommendation.color_column = None;
     }
 
+    warn_bar_color_ignored(&recommendation);
+
     Ok(recommendation)
+}
+
+/// Warn when `-c` names a column that no renderer consumes: grouped bars are
+/// not implemented, so the color column only reaches the summary legend —
+/// bar heights stay aggregated over all rows. Without this, `color=prod […]`
+/// reads as if the chart were split by `prod` when it is not.
+fn warn_bar_color_ignored(recommendation: &chart::ChartRecommendation) {
+    use crate::chart::selector::ChartType;
+    if recommendation.chart_type == ChartType::Bar && recommendation.color_column.is_some() {
+        eprintln!(
+            "warning: -c/--color has no effect on bar chart data (grouped bars are not supported); \
+             showing aggregated values over all rows"
+        );
+    }
 }
 
 /// Validate extra `-y` columns against the schema.
