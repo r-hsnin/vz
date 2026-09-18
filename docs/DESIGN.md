@@ -22,28 +22,30 @@ column type is decided by majority vote:
 
 | Value pattern | Detected as | Notes |
 |---------------|-------------|-------|
-| `YYYY-MM-DD` (optional time), `YYYY/MM/DD`, `MM/DD/YYYY`, `DD-Mon-YYYY`, `YYYY-MM` | `Temporal` | Checked before numeric |
+| `YYYY-MM-DD` (optional time), `YYYY/MM/DD`, `MM/DD/YYYY`, `DD-Mon-YYYY`, `DD.MM.YYYY`, month names (`Jan 15 2024`, `Jan 15, 2024`, `15 Jan 2024`), `YYYY-MM` | `Temporal` | Checked before numeric |
 | Display-formatted numbers via `util::parse_number` | `Quantitative` | `1,000`, `$100`, `€50`, `45%` (= 0.45), `10k`, `10GiB`, `(42)` (= -42), `USD 100` all parse → Quantitative. One parser shared by inference, aggregation, series, filters, diff, sparkline, and JSON samples, so a value means the same number on every path. `%` is a fraction (`50%` = 0.5); storage suffixes are decimal except `KiB/MiB/GiB/TiB` (binary). `--where` equality is numeric too (`revenue=2000` matches `$2,000`) |
 | Trend annotation via `util::trend_label`/`trend_from_slice` | `→ stable` band ±5% | Single implementation shared by oneshot summary lines and spark suffixes; denominator is `first.abs()` (`-100 → -50` = `↑ +50%`), near-zero start yields no trend |
 | `NaN`, `inf`, `-inf`, `Infinity` | `Nominal` (excluded from column vote) | `parse_number` returns `None` for non-finite → treated like nulls: skipped in inference, aggregation, and all chart paths |
 | Empty string | `Nominal` (ignored in column vote) | Nulls don't vote |
 | Anything else | `Nominal` | e.g. UUIDs, free text |
 
-Column decision (first 100 rows only, empty values excluded):
+Column decision (100 evenly spaced rows head→tail, empty values excluded):
 
 1. ≥ 80% of sampled values Temporal → `Temporal`
 2. ≥ 80% Quantitative → `Quantitative`
 3. Otherwise by cardinality: ≤ 20 unique values → `Categorical`, else `Nominal`
 
-Only the first 100 rows are sampled; there is no full-scan fallback.
-The same 100-row cap is applied in `pipeline::infer_from_data`.
+Only 100 evenly spaced rows (covering head to tail) are sampled; there is no full-scan fallback.
+The same even sampling is applied in `pipeline::infer_from_data`.
 
 ## Chart Selection Design
 
 The user-facing selection table and behavior live in [README.md](../README.md#chart-selection-rules).
 
 Design intent: the selector maps inferred column types to a chart type, normalizes
-reversed axes (e.g. Quantitative × Temporal) to the canonical orientation, and falls
+reversed user axes to the canonical orientation (Quantitative × Temporal →
+x=temporal Line; Quantitative × Categorical → x=categorical Bar), renders a
+count-Bar for a lone categorical `-x`, and falls
 back to Bar for unmatched type pairs.
 
 ## CLI Design
@@ -76,12 +78,13 @@ Design guideline: the common case needs no flags (`vz data.csv`), and every over
 
 ## Key Design Decisions
 
-1. **Ratatui for rendering** — Mature, active, Rust-native
-2. **No external data engine** — Keep binary small, no Polars/DuckDB dep for v1
-3. **In-memory processing** — v1 targets files that fit in memory (< 1GB)
-4. **Convention-first CLI** — Minimal flags needed for 80% of use cases
-5. **Shared data_builder** — All 3 modes build on the same `ChartData`
+1. **Plain words before chart literacy** — Every chart ships 0–3 `💡` takeaway sentences (movement/extremes/leader/clusters) computed from the same parsed numbers as the chart, so a non-engineer gets the point without reading axes. Same ±5% stable band and `parse_number` as every other path; silent when there is nothing to say.
+2. **Ratatui for rendering** — Mature, active, Rust-native
+3. **No external data engine** — Keep binary small, no Polars/DuckDB dep for v1
+4. **In-memory processing** — v1 targets files that fit in memory (< 1GB)
+5. **Convention-first CLI** — Minimal flags needed for 80% of use cases
+6. **Shared data_builder** — All 3 modes build on the same `ChartData`
    structures from `chart/data_builder.rs` to avoid divergence; each mode keeps
    only a thin adaptation layer (sorting, truncation, slide wiring, see
    ARCHITECTURE.md) on top
-6. **Format auto-detection** — Extension first, then content heuristics (tabs vs commas, JSON detection)
+7. **Format auto-detection** — Extension first, then content heuristics (tabs vs commas, JSON detection)

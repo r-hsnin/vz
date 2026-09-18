@@ -52,6 +52,7 @@ src/
 ├── chart/                  — selector.rs (types → chart), data_builder.rs (rows → chart data)
 ├── render/                 — ratatui widgets: line, bar, scatter, histogram, heatmap, nice_numbers
 ├── oneshot/                — stdout rendering: builders, summary, ansi
+├── insights.rs             — plain-language takeaways (pure logic; oneshot stderr + JSON `insights` + diff)
 ├── info.rs                 — --info column metadata
 ├── output/                 — machine-readable exporters: chart_json, markdown, spark, stats_text, svg, html, table
 ├── diff/                   — two-file comparison: schema, compute, render/{bar,line,spark,json,markdown,html}

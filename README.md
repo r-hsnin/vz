@@ -15,6 +15,7 @@ CLI BI tool with smart visualization and terminal presentation.
 - **Auto-inference** — Detects temporal, quantitative, categorical columns from data
 - **Smart chart selection** — Picks the best chart type based on column types
 - **One-shot output** — Renders chart to stdout and exits (no TUI needed)
+- **Plain-language insights** — Every chart prints 0–3 `💡` takeaways on stderr (growth, leader, clusters); also in `-o json` as `insights` and in diff mode/JSON
 - **Multi-series** — Auto-groups data by color column with legend
 - **Explore mode** — Interactive TUI with vim-style navigation
 - **Present mode** — Terminal slides with embedded charts from Markdown
@@ -97,7 +98,9 @@ vz sales.csv -x city -y revenue -t bar --top 5
 # Aggregation: mean instead of default sum
 vz sales.csv -x city -y revenue -t bar --agg mean
 
-# Count rows per category (auto-applies count aggregation)
+# Count rows per category: -x alone on a categorical column counts rows per value
+vz sales.csv -x city
+# Count aggregation with explicit type override
 vz sales.csv -x city -t bar
 
 # Show value and percentage labels on bars
@@ -232,6 +235,7 @@ Non-numeric cells are skipped, never counted as `0`.
 The default mode renders a chart to stdout with:
 1. A summary line: `Line │ x=date │ y=revenue (100–500) ▁▃▅▇ │ ↑ +50% │ color=city [Tokyo=cyan, Osaka=yellow] │ 6 rows`
 2. A Braille/Unicode chart with title, axis tick labels, and legend
+3. A `💡` takeaway (0–3 plain sentences on stderr: growth/leader/clusters; silent when <2 points)
 
 Summary line components:
 - Chart type and axis assignments
@@ -257,10 +261,11 @@ revenue  ▁▂▃▅▇  (100–500) ↑ +400%
 | Categorical | Quantitative | Bar |
 | Quantitative | Quantitative | Scatter |
 | Single Quantitative | — | Histogram |
+| Single Categorical (`-x city`, no numeric columns) | — | Bar of row counts |
 | Categorical | Categorical | Heatmap |
 | Nominal | *any* | Bar (fallback, warns on stderr) |
 
-When axes are specified in reverse order (e.g. Quantitative × Temporal), vz automatically assigns the correct chart type. Pairs involving a `Nominal` column (free text, UUIDs) fall back to Bar with a `falling back to bar` warning; any other pair without a chart rule (e.g. Temporal × Temporal) falls back to Bar with the same warning.
+When axes are specified in reverse order (e.g. `-x revenue -y date`), vz normalizes to the canonical orientation (`x=date`). Bar charts ignore `-c` for aggregation (grouped bars are not supported): bars stay summed over all rows and the color column only appears in the summary legend, with a warning on stderr.
 
 ## Explore Mode Keybindings
 
