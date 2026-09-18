@@ -301,7 +301,65 @@ fn test_no_skip_warning_on_clean_data() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         !stderr.contains("skipped"),
-        "Should not warn on clean data, but stderr: {stderr}"
+        "normalized chart must not skip rows, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_x_only_categorical_renders_count_bar() {
+    // Single categorical column with only -x: rows-per-category count bar.
+    // Was: "Cannot find a suitable Y axis column" error.
+    let file = common::temp_csv_with_suffix(
+        ".csv",
+        &["city", "Tokyo", "Osaka", "Tokyo", "Tokyo", "Osaka"],
+    );
+    let output = vz_binary()
+        .args([file.path().to_str().unwrap(), "-x", "city"])
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "vz failed: {stderr}");
+    assert!(
+        stderr.contains("Bar") && stderr.contains("x=city") && stderr.contains("count(city)"),
+        "expected count Bar x=city, got stdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+    assert!(
+        stdout.contains("Tokyo"),
+        "expected Tokyo bar, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_bar_color_column_warns_data_stays_aggregated() {
+    // Grouped bars are not implemented: `-c` on a Bar must warn that bar
+    // heights stay aggregated over all rows (legend only).
+    let file = common::temp_csv_with_suffix(
+        ".csv",
+        &[
+            "city,prod,revenue",
+            "Tokyo,A,100",
+            "Tokyo,B,200",
+            "Osaka,A,150",
+        ],
+    );
+    let output = vz_binary()
+        .args([
+            file.path().to_str().unwrap(),
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "-c",
+            "prod",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "vz failed: {stderr}");
+    assert!(
+        stderr.contains("--color") && stderr.contains("aggregated"),
+        "expected bar -c aggregation warning, got: {stderr}"
     );
 }
 
@@ -892,5 +950,45 @@ fn test_unknown_extra_y_column_errors_with_hint() {
     assert!(
         stderr.contains("revnue") && stderr.contains("Did you mean 'revenue'?"),
         "Expected extra-y typo error with hint, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_reversed_axes_hint_renders_canonical_chart() {
+    // `-x revenue -y date` must normalize to x=date (Line), not an empty chart.
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-x", "revenue", "-y", "date"])
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "vz failed: {stderr}");
+    assert!(
+        stderr.contains("Line") && stderr.contains("x=date"),
+        "expected normalized Line x=date, got stdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("skipped"),
+        "normalized chart must not skip rows, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_reversed_bar_axes_hint_renders_canonical_chart() {
+    // `-x revenue -y city` must normalize to x=city (Bar), not an empty chart.
+    let output = vz_binary()
+        .args(["fixtures/sales.csv", "-x", "revenue", "-y", "city"])
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "vz failed: {stderr}");
+    assert!(
+        stderr.contains("Bar") && stderr.contains("x=city"),
+        "expected normalized Bar x=city, got stdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("skipped"),
+        "normalized chart must not skip rows, got: {stderr}"
     );
 }

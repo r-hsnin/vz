@@ -259,6 +259,56 @@ fn test_x_only_hint_nonexistent_column_errors() {
     assert!(rec.unwrap_err().to_string().contains("nonexistent"));
 }
 
+// --- Axis normalization tests (reversed user hints) ---
+
+#[test]
+fn test_reversed_quant_temporal_hint_is_normalized() {
+    // `-x revenue -y date` must draw date on X (was: empty chart, all rows skipped)
+    let schema = make_schema(&[
+        ("date", DataType::Temporal),
+        ("revenue", DataType::Quantitative),
+    ]);
+    let rec = select_chart(&schema, Some("revenue"), Some("date")).unwrap();
+    assert_eq!(rec.chart_type, ChartType::Line);
+    assert_eq!(rec.x_column, "date");
+    assert_eq!(rec.y_column.as_deref(), Some("revenue"));
+}
+
+#[test]
+fn test_reversed_quant_categorical_hint_is_normalized() {
+    // `-x revenue -y city` must draw city on X (was: empty chart, all rows skipped)
+    let schema = make_schema(&[
+        ("city", DataType::Categorical),
+        ("revenue", DataType::Quantitative),
+    ]);
+    let rec = select_chart(&schema, Some("revenue"), Some("city")).unwrap();
+    assert_eq!(rec.chart_type, ChartType::Bar);
+    assert_eq!(rec.x_column, "city");
+    assert_eq!(rec.y_column.as_deref(), Some("revenue"));
+}
+
+#[test]
+fn test_canonical_order_is_untouched() {
+    let schema = make_schema(&[
+        ("date", DataType::Temporal),
+        ("revenue", DataType::Quantitative),
+    ]);
+    let rec = select_chart(&schema, Some("date"), Some("revenue")).unwrap();
+    assert_eq!(rec.x_column, "date");
+    assert_eq!(rec.y_column.as_deref(), Some("revenue"));
+}
+
+#[test]
+fn test_x_only_categorical_without_quant_y_is_count_bar() {
+    // `-x city` alone (no quantitative columns at all): count rows per city.
+    // Was: "Cannot find a suitable Y" error despite the README count claim.
+    let schema = make_schema(&[("city", DataType::Categorical)]);
+    let rec = select_chart(&schema, Some("city"), None).unwrap();
+    assert_eq!(rec.chart_type, ChartType::Bar);
+    assert_eq!(rec.x_column, "city");
+    assert_eq!(rec.y_column.as_deref(), Some("city"));
+}
+
 // --- Fallback warning tests ---
 
 #[test]

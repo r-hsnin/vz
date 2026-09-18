@@ -39,16 +39,23 @@ pub fn select_chart(
     x_hint: Option<&str>,
     y_hint: Option<&str>,
 ) -> Result<ChartRecommendation> {
-    // If user specified both axes, use them
+    // If user specified both axes, use them — but normalize reversed pairs
+    // to the canonical orientation so `chart_type_for_pair`'s flip arms
+    // (Q×T → Line, Q×C → Bar) actually render. Without the swap the
+    // recommendation kept the user's literal X/Y, producing an empty chart
+    // (e.g. `-x revenue -y date` plotted dates on the Y axis → all skipped).
     if let (Some(x_name), Some(y_name)) = (x_hint, y_hint) {
         let x_col = validate_column(schema, x_name)?;
         let y_col = validate_column(schema, y_name)?;
         let chart_type = chart_type_for_pair(x_col.data_type, y_col.data_type);
+        let (x_norm, y_norm) =
+            normalize_axis_order(x_name, y_name, x_col.data_type, y_col.data_type);
+        let color_column = find_color_column(schema, &x_norm, &y_norm);
         return Ok(ChartRecommendation {
             chart_type,
-            x_column: x_name.to_string(),
-            y_column: Some(y_name.to_string()),
-            color_column: find_color_column(schema, x_name, y_name),
+            x_column: x_norm,
+            y_column: Some(y_norm),
+            color_column,
         });
     }
 
@@ -151,7 +158,18 @@ fn select_with_x_hint(schema: &Schema, x_name: &str) -> Result<ChartRecommendati
         });
     }
 
-    // No quantitative Y available — histogram of X if quantitative
+    // No quantitative Y available — count aggregation:
+    // categorical X → Bar of counts (x=g alone draws, honoring the README
+    // claim that "count aggregation is auto-applied"); quantitative X keeps
+    // the old Histogram fallback.
+    if x_col.data_type == DataType::Categorical {
+        return Ok(ChartRecommendation {
+            chart_type: ChartType::Bar,
+            x_column: x_name.to_string(),
+            y_column: Some(x_name.to_string()),
+            color_column: find_color_column(schema, x_name, x_name),
+        });
+    }
     if x_col.data_type == DataType::Quantitative {
         return Ok(ChartRecommendation {
             chart_type: ChartType::Histogram,
@@ -166,6 +184,25 @@ fn select_with_x_hint(schema: &Schema, x_name: &str) -> Result<ChartRecommendati
          Hint: add a numeric column or specify -y explicitly.",
         x_name
     )
+}
+
+/// Normalize a user-specified axis pair to the canonical orientation.
+/// Line wants X=Temporal, Bar wants X=Categorical — swap when the user gave
+/// the pair in reverse (e.g. `-x revenue -y date` → x=date, y=revenue).
+/// Non-flippable pairs keep the user's literal order. Returns (x, y) names.
+fn normalize_axis_order(
+    x_name: &str,
+    y_name: &str,
+    x_type: DataType,
+    y_type: DataType,
+) -> (String, String) {
+    match (x_type, y_type) {
+        (DataType::Quantitative, DataType::Temporal)
+        | (DataType::Quantitative, DataType::Categorical) => {
+            (y_name.to_string(), x_name.to_string())
+        }
+        _ => (x_name.to_string(), y_name.to_string()),
+    }
 }
 
 /// Determine chart type from a pair of data types.
