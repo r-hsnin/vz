@@ -51,7 +51,8 @@ src/
 ├── infer/                  — type inference (types.rs: Schema/ColumnMeta, detector.rs)
 ├── chart/                  — selector.rs (types → chart), data_builder.rs (rows → chart data)
 ├── render/                 — ratatui widgets: line, bar, scatter, histogram, heatmap, nice_numbers
-├── oneshot/                — stdout rendering: builders, summary, ansi
+├── oneshot/                — stdout rendering: builders, summary, ansi (+ colored animated playback)
+├── anim/                   — motion: frames (pure interpolation) + player (TTY redraw); BarChartData.y_max_hint pins the axis
 ├── insights.rs             — plain-language takeaways (pure logic; oneshot stderr + JSON `insights` + diff)
 ├── info.rs                 — --info column metadata
 ├── output/                 — machine-readable exporters: chart_json, markdown, spark, stats_text, svg, html, table

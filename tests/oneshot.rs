@@ -992,3 +992,55 @@ fn test_reversed_bar_axes_hint_renders_canonical_chart() {
         "normalized chart must not skip rows, got: {stderr}"
     );
 }
+
+#[test]
+fn test_motion_off_matches_default_piped_output() {
+    // Piped (non-TTY) stdout must be deterministic: --motion off and the
+    // default produce byte-identical charts.
+    let base = || {
+        vz_binary()
+            .args(["fixtures/sales.csv", "-x", "city", "-y", "revenue"])
+            .output()
+            .expect("Failed to run vz")
+    };
+    let with_off = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "--motion",
+            "off",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let def = base();
+    assert!(with_off.status.success());
+    assert!(def.status.success());
+    assert_eq!(with_off.stdout, def.stdout);
+}
+
+#[test]
+fn test_motion_grow_piped_renders_final_frame_only() {
+    // Explicit grow on non-TTY must not animate: same final frame, no escapes.
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "--motion",
+            "grow",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        !stdout.contains("\x1b["),
+        "piped output must be plain: {stdout:?}"
+    );
+    assert!(stdout.contains("revenue by city"));
+}

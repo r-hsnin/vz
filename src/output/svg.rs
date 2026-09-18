@@ -558,6 +558,9 @@ mod tests {
             labels: false,
             theme: crate::theme::Theme::default(),
             bins: None,
+            motion: crate::cli::MotionArg::Off,
+            fps: 12,
+            frames: 12,
         };
         let svg = render_chart_svg(&rec, &headers, &rows, &opts);
         assert!(svg.starts_with("<svg"), "Should start with <svg tag");
@@ -576,6 +579,7 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
+            y_max_hint: None,
         });
         let marks = data_marks_svg(&data, 80, 24);
         assert_eq!(
@@ -683,6 +687,7 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
+            y_max_hint: None,
         });
         let pts = layout_points(&data, 80, 24);
         assert_eq!(pts.len(), 2);
@@ -705,6 +710,7 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
+            y_max_hint: None,
         });
         assert!(data_marks_svg(&data, 80, 24).is_empty());
     }
@@ -732,6 +738,9 @@ mod tests {
             labels: false,
             theme: crate::theme::Theme::default(),
             bins: None,
+            motion: crate::cli::MotionArg::Off,
+            fps: 12,
+            frames: 12,
         };
         let svg = render_chart_svg(&rec, &headers, &rows, &opts);
         assert!(svg.contains("vz-point"), "expected data overlay in SVG");

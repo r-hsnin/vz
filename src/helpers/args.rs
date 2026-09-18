@@ -25,6 +25,9 @@ pub fn build_render_options<'a>(
         labels: cli.labels,
         theme: resolve_theme(cli),
         bins: cli.bins,
+        motion: cli.motion,
+        fps: cli.fps,
+        frames: cli.frames,
     }
 }
 

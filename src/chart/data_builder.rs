@@ -76,6 +76,7 @@ pub fn aggregate_bar(
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
+            y_max_hint: None,
         },
         rows_used,
     )

@@ -307,6 +307,7 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
+            y_max_hint: None,
         };
         sort_bar_data(&mut data, None);
         assert_eq!(data.labels, vec!["A", "B", "C"]);
@@ -322,6 +323,7 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
+            y_max_hint: None,
         };
         sort_bar_data(&mut data, Some(SortOrder::Desc));
         let non_nan: Vec<(&str, f64)> = data
@@ -344,6 +346,7 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
+            y_max_hint: None,
         };
         truncate_bar_data(&mut data, None);
         assert_eq!(data.labels.len(), 3);
@@ -359,6 +362,7 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
+            y_max_hint: None,
         };
         truncate_bar_data(&mut data, Some(10));
         assert_eq!(data.labels.len(), 2);

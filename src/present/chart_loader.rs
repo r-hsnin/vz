@@ -186,6 +186,7 @@ fn load_diff_chart_data(
             show_labels: false,
             series_colors: theme.series_colors.clone(),
             axis_color: Some(theme.axis_color),
+            y_max_hint: None,
         };
         Ok(ChartData::Bar(bar_data))
     }

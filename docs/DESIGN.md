@@ -55,6 +55,16 @@ Flag definitions and examples live in [README.md](../README.md#usage); `vz --hel
 Design guideline: the common case needs no flags (`vz data.csv`), and every override
 (axes, type, aggregation, filtering) is opt-in.
 
+Motion (animated playback) is opt-out, not opt-in: on an interactive TTY the
+chart animates by default (bar → grow, line/scatter → draw), and `--motion off`
+restores the static render. The single load-bearing rule is **axis pinning** —
+intermediate frames reuse the final frame's axis (`BarChartData.y_max_hint`;
+line/scatter reuse the final `ChartConfig` axes), so bars visibly grow instead
+of the axis shrinking. Non-TTY output, `NO_COLOR`, and all `-o` machine formats
+always render the final frame byte-identically; frame building is pure
+(`anim::frames`) and the terminal player (`anim::player` via oneshot's colored
+`render_animated`) is a thin IO layer.
+
 ## Scope
 
 ### In Scope (v0.2)

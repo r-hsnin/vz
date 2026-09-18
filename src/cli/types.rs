@@ -89,6 +89,19 @@ pub enum OutputFormat {
     Html,
 }
 
+/// Motion effect for animated chart playback (TTY only).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum MotionArg {
+    /// Pick the effect automatically per chart type (bar → grow, line/scatter → draw).
+    Auto,
+    /// No animation: render the final frame immediately.
+    Off,
+    /// Bars grow upward from zero (bar charts only).
+    Grow,
+    /// Line/scatter points reveal left-to-right (line/scatter only).
+    Draw,
+}
+
 /// Color theme preset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ThemeArg {

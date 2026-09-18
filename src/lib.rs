@@ -2,6 +2,7 @@
 //!
 //! This library crate re-exports the public modules for use by benchmarks and tests.
 
+pub mod anim;
 pub mod chart;
 pub mod cli;
 pub mod diagnostics;
