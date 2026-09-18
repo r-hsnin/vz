@@ -138,6 +138,10 @@ pub struct HistogramData {
     pub x_label: String,
     /// Color for axis lines (from theme). Falls back to DarkGray if not set.
     pub axis_color: Option<Color>,
+    /// Pinned Y-axis maximum (bin count) for animation: when set, the axis
+    /// scales to this value instead of the computed max, so intermediate
+    /// build frames keep the final frame's axis.
+    pub max_count_hint: Option<usize>,
 }
 
 /// Data for a heatmap (count matrix of two categorical columns).

@@ -139,7 +139,7 @@ pub fn render_oneshot(
 /// colors match the static path), rewinding the cursor between frames.
 /// Falls back to a single static final-frame render when stdout is not
 /// rewound-friendly (player error) — never fails the whole command.
-fn render_animated(
+pub(crate) fn render_animated(
     frames: &[crate::render::ChartData],
     area: Rect,
     delay: std::time::Duration,

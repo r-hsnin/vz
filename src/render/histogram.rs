@@ -29,12 +29,16 @@ impl<'a> Widget for Histogram<'a> {
             .clone()
             .unwrap_or_else(|| "Histogram".to_string());
 
-        let max_count = bins.iter().map(|(_, _, c)| *c).max().unwrap_or(0) as f64;
+        let computed_max = bins.iter().map(|(_, _, c)| *c).max().unwrap_or(0);
+        // Animation pin: intermediate build frames carry the final max so the
+        // axis never rescales mid-playback. `None` = normal single-frame path.
+        let max_count = self.data.max_count_hint.unwrap_or(computed_max);
+        let max_count_f = max_count as f64;
 
         let chart_area = if bins.is_empty() {
             area
-        } else if max_count <= 10.0 {
-            let y_ticks = compute_integer_ticks(max_count.ceil() as usize, 5);
+        } else if max_count <= 10 {
+            let y_ticks = compute_integer_ticks(max_count, 5);
             let y_ticks = super::dedup_tick_labels(&y_ticks);
             let (y_area, chart_area) = super::split_y_axis(area, &y_ticks);
             let color = self.data.axis_color.unwrap_or(Color::DarkGray);
@@ -42,7 +46,7 @@ impl<'a> Widget for Histogram<'a> {
             chart_area
         } else {
             let color = self.data.axis_color.unwrap_or(Color::DarkGray);
-            super::render_y_axis_frame_colored(max_count, 5, &area, buf, false, color)
+            super::render_y_axis_frame_colored(max_count_f, 5, &area, buf, false, color)
         };
 
         render_histogram_bars(&bins, &title, chart_area, buf);
@@ -167,6 +171,7 @@ mod tests {
             bin_count: 5,
             x_label: "Age".to_string(),
             axis_color: None,
+            max_count_hint: None,
         };
 
         let hist = Histogram::new(&data);
@@ -190,6 +195,7 @@ mod tests {
             bin_count: 5,
             x_label: "X".to_string(),
             axis_color: None,
+            max_count_hint: None,
         };
 
         let hist = Histogram::new(&data);
@@ -206,6 +212,7 @@ mod tests {
             bin_count: 1,
             x_label: "X".to_string(),
             axis_color: None,
+            max_count_hint: None,
         };
 
         let hist = Histogram::new(&data);

@@ -52,7 +52,7 @@ src/
 ├── chart/                  — selector.rs (types → chart), data_builder.rs (rows → chart data)
 ├── render/                 — ratatui widgets: line, bar, scatter, histogram, heatmap, nice_numbers
 ├── oneshot/                — stdout rendering: builders, summary, ansi (+ colored animated playback)
-├── anim/                   — motion: frames (pure interpolation) + player (TTY redraw); BarChartData.y_max_hint pins the axis
+├── anim/                   — motion: frames (pure interpolation incl. hist build/heatmap wipe) + player (TTY redraw for ChartData + text lines) + morph_value; y_max_hint/max_count_hint pin axes; svg opt-in fade via output/svg
 ├── insights.rs             — plain-language takeaways (pure logic; oneshot stderr + JSON `insights` + diff)
 ├── info.rs                 — --info column metadata
 ├── output/                 — machine-readable exporters: chart_json, markdown, spark, stats_text, svg, html, table

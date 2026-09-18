@@ -1044,3 +1044,53 @@ fn test_motion_grow_piped_renders_final_frame_only() {
     );
     assert!(stdout.contains("revenue by city"));
 }
+
+#[test]
+fn test_motion_hist_heatmap_piped_match_static() {
+    // Histogram + heatmap never animate on pipes: default/auto/grow/draw all
+    // render the final frame byte-identically.
+    for args in [
+        vec!["fixtures/exam_scores.csv", "-t", "histogram"],
+        vec!["fixtures/departments.csv", "-t", "heatmap"],
+    ] {
+        let base = vz_binary().args(&args).output().expect("Failed to run vz");
+        for motion in ["off", "grow", "draw"] {
+            let mut full = args.clone();
+            full.push("--motion");
+            full.push(motion);
+            let out = vz_binary().args(&full).output().expect("Failed to run vz");
+            assert!(out.status.success());
+            assert_eq!(
+                out.stdout, base.stdout,
+                "piped {args:?} --motion {motion} must match default"
+            );
+            assert!(!String::from_utf8(out.stdout).unwrap().contains("\x1b["));
+        }
+    }
+}
+
+#[test]
+fn test_svg_auto_static_but_grow_animates_with_reduced_motion_guard() {
+    let base = vz_binary()
+        .args(["fixtures/sales.csv", "-o", "svg"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(base.status.success());
+    let base_svg = String::from_utf8(base.stdout).unwrap();
+    assert!(
+        !base_svg.contains("vz-anim"),
+        "default SVG export must stay static"
+    );
+
+    let animated = vz_binary()
+        .args(["fixtures/sales.csv", "-o", "svg", "--motion", "grow"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(animated.status.success());
+    let svg = String::from_utf8(animated.stdout).unwrap();
+    assert!(svg.contains("vz-anim"), "explicit grow must animate SVG");
+    assert!(
+        svg.contains("prefers-reduced-motion"),
+        "animation must respect reduced-motion"
+    );
+}

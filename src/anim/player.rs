@@ -70,3 +70,42 @@ pub fn render_frame_lines(frame: &ChartData, area: Rect) -> Vec<String> {
         })
         .collect()
 }
+
+/// Play pre-built text frames (one `Vec<String>` per frame) to `writer`,
+/// redrawing in place.
+///
+/// The first frame prints normally; each subsequent frame moves the cursor up
+/// by the line count and re-prints. Returns the number of frames written.
+/// Used by text-only paths (e.g. diff bars) that don't render via ratatui.
+pub fn play_text_frames<W: Write>(
+    writer: &mut W,
+    frames: &[Vec<String>],
+    frame_delay: Duration,
+) -> anyhow::Result<usize> {
+    if frames.is_empty() {
+        return Ok(0);
+    }
+    write!(writer, "\x1b[?25l")?;
+    let mut written = 0usize;
+    for (i, frame) in frames.iter().enumerate() {
+        if i > 0 {
+            let h = frame.len().max(1) as u16;
+            write!(writer, "\x1b[{h}A")?;
+            for _ in 0..frame.len() {
+                write!(writer, "\x1b[2K\r\n")?;
+            }
+            write!(writer, "\x1b[{h}A")?;
+        }
+        for line in frame {
+            writeln!(writer, "{line}")?;
+        }
+        writer.flush()?;
+        written += 1;
+        if i + 1 < frames.len() && !frame_delay.is_zero() {
+            std::thread::sleep(frame_delay);
+        }
+    }
+    write!(writer, "\x1b[?25h")?;
+    writer.flush()?;
+    Ok(written)
+}

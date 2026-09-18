@@ -53,12 +53,6 @@ pub(super) fn print_diff_bar(cli: &Cli, diff: &DiffResult) {
         return;
     }
 
-    // Find max absolute after value for bar scaling
-    let max_abs = entries
-        .iter()
-        .map(|e| e.after.abs())
-        .fold(0.0_f64, f64::max);
-
     let label_width = entries.iter().map(|e| e.label.len()).max().unwrap_or(8);
     let bar_width: usize = cli
         .width
@@ -67,38 +61,103 @@ pub(super) fn print_diff_bar(cli: &Cli, diff: &DiffResult) {
         .saturating_sub(label_width + 40);
     let bar_width = bar_width.max(10);
 
-    for entry in &entries {
-        let bar_len = if max_abs > 0.0 {
-            ((entry.after.abs() / max_abs) * bar_width as f64).round() as usize
-        } else {
-            0
-        };
-        let bar = "█".repeat(bar_len);
-
-        let direction = if entry.delta > 0.0 {
-            "▲"
-        } else if entry.delta < 0.0 {
-            "▼"
-        } else {
-            "─"
-        };
-
-        let change_str = match entry.pct_change {
-            Some(pct) if pct > 0.0 => format!("{} +{:.0}%", direction, pct),
-            Some(pct) if pct < 0.0 => format!("{} {:.0}%", direction, pct),
-            Some(_) => format!("{} 0%", direction),
-            None if entry.delta > 0.0 => format!("{} +{}", direction, format_number(entry.delta)),
-            None => direction.to_string(),
-        };
-
-        println!(
-            "  {:width$}  {}  {} → {}  {}",
-            entry.label,
-            bar,
-            format_number(entry.before),
-            format_number(entry.after),
-            change_str,
-            width = label_width,
-        );
+    // Animated morph (TTY only): bars interpolate before → after with the
+    // scale pinned to the final max; numbers stay final so the last frame is
+    // byte-identical to the static render.
+    let motion = crate::anim::MotionConfig::new(cli.motion, cli.fps, cli.frames);
+    let no_color = std::env::var("NO_COLOR").is_ok_and(|v| !v.is_empty());
+    if crate::anim::should_animate(
+        &motion,
+        std::io::IsTerminal::is_terminal(&std::io::stdout()),
+        no_color,
+    ) && let Some(crate::anim::Effect::Morph) = crate::anim::resolve_diff_effect(cli.motion)
+    {
+        let n = motion.frames as usize;
+        let frames: Vec<Vec<String>> = (0..n)
+            .map(|i| {
+                if i + 1 == n {
+                    return diff_bar_lines(&entries, None, label_width, bar_width);
+                }
+                let t = i as f64 / (n - 1) as f64;
+                let displayed: Vec<f64> = entries
+                    .iter()
+                    .map(|e| crate::anim::morph_value(e.before, e.after, t))
+                    .collect();
+                diff_bar_lines(&entries, Some(&displayed), label_width, bar_width)
+            })
+            .collect();
+        let delay = std::time::Duration::from_secs_f64(1.0 / f64::from(motion.fps));
+        if crate::anim::player::play_text_frames(&mut std::io::stdout().lock(), &frames, delay)
+            .is_ok()
+        {
+            return;
+        }
+        // Fall through to static on player error — never fail the command.
     }
+
+    for line in diff_bar_lines(&entries, None, label_width, bar_width) {
+        println!("{line}");
+    }
+}
+
+/// Build diff bar text lines. `displayed` overrides the bar lengths
+/// (interpolated morph values); `None` renders the final `after` values.
+/// Direction markers and `before → after` numbers always use the final values.
+pub(super) fn diff_bar_lines(
+    entries: &[crate::diff::DiffEntry],
+    displayed: Option<&[f64]>,
+    label_width: usize,
+    bar_width: usize,
+) -> Vec<String> {
+    // Pin the scale to the final max so intermediate frames grow/shrink
+    // instead of rescaling.
+    let max_abs = entries
+        .iter()
+        .map(|e| e.after.abs())
+        .fold(0.0_f64, f64::max);
+
+    entries
+        .iter()
+        .enumerate()
+        .map(|(i, entry)| {
+            let shown = displayed
+                .and_then(|d| d.get(i))
+                .copied()
+                .unwrap_or(entry.after);
+            let bar_len = if max_abs > 0.0 {
+                ((shown.abs() / max_abs) * bar_width as f64).round() as usize
+            } else {
+                0
+            };
+            let bar = "█".repeat(bar_len);
+
+            let direction = if entry.delta > 0.0 {
+                "▲"
+            } else if entry.delta < 0.0 {
+                "▼"
+            } else {
+                "─"
+            };
+
+            let change_str = match entry.pct_change {
+                Some(pct) if pct > 0.0 => format!("{} +{:.0}%", direction, pct),
+                Some(pct) if pct < 0.0 => format!("{} {:.0}%", direction, pct),
+                Some(_) => format!("{} 0%", direction),
+                None if entry.delta > 0.0 => {
+                    format!("{} +{}", direction, format_number(entry.delta))
+                }
+                None => direction.to_string(),
+            };
+
+            format!(
+                "  {:width$}  {}  {} → {}  {}",
+                entry.label,
+                bar,
+                format_number(entry.before),
+                format_number(entry.after),
+                change_str,
+                width = label_width,
+            )
+        })
+        .collect()
 }

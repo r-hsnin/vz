@@ -89,7 +89,28 @@ pub(super) fn print_diff_line_chart(
     };
 
     let area = Rect::new(0, 0, width, height);
+    let final_chart = ChartData::Line(config);
+
+    // Animated draw (TTY only): series reveal left-to-right on the final
+    // axes; piped output and --motion off render the final frame once.
+    let motion = crate::anim::MotionConfig::new(cli.motion, cli.fps, cli.frames);
+    let no_color = std::env::var("NO_COLOR").is_ok_and(|v| !v.is_empty());
+    if crate::anim::should_animate(
+        &motion,
+        std::io::IsTerminal::is_terminal(&std::io::stdout()),
+        no_color,
+    ) && let Some(effect) =
+        crate::anim::resolve_effect(cli.motion, crate::chart::selector::ChartType::Line)
+    {
+        let frames = crate::anim::build_frames(&final_chart, Some(effect), motion.frames as usize);
+        let delay = std::time::Duration::from_secs_f64(1.0 / f64::from(motion.fps));
+        if crate::oneshot::render_animated(&frames, area, delay).is_ok() {
+            return Ok(());
+        }
+        // Fall through to static on player error.
+    }
+
     let mut buf = Buffer::empty(area);
-    render::render_chart_data(&ChartData::Line(config), area, &mut buf);
+    render::render_chart_data(&final_chart, area, &mut buf);
     oneshot::print_buffer(&buf, &mut io::stdout().lock())
 }

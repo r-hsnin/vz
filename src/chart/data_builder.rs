@@ -355,6 +355,7 @@ pub fn build_histogram(
         bin_count: bin_count.unwrap_or(DEFAULT_BINS),
         x_label,
         axis_color: None,
+        max_count_hint: None,
     }
 }
 

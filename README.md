@@ -134,7 +134,7 @@ vz present slides.md
 | `-f` | `--format` | Force input format: `csv`, `tsv`, `json`, `ndjson`, `space` |
 | `-W` | `--width` | Chart width in columns (default: terminal width) |
 | `-H` | `--height` | Chart height in rows (default: 24) |
-| | `--motion` | Animate on TTY: `auto` (default: bar→grow, line/scatter→draw), `off`, `grow`, `draw`. Piped/`NO_COLOR`/all `-o` formats always render the static final frame |
+| | `--motion` | Animate on TTY: `auto` (default: bar→grow, line/scatter→draw, histogram→build, heatmap→wipe, diff bar→morph), `off`, `grow` (bar/histogram/diff), `draw` (line/scatter/heatmap). Piped/`NO_COLOR` always render the static final frame; `-o svg/html` animate only with explicit `grow`/`draw` (fade + `prefers-reduced-motion` guard) |
 | | `--fps` | Animation frames per second 1–30 (default: 12) |
 | | `--frames` | Animation frame count 2–30 (default: 12) |
 | `-I` | `--info` | Show column metadata without rendering a chart |
