@@ -2,9 +2,7 @@ mod args;
 mod types;
 
 pub use args::{parse_column_spec, parse_multi_y_specs};
-pub use types::{
-    AggFunction, ChartTypeArg, InputFormatArg, MotionArg, OutputFormat, SortOrder, ThemeArg,
-};
+pub use types::{AggFunction, ChartTypeArg, InputFormatArg, OutputFormat, SortOrder, ThemeArg};
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -152,18 +150,6 @@ pub struct Cli {
     /// Disable automatic row limit for directory mode (load all rows regardless of size).
     #[arg(long = "no-limit")]
     pub no_limit: bool,
-
-    /// Animate chart rendering on TTY: auto (per chart type), off, grow (bar), draw (line/scatter).
-    #[arg(long = "motion", value_enum, default_value_t = MotionArg::Auto)]
-    pub motion: MotionArg,
-
-    /// Animation frames per second (1-30, default: 12).
-    #[arg(long = "fps", value_name = "N", default_value_t = 12)]
-    pub fps: u32,
-
-    /// Animation frame count (2-30, default: 12).
-    #[arg(long = "frames", value_name = "N", default_value_t = 12)]
-    pub frames: u32,
 }
 
 #[derive(Subcommand, Debug, PartialEq, Clone)]

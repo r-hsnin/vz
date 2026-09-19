@@ -436,30 +436,7 @@ fn render_chart_svg_with_marks(
             svg = svg.replacen("</svg>", &format!("{marks}</svg>"), 1);
         }
     }
-    // Opt-in export animation: explicit --motion grow/draw only (auto/off
-    // stay byte-identical). Text-grid SVGs can't vectorize bar growth, so the
-    // export effect is a whole-chart fade with a reduced-motion guard.
-    let no_color = std::env::var("NO_COLOR").is_ok_and(|v| !v.is_empty());
-    if crate::anim::should_animate_export(opts.motion, no_color) {
-        svg = inject_svg_animation(&svg);
-    }
     svg
-}
-
-/// Inject a whole-chart fade-in animation into an SVG document.
-///
-/// Adds `class="vz-anim"` to the root `<svg>` and a `<style>` block with a
-/// `vz-fade` keyframe plus `@media (prefers-reduced-motion: reduce)` guard
-/// that disables the animation. Pure string transform (no IO).
-pub fn inject_svg_animation(svg: &str) -> String {
-    const STYLE: &str = "<style>.vz-anim{animation:vz-fade .6s ease-out}@keyframes vz-fade{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:reduce){.vz-anim{animation:none}}</style>";
-    let with_class = svg.replacen("<svg ", "<svg class=\"vz-anim\" ", 1);
-    if let Some(pos) = with_class.find('>') {
-        let (head, tail) = with_class.split_at(pos + 1);
-        format!("{head}{STYLE}{tail}")
-    } else {
-        with_class
-    }
 }
 
 /// Render the chart to SVG and print to stdout.
@@ -581,9 +558,6 @@ mod tests {
             labels: false,
             theme: crate::theme::Theme::default(),
             bins: None,
-            motion: crate::cli::MotionArg::Off,
-            fps: 12,
-            frames: 12,
         };
         let svg = render_chart_svg(&rec, &headers, &rows, &opts);
         assert!(svg.starts_with("<svg"), "Should start with <svg tag");
@@ -602,7 +576,6 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
-            y_max_hint: None,
         });
         let marks = data_marks_svg(&data, 80, 24);
         assert_eq!(
@@ -710,7 +683,6 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
-            y_max_hint: None,
         });
         let pts = layout_points(&data, 80, 24);
         assert_eq!(pts.len(), 2);
@@ -733,7 +705,6 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
-            y_max_hint: None,
         });
         assert!(data_marks_svg(&data, 80, 24).is_empty());
     }
@@ -761,58 +732,9 @@ mod tests {
             labels: false,
             theme: crate::theme::Theme::default(),
             bins: None,
-            motion: crate::cli::MotionArg::Off,
-            fps: 12,
-            frames: 12,
         };
         let svg = render_chart_svg(&rec, &headers, &rows, &opts);
         assert!(svg.contains("vz-point"), "expected data overlay in SVG");
         assert!(svg.contains("data-label=\"Tokyo\""), "expected Tokyo mark");
-    }
-
-    #[test]
-    fn test_inject_svg_animation_adds_class_and_reduced_motion_guard() {
-        let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\"></svg>";
-        let out = inject_svg_animation(svg);
-        assert!(
-            out.contains("class=\"vz-anim\""),
-            "root class missing: {out}"
-        );
-        assert!(out.contains("vz-fade"), "keyframes missing: {out}");
-        assert!(
-            out.contains("prefers-reduced-motion"),
-            "reduced-motion guard missing: {out}"
-        );
-    }
-
-    #[test]
-    fn test_render_chart_svg_auto_stays_static() {
-        use crate::chart::selector::ChartType;
-        use crate::test_helpers::make_recommendation;
-        let rec = make_recommendation(ChartType::Bar, "city", Some("revenue"), None);
-        let headers = vec!["city".to_string(), "revenue".to_string()];
-        let rows = vec![vec!["Tokyo".to_string(), "100".to_string()]];
-        let opts = crate::oneshot::RenderOptions {
-            chart_type_override: None,
-            y_label_override: None,
-            width: Some(60),
-            height: Some(20),
-            sort_order: None,
-            extra_y_columns: vec![],
-            limit: None,
-            agg: crate::cli::AggFunction::Sum,
-            title: None,
-            labels: false,
-            theme: crate::theme::Theme::default(),
-            bins: None,
-            motion: crate::cli::MotionArg::Auto,
-            fps: 12,
-            frames: 12,
-        };
-        let svg = render_chart_svg(&rec, &headers, &rows, &opts);
-        assert!(
-            !svg.contains("vz-anim"),
-            "auto export must stay static: {svg}"
-        );
     }
 }

@@ -73,7 +73,6 @@ fn render_diff_chart(frame: &mut Frame, app: &DiffExploreApp, area: ratatui::lay
                 show_labels: true,
                 series_colors: vec![],
                 axis_color: Some(app.theme.axis_color),
-                y_max_hint: None,
             };
             let chart_data = ChartData::Bar(bar_data);
             frame.render_widget(ChartWidget(&chart_data), area);

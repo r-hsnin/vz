@@ -44,12 +44,6 @@ pub struct RenderOptions<'a> {
     pub theme: crate::theme::Theme,
     /// Number of bins for histogram charts (None = default 10).
     pub bins: Option<usize>,
-    /// Animation mode (default: auto per chart type; off = static).
-    pub motion: crate::cli::MotionArg,
-    /// Animation frames per second.
-    pub fps: u32,
-    /// Animation frame count.
-    pub frames: u32,
 }
 
 pub fn render_oneshot(
@@ -105,81 +99,18 @@ pub fn render_oneshot(
     warn_incompatible_flags(chart_type, opts);
 
     let area = Rect::new(0, 0, width, height);
-    let final_chart =
-        build_chart_data_for_svg(chart_type, recommendation, headers, rows, opts, area);
-
-    // Animated playback (TTY only): summary/insights already printed once
-    // above; only the chart region redraws in place. Every other path
-    // (piped output, NO_COLOR, --motion off, non-animated chart types or
-    // machine-readable -o formats) renders the final frame exactly once,
-    // byte-identical to the pre-animation behavior.
-    let motion = crate::anim::MotionConfig::new(opts.motion, opts.fps, opts.frames);
-    let no_color = std::env::var("NO_COLOR").is_ok_and(|v| !v.is_empty());
-    if crate::anim::should_animate(
-        &motion,
-        io::IsTerminal::is_terminal(&io::stdout()),
-        no_color,
-    ) && let Some(effect) = crate::anim::resolve_effect(opts.motion, chart_type)
-    {
-        let frames = crate::anim::build_frames(&final_chart, Some(effect), motion.frames as usize);
-        let delay = std::time::Duration::from_secs_f64(1.0 / f64::from(motion.fps));
-        render_animated(&frames, area, delay)?;
-        return Ok(());
-    }
-
     let mut buf = Buffer::empty(area);
-    crate::render::render_chart_data(&final_chart, area, &mut buf);
+    render_chart_to_buffer(
+        chart_type,
+        recommendation,
+        headers,
+        rows,
+        opts,
+        area,
+        &mut buf,
+    );
 
     print_buffer(&buf, &mut io::stdout().lock())
-}
-
-/// Play pre-built animation frames with colored output.
-///
-/// Each frame renders to a `Buffer` and prints via [`print_buffer`] (so ANSI
-/// colors match the static path), rewinding the cursor between frames.
-/// Falls back to a single static final-frame render when stdout is not
-/// rewound-friendly (player error) — never fails the whole command.
-pub(crate) fn render_animated(
-    frames: &[crate::render::ChartData],
-    area: Rect,
-    delay: std::time::Duration,
-) -> anyhow::Result<()> {
-    use std::io::Write as _;
-
-    let mut out = io::stdout().lock();
-    // Hide cursor during playback; restore before returning.
-    let _ = write!(out, "\x1b[?25l");
-    let mut failed = false;
-    for (i, frame) in frames.iter().enumerate() {
-        if i > 0 {
-            // Rewind over the previous frame's lines, then clear each line.
-            let _ = write!(out, "\x1b[{}A", area.height);
-            for _ in 0..area.height {
-                let _ = write!(out, "\x1b[2K\r\n");
-            }
-            let _ = write!(out, "\x1b[{}A", area.height);
-        }
-        let mut buf = Buffer::empty(area);
-        crate::render::render_chart_data(frame, area, &mut buf);
-        if print_buffer(&buf, &mut out).is_err() {
-            failed = true;
-            break;
-        }
-        let _ = out.flush();
-        if i + 1 < frames.len() && !delay.is_zero() {
-            std::thread::sleep(delay);
-        }
-    }
-    let _ = write!(out, "\x1b[?25h");
-    let _ = out.flush();
-    if failed {
-        let mut buf = Buffer::empty(area);
-        crate::render::render_chart_data(frames.last().unwrap_or(&frames[0]), area, &mut buf);
-        print_buffer(&buf, &mut io::stdout().lock())?;
-    }
-    // Keep the final frame's trailing newline behavior identical to static.
-    let _ = writeln!(out);
-    Ok(())
 }
 
 /// Emit warnings when CLI flags are used with incompatible chart types.

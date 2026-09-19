@@ -50,7 +50,6 @@ pub(super) fn print_diff_html(cli: &Cli, diff: &DiffResult, before_path: &Path, 
         show_labels: true,
         series_colors: colors,
         axis_color: Some(Color::DarkGray),
-        y_max_hint: None,
     };
 
     let area = Rect::new(0, 0, width, height);

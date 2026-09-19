@@ -117,16 +117,12 @@ pub struct BarChartData {
     pub labels: Vec<String>,
     pub values: Vec<f64>,
     pub y_label: String,
-    /// Show value + percentage labels on bar chart bars.
+    /// Show value + percentage labels on bars.
     pub show_labels: bool,
     /// Color palette for bars (from theme). Falls back to SERIES_COLORS if empty.
     pub series_colors: Vec<Color>,
     /// Color for axis lines (from theme). Falls back to DarkGray if not set.
     pub axis_color: Option<Color>,
-    /// Pinned Y-axis maximum for animation: when set, the axis scales to this
-    /// value instead of the data max, so intermediate grow frames keep the
-    /// final frame's axis (bars visibly grow instead of the axis shrinking).
-    pub y_max_hint: Option<f64>,
 }
 
 /// Data for a histogram.
@@ -138,10 +134,6 @@ pub struct HistogramData {
     pub x_label: String,
     /// Color for axis lines (from theme). Falls back to DarkGray if not set.
     pub axis_color: Option<Color>,
-    /// Pinned Y-axis maximum (bin count) for animation: when set, the axis
-    /// scales to this value instead of the computed max, so intermediate
-    /// build frames keep the final frame's axis.
-    pub max_count_hint: Option<usize>,
 }
 
 /// Data for a heatmap (count matrix of two categorical columns).

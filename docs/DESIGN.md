@@ -55,21 +55,6 @@ Flag definitions and examples live in [README.md](../README.md#usage); `vz --hel
 Design guideline: the common case needs no flags (`vz data.csv`), and every override
 (axes, type, aggregation, filtering) is opt-in.
 
-Motion (animated playback) is opt-out, not opt-in: on an interactive TTY the
-chart animates by default (bar → grow, line/scatter → draw, histogram → build,
-heatmap → wipe, diff bar → morph), and `--motion off` restores the static
-render. The single load-bearing rule is **axis pinning** — intermediate frames
-reuse the final frame's axis (`BarChartData.y_max_hint`,
-`HistogramData.max_count_hint`; line/scatter reuse the final `ChartConfig`
-axes; heatmap keeps `max_count`; diff bars pin to the final max and keep
-numbers static), so bars visibly grow instead of the axis shrinking. Non-TTY
-output and `NO_COLOR` always render the final frame byte-identically; `-o
-svg/html` animate only with explicit `--motion grow/draw` (whole-chart fade
-with a `prefers-reduced-motion` guard — text-grid SVGs can't vectorize bar
-growth). Frame building is pure (`anim::frames` + `anim::morph_value`) and the
-terminal players (`anim::player` text/ChartData playback via oneshot's colored
-`render_animated`) are thin IO layers.
-
 ## Scope
 
 ### In Scope (v0.2)

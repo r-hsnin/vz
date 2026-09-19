@@ -25,7 +25,6 @@ Release procedures live in [RUNBOOK.md](RUNBOOK.md).
 - **NaN/inf are skipped in aggregations, diffs, and every chart path** (line/scatter/histogram/spark/JSON series), and ignored in the type-inference vote like nulls. `--agg max/min` never emits `±inf`; text-only diffs report no entries instead of `0→0`. JSON `data[]` renders them as `null`, while `chart_data` series omit those points.
 - **Diff mode ignores `--where`/`--agg`/`--color`.** A `no effect in diff mode` warning is printed; filter before comparing instead.
 - **Explore/Present require an interactive terminal.** In CI or pipes, use one-shot mode.
-- **Charts animate on TTY by default.** Bar grows, line/scatter draws, histogram builds, heatmap wipes, diff bars morph before→after; `--motion off` restores the static render. Piped output and `NO_COLOR` always emit the final frame only (byte-identical to `--motion off`). `-o svg/html` stay static under `auto`/`off` and animate (whole-chart fade with `prefers-reduced-motion` guard) only with explicit `--motion grow/draw`.
 
 ## Build Failures
 

@@ -76,7 +76,6 @@ pub fn aggregate_bar(
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
-            y_max_hint: None,
         },
         rows_used,
     )
@@ -355,7 +354,6 @@ pub fn build_histogram(
         bin_count: bin_count.unwrap_or(DEFAULT_BINS),
         x_label,
         axis_color: None,
-        max_count_hint: None,
     }
 }
 

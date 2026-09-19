@@ -27,10 +27,7 @@ impl<'a> Widget for BarChart<'a> {
             .clone()
             .unwrap_or_else(|| "Bar Chart".to_string());
 
-        let data_max = self.data.values.iter().copied().fold(0.0_f64, f64::max);
-        // Animation pin: intermediate grow frames carry the final max so the
-        // axis never rescales mid-playback. `None` = normal single-frame path.
-        let max_val = self.data.y_max_hint.unwrap_or(data_max);
+        let max_val = self.data.values.iter().copied().fold(0.0_f64, f64::max);
 
         let chart_area = if self.data.values.is_empty() {
             area
@@ -169,7 +166,6 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
-            y_max_hint: None,
         };
 
         let chart = BarChart::new(&data);
@@ -195,7 +191,6 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
-            y_max_hint: None,
         };
 
         let chart = BarChart::new(&data);
@@ -215,7 +210,6 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
-            y_max_hint: None,
         };
 
         let chart = BarChart::new(&data);
@@ -234,7 +228,6 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
-            y_max_hint: None,
         };
 
         let chart = BarChart::new(&data);
@@ -266,7 +259,6 @@ mod tests {
             show_labels: false,
             series_colors: vec![],
             axis_color: None,
-            y_max_hint: None,
         };
 
         let chart = BarChart::new(&data);

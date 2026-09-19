@@ -78,51 +78,6 @@ fn test_apply_top_limit() {
     assert_eq!(sorted[0].label, "Tokyo"); // highest delta
 }
 
-#[test]
-fn test_resolve_diff_effect_auto_and_grow_morph() {
-    use crate::cli::MotionArg;
-    assert_eq!(
-        crate::anim::resolve_diff_effect(MotionArg::Auto),
-        Some(crate::anim::Effect::Morph)
-    );
-    assert_eq!(
-        crate::anim::resolve_diff_effect(MotionArg::Grow),
-        Some(crate::anim::Effect::Morph)
-    );
-    assert_eq!(crate::anim::resolve_diff_effect(MotionArg::Off), None);
-    assert_eq!(crate::anim::resolve_diff_effect(MotionArg::Draw), None);
-}
-
-#[test]
-fn test_diff_bar_lines_final_carries_before_after_numbers() {
-    let entries = sample_entries();
-    let lines = super::bar::diff_bar_lines(&entries, None, 6, 20);
-    assert_eq!(lines.len(), 3);
-    assert!(lines[0].contains("Tokyo"));
-    assert!(lines[0].contains('▲'));
-    assert!(lines[0].contains("1k → 1.2k") || lines[0].contains("1000"));
-}
-
-#[test]
-fn test_diff_bar_morph_first_frame_shorter_than_final() {
-    let entries = sample_entries();
-    let first_displayed: Vec<f64> = entries
-        .iter()
-        .map(|e| crate::anim::morph_value(e.before, e.after, 0.0))
-        .collect();
-    let first = super::bar::diff_bar_lines(&entries, Some(&first_displayed), 6, 20);
-    let last = super::bar::diff_bar_lines(&entries, None, 6, 20);
-    // Same labels/numbers, only bar glyph counts differ.
-    assert_eq!(first.len(), last.len());
-    for (f, l) in first.iter().zip(last.iter()) {
-        assert_eq!(
-            f.replace('█', ""),
-            l.replace('█', ""),
-            "only bar length may differ"
-        );
-    }
-}
-
 // --- render_diff_line tests ---
 
 fn sample_ts() -> DiffTimeSeries {
