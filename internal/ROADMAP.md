@@ -20,9 +20,16 @@
 実施時は `release-manifest.txt` を `src/` から `crates/*/src` へ変更する必要がある
 （公開範囲の変更として承認を要する。手順は [PUBLICATION.md](PUBLICATION.md) §8）。
 
+公開 [docs/DESIGN.md](../docs/DESIGN.md) の D1/D4 は現行設計のみを述べる。将来の到達点は
+ここに置く:
+
+- D1: `vz-core` に `src/lib.rs` の狭い公開表面を移し、`vz` binary が依存する 2 crate 構成。
+- D4: 分割時に `vz-core` が型付き `thiserror` enum（`Io`/`Parse`/`Schema`/`Empty`）を持ち、
+  `anyhow` は binary 側へ後退する。
+
 ## 決定ステータス（公開 DESIGN から移設）
 
-公開 [docs/DESIGN.md](../docs/DESIGN.md) の Decision Records は rationale を保持し、
+公開 [docs/DESIGN.md](../docs/DESIGN.md) の Design Decisions は rationale を保持し、
 進行状況ラベルはここに集約する。
 
 | 決定 | ステータス |

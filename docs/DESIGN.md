@@ -197,18 +197,20 @@ Accepted residual divergences (deliberate tradeoffs, not oversights):
    indices.** JSON is string-based by contract; the index mapping is a rendering
    concern and stays at the edge.
 
-## Decision Records
+## Design Decisions
 
-### D1. Single crate now, two crates later, never N crates
+Why the design is the way it is, including the alternatives that were rejected. Progress
+and future plans are not tracked in this document.
 
-- **Context.** The API is still churning, but benchmarks and future reuse need a stable
-  library surface.
-- **Decision.** Ship one crate today. The target is a two-crate workspace: `vz-core`
-  (library) plus `vz` (binary). The narrow public surface in `src/lib.rs` is the future
-  `vz-core` body. Never split into N crates.
-- **Rationale.** One crate keeps velocity and build/binary size while types move. Two
-  crates give exactly one public surface to stabilize; the benchmark already consumes
-  the library entry points.
+### D1. Single crate with a narrow public surface
+
+- **Context.** The API is still churning, but the benchmarks and library entry points
+  need a stable surface.
+- **Decision.** Ship one crate. `src/lib.rs` exposes only the data-plane modules plus
+  `cli` and the entry points; everything else stays `pub(crate)` or private.
+- **Rationale.** One crate keeps velocity and build/binary size while types move, a small
+  surface is the only thing that can be kept coherent at this stage, and the benchmark
+  already consumes the library entry points.
 - **Alternatives rejected.** A many-crate split (data/chart/render/output) would make
   one fix bump three or four crates, turn cross-crate renames into breaking changes, and
   raise onboarding cost for a single-product tool.
@@ -216,13 +218,13 @@ Accepted residual divergences (deliberate tradeoffs, not oversights):
 ### D2. `Cli` must not leak below the app plane
 
 - **Context.** `&Cli` parameters in data and output code force every test through
-  `Cli::try_parse_from`, block reuse from other products, and block the crate split.
+  `Cli::try_parse_from` and couple every consumer to the CLI type.
 - **Decision.** `Cli` lives only in the app plane and `cli/`. Everything downstream
   takes plain structures — `PipelineParams`, `DirectoryParams`, `DiffParams`,
   `TableParams`, `ChartJsonParams`, `SparkParams`, `Query`, and `FilterOutcome`. Each
   mode has exactly one `&Cli → Params` conversion in its `*_from_cli` adapter.
-- **Rationale.** Core logic is testable without parsing arguments, and the conversion
-  point is the seam the crate split will cut along.
+- **Rationale.** Core logic is testable without parsing arguments, and one conversion
+  point per mode keeps the argument-to-params seam explicit.
 - **Alternatives rejected.** Passing `&Cli` into core; a global configuration
   singleton.
 - **Rule.** New code must not add a `&Cli` parameter below the app plane.
@@ -240,24 +242,22 @@ Accepted residual divergences (deliberate tradeoffs, not oversights):
   separate terminal renderer (two layout engines to keep in sync).
 - **Rule.** Ratatui types must not appear in output public signatures.
 
-### D4. `anyhow` now, typed errors only at the crate split
+### D4. `anyhow` throughout
 
 - **Context.** A single binary needs no stable error API.
-- **Decision.** Use `anyhow::Result` throughout today. When core splits, core gains a
-  typed `thiserror` enum (`Io`/`Parse`/`Schema`/`Empty`) and `anyhow` retreats to the
-  binary.
-- **Rationale.** A type taxonomy invented before its consumers exist is churn; core
-  gets a real error contract exactly when it becomes a library.
-- **Alternatives rejected.** Introducing `thiserror` now; leaking `anyhow` into core's
-  public surface after the split.
+- **Decision.** Use `anyhow::Result` throughout the crate.
+- **Rationale.** A type taxonomy invented before its consumers exist is churn; a typed
+  error contract is only worth introducing when there is a library surface to publish.
+- **Alternatives rejected.** Introducing `thiserror` now; leaking `anyhow` into a public
+  error type.
 
 ### D5. `helpers/` is dissolved and must not be recreated
 
 - **Context.** `helpers/` accumulated cross-plane couplings as a migration station.
 - **Decision.** The module is gone: `resolve_*` belongs to `cli`, `build_*`/`parse_*`
   to `chart`, `apply_filters` to `filter`, and render options to `oneshot`.
-- **Rationale.** Functions live with their owner, and the coupling the crate split must
-  delete is not re-grown.
+- **Rationale.** Functions live with their owner, and the cross-plane coupling the old
+  module encouraged is not re-grown.
 - **Alternatives rejected.** Keeping `helpers/` as a facade; adding a new catch-all
   `utils` module.
 
@@ -280,8 +280,8 @@ Accepted residual divergences (deliberate tradeoffs, not oversights):
   the three entry points;
   everything else is `pub(crate)` or private. Do not add a `#[doc(hidden)]` compatibility
   layer. Breaking changes are allowed when they improve the design.
-- **Rationale.** A small surface is the only thing that can be stabilized at the split;
-  hidden compatibility items silently become contracts.
+- **Rationale.** A small surface is easier to keep coherent; hidden compatibility items
+  silently become contracts.
 - **Alternatives rejected.** `#[doc(hidden)]` deprecation shims kept for compatibility.
 
 ### D8. `--bins` is bounded by `MAX_BINS` and defensively clamped

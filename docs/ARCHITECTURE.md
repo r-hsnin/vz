@@ -97,8 +97,7 @@ Owns `Cli`, stdin/stdout/stderr, TUI loops, and mode dispatch.
 
 ## Plane Dependency Rules
 
-Intended direction (enforced by review today; compiler-enforced only after the
-crate split):
+Intended direction (enforced by review today):
 
 ```
 app plane ──uses──▶ render / output planes ──uses──▶ data plane
