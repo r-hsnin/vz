@@ -52,7 +52,7 @@ pub fn run(cli: &Cli, json_errors: bool) -> Result<()> {
             );
         } else {
             eprintln!("Error: {:#}", e);
-            if let Some(hint) = diagnostics::error_hint(&e, cli) {
+            if let Some(hint) = diagnostics::error_hint(&e, cli.primary_file()) {
                 eprintln!("\n{}", hint);
             }
         }

@@ -2,8 +2,6 @@
 
 use std::path::Path;
 
-use crate::cli::Cli;
-
 /// Supported data file extensions for discovery.
 const DATA_EXTENSIONS: &[&str] = &["csv", "tsv", "json", "ndjson", "jsonl", "tab"];
 
@@ -15,11 +13,11 @@ pub fn is_data_file(name: &str) -> bool {
 }
 
 /// Generate contextual hints for common errors.
-pub fn error_hint(err: &anyhow::Error, cli: &Cli) -> Option<String> {
+pub fn error_hint(err: &anyhow::Error, file: Option<&Path>) -> Option<String> {
     let msg = format!("{:#}", err);
     // File not found: suggest similar files in the same directory
     if msg.contains("No such file")
-        && let Some(file) = cli.primary_file()
+        && let Some(file) = file
     {
         let parent = file.parent().unwrap_or(Path::new("."));
         let stem = file.file_name()?.to_str()?;
@@ -242,5 +240,33 @@ mod tests {
             " Did you mean 'revenue'?"
         );
         assert_eq!(format_column_suffix(None, "zzzz"), "");
+    }
+
+    #[test]
+    fn test_error_hint_no_such_file_with_similar() {
+        let err = anyhow::anyhow!("No such file or directory: fixtures/sale.csv");
+        let hint = error_hint(&err, Some(Path::new("fixtures/sale.csv")));
+        let hint = hint.expect("expected a hint for a mistyped filename");
+        assert!(hint.contains("Did you mean?"), "got: {hint}");
+        assert!(hint.contains("sales.csv"), "got: {hint}");
+    }
+
+    #[test]
+    fn test_error_hint_no_such_file_without_path_returns_none() {
+        let err = anyhow::anyhow!("No such file or directory: fixtures/sale.csv");
+        assert_eq!(error_hint(&err, None), None);
+    }
+
+    #[test]
+    fn test_error_hint_no_data_rows_needs_no_path() {
+        let err = anyhow::anyhow!("No data rows found");
+        let hint = error_hint(&err, None).expect("expected a hint for empty data");
+        assert!(hint.contains("--no-header"), "got: {hint}");
+    }
+
+    #[test]
+    fn test_error_hint_unrelated_returns_none() {
+        let err = anyhow::anyhow!("something else went wrong");
+        assert_eq!(error_hint(&err, None), None);
     }
 }
