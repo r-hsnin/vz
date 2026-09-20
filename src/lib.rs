@@ -1,30 +1,37 @@
 //! vz — CLI BI tool with smart visualization and terminal presentation.
 //!
-//! This library crate re-exports the public modules for use by benchmarks and tests.
+//! The library surface is the future `vz-core` body: data-plane modules
+//! (`loader`, `infer`, `filter`, `chart`, `util`, `theme`, …) plus the
+//! binary entry points (`run`, [`Cli`](cli::Cli)). Everything else is an
+//! app-plane detail and stays `pub(crate)` or private.
 
 pub mod chart;
 pub mod cli;
-pub mod diagnostics;
-pub mod diff;
-pub mod directory;
-pub mod explore;
 pub mod filter;
 pub mod infer;
-pub mod info;
-pub mod insights;
 pub mod loader;
-pub mod oneshot;
-pub mod output;
-pub mod pipeline;
-pub mod present;
-pub mod render;
-pub mod sparkline;
 pub mod theme;
 pub mod util;
-pub mod watch;
+
+pub(crate) mod diagnostics;
+pub(crate) mod diff;
+pub(crate) mod directory;
+pub(crate) mod explore;
+pub(crate) mod info;
+pub(crate) mod insights;
+pub(crate) mod oneshot;
+pub(crate) mod output;
+pub(crate) mod pipeline;
+pub(crate) mod present;
+pub(crate) mod render;
+pub(crate) mod sparkline;
+pub(crate) mod watch;
 
 mod app;
 pub use app::{apply_output_shorthands, run};
+
+/// Re-exported for benchmarks: the load → infer measurement path.
+pub use pipeline::infer_from_data;
 
 #[cfg(test)]
 mod test_helpers;

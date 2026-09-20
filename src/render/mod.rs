@@ -297,12 +297,14 @@ pub fn split_y_axis(area: Rect, y_ticks: &[String]) -> (Rect, Rect) {
 /// Compute Y-axis ticks, render the axis, and return the remaining chart area.
 /// This encapsulates the shared pattern used by bar and histogram charts:
 /// nice_scale → format ticks → dedup → split → render → return chart_area.
+#[cfg(test)]
 pub fn render_y_axis_frame(max_val: f64, tick_count: usize, area: &Rect, buf: &mut Buffer) -> Rect {
     render_y_axis_frame_inner(max_val, tick_count, area, buf, false, Color::DarkGray)
 }
 
 /// Render Y-axis frame with tight scaling (max stays close to data max).
 /// Used for bar charts where wasted headroom reduces readability.
+#[cfg(test)]
 pub fn render_y_axis_frame_tight(
     max_val: f64,
     tick_count: usize,
