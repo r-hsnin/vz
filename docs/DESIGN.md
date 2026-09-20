@@ -1,248 +1,303 @@
 # vz — Design Document
 
-Design intent: vision, philosophy, behavioral rules, and key decisions.
-Structural facts (modules, data flow, change impact) live in [ARCHITECTURE.md](ARCHITECTURE.md).
+Rationale, intent, and the decisions behind vz. Structural facts (module map, data flow,
+change impact) live in [ARCHITECTURE.md](ARCHITECTURE.md). CLI reference is in
+[README.md](../README.md), development commands in [CONTRIBUTING.md](../CONTRIBUTING.md),
+known pitfalls in [GOTCHAS.md](GOTCHAS.md), and release/publication procedure in
+[RUNBOOK.md](RUNBOOK.md). Where prose and code disagree, code wins.
 
-## Vision
+## What This Document Owns
 
-CLI BI tool that auto-visualizes data in the terminal with zero configuration.
-Three output modes: **One-shot** (default stdout), **Explore** (interactive TUI), **Present** (slide-based).
+- **DESIGN (this file) — why.** Product intent, scope, inference and chart-selection
+  rationale, the canonical-assembler contract, and architecture-level decisions with
+  rejected alternatives.
+- **ARCHITECTURE — what/how.** Modules, planes, dependency rules, data flow, and the
+  change-impact map.
 
-## Core Philosophy
+A statement about code layout belongs in ARCHITECTURE. A statement about why a behavior
+exists belongs here.
 
-- **Convention over Configuration** — Data types determine visualization
-- **Zero-config by default** — Override only when needed
-- **Terminal-native** — No browser, no GUI, just your terminal
-- **Instant value** — `vz data.csv` produces a meaningful chart immediately
+## Philosophy
 
-## Type Inference Rules
-
-Implemented in `infer/detector.rs`. Each value is classified first, then the
-column type is decided by majority vote:
-
-| Value pattern | Detected as | Notes |
-|---------------|-------------|-------|
-| `YYYY-MM-DD` (optional time), `YYYY/MM/DD`, `MM/DD/YYYY`, `DD-Mon-YYYY`, `DD.MM.YYYY`, month names (`Jan 15 2024`, `Jan 15, 2024`, `15 Jan 2024`), `YYYY-MM` | `Temporal` | Checked before numeric |
-| Display-formatted numbers via `util::parse_number` | `Quantitative` | `1,000`, `$100`, `€50`, `45%` (= 0.45), `10k`, `10GiB`, `(42)` (= -42), `USD 100` all parse → Quantitative. One parser shared by inference, aggregation, series, filters, diff, sparkline, and JSON samples, so a value means the same number on every path. `%` is a fraction (`50%` = 0.5); storage suffixes are decimal except `KiB/MiB/GiB/TiB` (binary). `--where` equality is numeric too (`revenue=2000` matches `$2,000`) |
-| Trend annotation via `util::trend_label`/`trend_from_slice` | `→ stable` band ±5% | Single implementation shared by oneshot summary lines and spark suffixes; denominator is `first.abs()` (`-100 → -50` = `↑ +50%`), near-zero start yields no trend |
-| `NaN`, `inf`, `-inf`, `Infinity` | `Nominal` (excluded from column vote) | `parse_number` returns `None` for non-finite → treated like nulls: skipped in inference, aggregation, and all chart paths |
-| Empty string | `Nominal` (ignored in column vote) | Nulls don't vote |
-| Anything else | `Nominal` | e.g. UUIDs, free text |
-
-Column decision (100 evenly spaced rows head→tail, empty values excluded):
-
-1. ≥ 80% of sampled values Temporal → `Temporal`
-2. ≥ 80% Quantitative → `Quantitative`
-3. Otherwise by cardinality: ≤ 20 unique values → `Categorical`, else `Nominal`
-
-Only 100 evenly spaced rows (covering head to tail) are sampled; there is no full-scan fallback.
-The same even sampling is applied in `pipeline::infer_from_data`.
-
-## Chart Selection Design
-
-The user-facing selection table and behavior live in [README.md](../README.md#chart-selection-rules).
-
-Design intent: the selector maps inferred column types to a chart type, normalizes
-reversed user axes to the canonical orientation (Quantitative × Temporal →
-x=temporal Line; Quantitative × Categorical → x=categorical Bar), renders a
-count-Bar for a lone categorical `-x`, and falls
-back to Bar for unmatched type pairs.
-
-## CLI Design
-
-Flag definitions and examples live in [README.md](../README.md#usage); `vz --help` is authoritative at runtime.
-
-Design guideline: the common case needs no flags (`vz data.csv`), and every override
-(axes, type, aggregation, filtering) is opt-in.
+1. **Convention over configuration.** The inferred column types decide the chart. The
+   common case (`vz data.csv`) needs no flags; every override (axes, type, aggregation,
+   filtering, theme) is opt-in, and a file path alone is a complete command.
+2. **Plain language is a first-class output.** Each chart may carry 0–3 takeaway
+   sentences computed from the same parsed numbers as the chart, so a reader gets the
+   point without reading axes. They are silent when there is nothing to say.
+3. **Terminal-first, no external engine.** Charts render in the terminal; SVG/HTML/JSON
+   exist so agents and reports can consume the same chart data headlessly. There is no
+   database or query engine behind vz.
+4. **Determinism over cleverness.** The same input yields the same type, chart, and
+   numbers on every path. Shared parsers and a single chart-data assembler enforce it.
 
 ## Scope
 
-### In Scope (v0.2)
-- File-based batch visualization (CSV/TSV/JSON/NDJSON)
-- Auto-inference of column types and chart selection
-- Three output modes: oneshot (stdout), explore (TUI), present (slides)
-- Machine-readable exports: JSON, SVG, HTML, Markdown, sparkline, table
-- Row filtering, aggregation, sampling
-- Color themes (dark, light, high-contrast)
-- File watch mode for iterative exploration
-- Diff mode (two-file comparison)
-- Directory mode (multi-file combine)
-- Shell completions
+### In scope
 
-### Non-goals (for now)
-- Database connections (Parquet, SQLite, PostgreSQL)
-- PNG raster export
-- Streaming / real-time data beyond `--watch`
-- Data transformation / ETL operations
-- Custom color palettes (beyond the 3 built-in themes)
+- File and stdin batch visualization: CSV, TSV, JSON array, NDJSON, fixed-width.
+- Automatic column-type inference and chart selection.
+- Output modes: one-shot stdout, interactive explore (and diff-explore), markdown
+  present, two-file diff, directory combine + schema catalog.
+- Exports: text, JSON, table, markdown, sparkline, SVG, HTML.
+- Filtering (`--where`), aggregation, sampling, sorting, themes.
+- `--info` schema inspection, `--watch` auto-redraw, and shell completions.
 
-## Key Design Decisions
+### Non-goals
 
-1. **Plain words before chart literacy** — Every chart ships 0–3 `💡` takeaway sentences (movement/extremes/leader/clusters) computed from the same parsed numbers as the chart, so a non-engineer gets the point without reading axes. Same ±5% stable band and `parse_number` as every other path; silent when there is nothing to say.
-2. **Ratatui for rendering** — Mature, active, Rust-native
-3. **No external data engine** — Keep binary small, no Polars/DuckDB dep for v1
-4. **In-memory processing** — v1 targets files that fit in memory (< 1GB)
-5. **Convention-first CLI** — Minimal flags needed for 80% of use cases
-6. **Shared data_builder** — All 3 modes build on the same `ChartData`
-   structures from `chart/data_builder.rs` to avoid divergence; each mode keeps
-   only a thin adaptation layer (sorting, truncation, slide wiring, see
-   ARCHITECTURE.md) on top
- 7. **Format auto-detection** — Extension first, then content heuristics (tabs vs commas, JSON detection)
+- Database connections and analytical query engines (Parquet, SQLite, PostgreSQL,
+  Polars, DuckDB).
+- Raster/PNG export.
+- Streaming or real-time data beyond `--watch`.
+- Data transformation/ETL, joins, or reshaping.
+- Custom color palettes beyond the built-in themes.
+- Release and publication mechanics (see [RUNBOOK.md](RUNBOOK.md)).
 
-## Module Boundaries (intent; layout lives in ARCHITECTURE.md)
+## Type System and Inference Rationale
 
-Intent is a one-way dependency: **data plane → render plane → app plane
-never reverses**. Concretely:
+Every column is one of four types, defined in `infer/types.rs`:
 
-- **Data plane** (`loader/`, `infer/`, `filter.rs`, `chart/`, `util.rs`,
-  `sparkline.rs`, pure parts of `insights.rs`/`info.rs`/`diagnostics.rs`) is
-  pure: no `Cli`, no stdout/stderr, no TUI event loop. It is the future
-  `vz-core` body, so every new function here must stay callable without
-  `Cli::try_parse_from`.
-- **Render plane** (`render/`) owns ratatui `Buffer`/`Rect` geometry. It is
-  the single owner of cell layout; `output/svg.rs` mirrors that geometry for
-  the text-grid layer (see its layout-contract comment). Nothing else may
-  invent coordinates.
-- **Output plane** (`output/`) must be headless `String`/value producers with
-  thin `print_*` wrappers. `chart_json`/`spark` already take `*Params`
-  structs instead of `&Cli` — that is the pattern to copy. `markdown`/`table`
-  take `TableParams` since Phase 2-2, `recommend` takes `Query` since
-  Phase 2-3, `pipeline` takes `PipelineParams` since Phase 2-4,
-  `diff/` takes `DiffParams` since Phase 2-5 (`--where`/`--agg`/`--color`
-  no-effect warnings stay in the `run_diff_from_cli` adapter),
-  `directory/` takes `DirectoryParams` since Phase 2-6 (scan/combine plus
-  `PipelineParams`),
-  `filter::apply_filters` returns `FilterOutcome` (data + `info:` notice)
-  since Phase 2-4; `svg` rendering via `Buffer` is known debt, not
-  precedent (see below).
-- **App plane** (`main.rs`, `pipeline.rs`, `oneshot/`, `diff/`, `directory/`,
-  `explore/`, `present/`, `watch.rs`, `cli/`) owns `Cli`,
-  stdout/stderr, and TUI loops. Only this plane converts `Cli` into plain
-  parameter structs.
+| Type | Meaning | Role in chart selection |
+|---|---|---|
+| `Temporal` | Date/time values | Ordered X axis (trends) |
+| `Quantitative` | Numeric magnitude | Measured Y axis, histograms |
+| `Categorical` | Small set of labels | Grouping column or discrete X axis |
+| `Nominal` | High-cardinality or non-numeric identity | Not charted as a category by default |
 
-## Decision Records (why the boundaries exist)
+Inference has three stages, implemented in `infer/detector.rs` and driven by
+`pipeline::infer_from_data`:
 
-1. **Shared `ChartData` with thin mode adapters** (extends decision 6 above).
-   `chart/data_builder.rs` is the canonical assembler
-   (`ResolvedAxes` → `aggregate_bar`/`build_chart_config`/`build_histogram`/
-   `build_heatmap_data`/`build_diff_line_config`/`build_diff_bar_data` →
-   `ChartData`, the histogram bin-column choice `histogram_column`, plus
-   post-aggregation `sort_bar_data`/`truncate_bar_data`
-   shared by every Bar consumer and extra-Y span refit
-   `append_series_refit_y`, all since Phase 3-3);
-   `oneshot/builders.rs` adapts on top (axis resolution from a
-   recommendation, title derivation, extra-Y wiring, label fitting, theme).
-   Explore and present call the canonical assembler directly: routing them
-   through `oneshot/builders.rs` would drag oneshot-only concerns (extra-Y,
-   terminal-width fitting) into other modes. An adapter resolves its input
-   plane (recommendation / interactive state / chart block) and may derive
-   titles, but never re-derives aggregation or axis spans.
-   Temporal diff Line assembly is unified since Phase 3-1 (oneshot-diff,
-   explore-diff, present-diff all build through `build_diff_line_config`);
-   categorical diff Bar annotation is unified since Phase 3-2
-   (oneshot-text/markdown/html, explore-chart, present-slide all build through
-   `build_diff_bar_data`; color-by-direction stays at the edge).
-   Residual divergences (|Δ| explore sort, JSON/spark color-group ordering)
-   are listed in ARCHITECTURE.md.
-2. **`Cli` must not leak below the app plane.** Every `&Cli` parameter in
-  data/output code forces tests through `Cli::try_parse_from`, blocks reuse
-  from other products, and blocks the L3 crate split. Phase 2 removed all
-  instances from data/output code (only `cli/` + binary adapters keep
-  `&Cli`):
-  (done: `diagnostics::error_hint(_, Option<&Path>)` in Phase 2-1,
-    `output/table.rs` + `output/markdown.rs` via `TableParams` in Phase 2-2,
-    `chart/recommend.rs` via `Query` in / `Warnings` out in Phase 2-3 with
-    the sole `Cli → Query` conversion at `Cli::to_query`,
-    `pipeline::render_data` via `PipelineParams` in Phase 2-4 with the sole
-    `Cli → PipelineParams` conversion at `Cli::to_pipeline_params` and the
-    `render_data_from_cli` adapter, `filter::apply_filters` via
-    `FilterOutcome` out in Phase 2-4,
-    `diff::run_diff` via `DiffParams` in Phase 2-5 with the sole
-    `Cli → DiffParams` conversion at `Cli::to_diff_params` and the
-    `run_diff_from_cli` adapter keeping the `--where`/`--agg`/`--color`
-    warnings,
-    `directory::run_directory` via `DirectoryParams` in Phase 2-6 with the
-    sole `Cli → DirectoryParams` conversion at `Cli::to_directory_params`
-    and the `run_directory_from_cli` adapter).
-    New code must take a
-    plain `*Params`/`*Options` struct (precedent: `ChartJsonParams`,
-    `SparkParams`, `TableParams`, `PipelineParams`, `DiffParams`,
-    `DirectoryParams`, `FilterOutcome`) or
-    `Option<&Path>` instead.
-3. **Ratatui stays inside the render contract.** SVG/HTML/JSON exist so
-   agents and reports can consume charts without a terminal; exposing
-   `Buffer`/`Rect`/`Color` in their signatures would drag the TUI stack into
-   every consumer. `output/svg.rs` using a `Buffer` today is tolerated only
-   because of the shared cell-geometry contract — the direction is toward
-   `render_*(&ChartData, &Opts) -> String` functions with printing left to
-   the binary.
-4. **`anyhow` now, typed errors at L3.** A single binary needs no stable error
-   API, so `anyhow::Result` everywhere is correct today. When `vz-core`
-   splits out, core gains a `thiserror` enum (`Io`/`Parse`/`Schema`/`Empty`)
-   and `anyhow` retreats to the binary — do not introduce typed errors before
-   the split, and do not leak `anyhow` into core's public surface after it.
-5. **Single crate now, two crates next, never N crates.** One crate keeps
-   velocity and binary size while the API is still churning; a 2-crate
-   workspace (`vz-core` lib + `vz` bin) is the reuse target because it has
-   exactly one public surface to stabilize. Finer splits (data/chart/render/
-   output/…) were evaluated and rejected: one fix would bump 3–4 crates,
-   cross-crate renames become breaking changes, and beginners get lost.
-   Revisit only when two independent products pin different core versions.
-6. **`Query` (Cli-independent params) is the L3 seam.** All core entry points
-   will take one plain `Query` struct; `Cli → Query` conversion lives in
-   exactly one place in the binary. This is why params structs already exist
-   for JSON/spark output — extend the pattern, never add another `&Cli`.
-7. **`helpers/` dissolves, never grows.** `resolve_*` belongs to `cli`,
-   `build_*/parse_*` belongs to `chart`, `apply_filters` belongs to `filter`.
-   The module exists only as a migration station; adding new helpers there
-   re-creates the coupling L3 must delete.
-   (Dissolution completed in Phase 1: `cli/resolve.rs`, `chart/recommend.rs`,
-   `filter::apply_filters`, `oneshot::RenderOptions::from_cli`.)
+1. **Per-value classification.** Empty values are nulls. Temporal patterns are tested
+   before numeric ones. A value that the shared numeric parser
+   (`util::parse_number`) accepts is `Quantitative`; this one parser is reused by
+   aggregation, filters, diff, sparklines, and JSON samples, so a number means the same
+   thing on every path. Everything else is `Nominal`. Non-finite values (`NaN`, `inf`)
+   are `Nominal` and are excluded from the vote because downstream paths skip them.
+2. **Column vote.** Over the sampled non-empty, finite values, a column is `Temporal`
+   if at least 80% vote temporal, then `Quantitative` if at least 80% vote numeric
+   (a minimum of one vote). Empty and non-finite values abstain.
+3. **Cardinality fallback.** Otherwise, at most 20 distinct values ⇒ `Categorical`;
+   more ⇒ `Nominal`.
 
-## Reuse Roadmap to L3 (`vz-core` + `vz`)
+Design rationale:
 
-Target (workspace, `edition 2024` / MSRV 1.88 inherited, single lockfile):
+- **The ≥80% vote is robust, not strict.** A mostly-numeric column with a few `N/A` or
+  typo rows still infers as numeric; a mostly-text column is not flipped by a handful of
+  numeric cells. Requiring unanimity would let one bad cell change the chart.
+- **The 20-unique boundary separates labels from identifiers.** A category axis or
+  legend is only readable for a small number of values. A high-cardinality column is
+  an identifier (UUID, ID), and auto-charting it as a category would produce an
+  unreadable axis, so it becomes `Nominal` instead.
+- **Sampling is 100 evenly spaced rows covering head to tail**, not the first 100. This
+  makes inference **order-independent**: a file with 100 dates followed by garbage
+  infers the same as the reversed file, and a reordered export does not change the
+  chart. There is no full-scan fallback; the fixed, bounded sample keeps inference cost
+  constant as files grow.
+- **The same parsed numbers drive every path.** Because inference, aggregation,
+  filtering, and statistics share `parse_number`, a value classified `Quantitative`
+  also aggregates and compares as the same number.
 
-- `crates/vz-core` (lib, publishable): `loader/`, `infer/`, `filter`,
-  `util`, `sparkline`, `chart/` (selector + data_builder), `render/`
-  (ratatui hidden from public signatures), `output/` as `String`-returning
-  functions, `diff/{compute,schema,types}` (pure parts only),
-  `present/parser` (markdown → `Presentation` only), `theme`, `insights`,
-  pure parts of `info`/`diagnostics`, plus `query.rs` (`Query` +
-  `load_infer_select` / `build_chart`).
-- `crates/vz` (bin + thin adapters, `publish = false`): `cli/` (clap only),
-  `Cli → Query` conversion, `pipeline`, `oneshot/`, `diff` rendering +
-  `run_diff`, `directory/`, `explore/`, `present/` (loop + chart_loader +
-  render), `watch`, printing wrappers.
-- Ambiguous rulings (decided, do not relitigate without new evidence):
-  `output/svg,html` → core as `String` functions; `present/parser` → core but
-  slide running → bin; `diff` compute/schema → core but `--where`-ignoring
-  CLI behavior → bin; `diagnostics::suggest_column` → core but
-  `error_hint` → bin with `Option<&Path>`.
-- Public-surface rules for core: new public structs get
-  `#[non_exhaustive]`; no `ratatui`/`crossterm` types in public signatures
-  (convert internally, e.g. own `Color` + `to_ratatui()`); document with
-  rustdoc + one example per entry point (`loader+infer+select`,
-  `build_chart` embedding, `render_svg` report).
-- `release-manifest.txt` must switch from `src/` to `crates/*/src` +
-  `crates/*/Cargo.toml` at split time. Manifest edits are publication-scope
-  changes: never expand silently (AGENTS.md guardrail).
+## Chart Selection Rationale
 
-## Agent Judgment Guide (when unsure, read this)
+The type pair determines the chart (`chart/selector.rs`). The **normative** mapping
+lives in [README.md#chart-selection-rules](../README.md#chart-selection-rules); this
+section explains the rationale, not a second spec:
 
-- **Where does new logic go?** Data parsing/inference/selection/aggregation
-  → data plane (no `Cli`). Pixels/cells/geometry → `render/`. New
-  machine-readable shape → `output/` as a `String`/value function + thin
-  print wrapper. Flags plumbing/validation messages/TUI wiring → app plane.
-- **Forbidden without explicit approval:** new `&Cli` parameters outside
-  `cli/` + binary adapters; new `println!/eprintln!` in data/render/output
-  cores; new `pub mod` in `lib.rs` (default `pub(crate)`); new files under
-  `helpers/`; new `tests/` targets or helper copies; new dependencies
-  (binary size); `Cargo.toml` version bumps (release-time only).
-- **Prefer:** extending a `*Params` struct over adding a flag parameter;
-  returning `Vec<Warning>` over printing warnings from core; moving a
-  function toward its owning plane over adding a cross-plane `use`.
-- **If two placements seem valid,** choose the one that keeps the data plane
-  `Cli`-free and the dependency arrow pointing app → data. Duplication
-  across modes is never the answer — lift the shared piece into
-  `chart/` or `output/`.
+| X type | Y type | Chart | Why |
+|---|---|---|---|
+| `Temporal` | `Quantitative` | Line | Ordered X expresses a trend over time |
+| `Categorical` | `Quantitative` | Bar | Compare magnitudes across discrete groups |
+| `Quantitative` | `Quantitative` | Scatter | Relationship between two measures |
+| `Categorical` | `Categorical` | Heatmap | Count matrix over two dimensions |
+| `Quantitative` | `Temporal` | Line (normalized) | Same pair, reversed input |
+| `Quantitative` | `Categorical` | Bar (normalized) | Same pair, reversed input |
+| anything else | — | Bar (fallback, warns) | No dedicated rule |
+
+Selection order, and why each step precedes the next:
+
+1. **Both axes given.** Validate both, pick the chart from the pair, and normalize
+   reversed pairs so `Quantitative × Temporal` and `Quantitative × Categorical` become
+   the canonical `x = temporal`/`x = categorical`. What matters is the *semantics* of
+   the pair, not which flag the user happened to type on the left; without
+   normalization `-x revenue -y date` would plot dates on Y and render empty. The color
+   column is the first categorical not already used as X or Y.
+2. **Only Y given.** Prefer the first temporal column as X, then the first
+   categorical, then another quantitative; the chart type always follows
+   `chart_type_for_pair(x, y)` rather than being implied by the preference order. If Y
+   is the only column, a lone temporal Y is caught by the temporal branch and yields
+   `chart_type_for_pair(Temporal, Temporal)` → Bar with a fallback warning; a
+   quantitative or nominal Y renders a Histogram, while a lone categorical Y becomes a
+   Heatmap with `x = y = Y`.
+3. **Only X given.** If another quantitative column exists, use the pair rule. With no
+   quantitative Y, a categorical X renders a **Bar of row counts** (the automatic
+   application of Count over `x = y`), and a quantitative X renders a Histogram.
+4. **No hints.** Apply the table in priority order: temporal × quantitative → Line
+   (color = first categorical); categorical × quantitative → Bar (no auto color, so
+   bars stay a single aggregate); two or more quantitative → Scatter; exactly one
+   quantitative → Histogram; two or more categorical → Heatmap. If nothing matches, the
+   error lists the detected columns and suggests `-x`/`-y`.
+
+**Fallback semantics are deliberately narrow.** The "no chart rule" warning is emitted
+only when the recommended chart is Bar *and* the resolved axis pair has no dedicated
+rule: any pair involving `Nominal`, plus the exhaustive non-Nominal set
+{`Temporal × Temporal`, `Temporal × Categorical`, `Categorical × Temporal`}. It is not emitted on the no-hint
+auto path, because auto-selection never lands on an arbitrary Bar; it either matches a
+rule or errors — though the only-Y and only-X hint paths can trigger it. The message
+names both columns and their types and suggests `-t`. One-shot and present print it to
+stderr; explore stays silent to keep the TUI clean.
+
+**Bar aggregation.** Sum is the default. Count is applied automatically in exactly two
+situations: when `-t bar` is forced with no explicit Y and the resolved Y is not
+quantitative, and when no Y is given for a categorical X in a dataset with no
+quantitative columns. Both cases describe "count rows per category", which is what a
+bar of a lone categorical column should mean.
+
+**Grouped bars are unsupported.** The canonical bar data model holds one aggregate per
+category, and the terminal bar widget has no grouped-series geometry. A `-c` column on
+a Bar therefore feeds only the summary legend. When the user passes `-c` explicitly, vz
+warns that the data is aggregated over all rows rather than split; silently dropping it
+would read as if the chart were grouped when it is not.
+
+## Canonical Assembler and Mode Adapters
+
+`chart/data_builder.rs` is the **single canonical source** of chart-ready data:
+aggregation, series construction, histograms, heatmaps, diff bars/lines, the histogram
+bin-column choice, and the shared post-aggregation sort/truncate helpers. The selector
+and recommender decide *what* to chart; the assembler builds it.
+
+Mode adapters (one-shot builders, directory, diff, explore, present) obey the
+canonical-assembler contract owned by
+[ARCHITECTURE.md](ARCHITECTURE.md#canonical-assembler-contract) — sort/truncate/fit/
+theme/wire only, never re-deriving aggregation or axis spans. Explore and present call
+the canonical assembler directly rather than routing through the one-shot builder, so
+one-shot-only concerns (extra-Y wiring, terminal-width fitting) do not leak into other
+modes.
+
+Rejected alternatives:
+
+- **Per-mode aggregation.** Each mode computing its own totals drifts over time until
+  two views of the same data disagree. It also multiplies the test surface by the
+  number of modes.
+- **A trait-based renderer per mode.** An abstraction over "what a mode is" hides the
+  shared data contract and adds indirection without a performance or clarity gain.
+- **Routing every mode through the one-shot builder.** This drags one-shot-specific
+  fitting and extra-Y logic into explore and present, coupling modes that should only
+  share the data layer.
+
+Accepted residual divergences (deliberate tradeoffs, not oversights):
+
+1. **Explore sorts interactive bars by `|Δ|`, while one-shot/present/HTML sort by signed
+   Δ.** In an interactive session "largest change" naturally means magnitude; batch
+   output should preserve sign so direction is visible. Unifying would make one of the
+   two uses worse.
+2. **JSON grouped series and sparkline color groups use `BTreeMap` (alphabetical), while
+   canonical `ChartData` uses first-appearance order.** Machine-readable output favors a
+   stable, sortable ordering; the canonical order is the domain order. Unifying would
+   change the machine format without a consumer need.
+3. **JSON line/scatter series keep raw X strings, while the renderer maps X to numeric
+   indices.** JSON is string-based by contract; the index mapping is a rendering
+   concern and stays at the edge.
+
+## Decision Records
+
+### D1. Single crate now, two crates later, never N crates
+
+- **Context.** The API is still churning, but benchmarks and future reuse need a stable
+  library surface.
+- **Decision.** Ship one crate today. The target is a two-crate workspace: `vz-core`
+  (library) plus `vz` (binary). The narrow public surface in `src/lib.rs` is the future
+  `vz-core` body. Never split into N crates.
+- **Rationale.** One crate keeps velocity and build/binary size while types move. Two
+  crates give exactly one public surface to stabilize; the benchmark already consumes
+  the library entry points.
+- **Alternatives rejected.** A many-crate split (data/chart/render/output) would make
+  one fix bump three or four crates, turn cross-crate renames into breaking changes, and
+  raise onboarding cost for a single-product tool.
+- **Status.** Intent. Today the code is a single crate. At split time the publication
+  manifest must change from `src/` to `crates/*/src`; publication procedure is owned by
+  [RUNBOOK.md](RUNBOOK.md).
+
+### D2. `Cli` must not leak below the app plane
+
+- **Context.** `&Cli` parameters in data and output code force every test through
+  `Cli::try_parse_from`, block reuse from other products, and block the L3 split.
+- **Decision.** `Cli` lives only in the app plane and `cli/`. Everything downstream
+  takes plain structures — `PipelineParams`, `DirectoryParams`, `DiffParams`,
+  `TableParams`, `ChartJsonParams`, `SparkParams`, `Query`, and `FilterOutcome`. Each
+  mode has exactly one `&Cli → Params` conversion in its `*_from_cli` adapter.
+- **Rationale.** Core logic is testable without parsing arguments, and the conversion
+  point is the seam the crate split will cut along.
+- **Alternatives rejected.** Passing `&Cli` into core; a global configuration
+  singleton.
+- **Status.** Done. New code must not add a `&Cli` parameter below the app plane.
+
+### D3. Ratatui is the render engine; SVG/HTML mirror its cell geometry
+
+- **Context.** Terminal charts need a real layout engine, and non-terminal consumers
+  need a faithful rendering of the same chart.
+- **Decision.** Ratatui is the sole render engine, and `render/` is the sole owner of
+  cell geometry. `output/svg.rs` consumes the same `Buffer` and mirrors that geometry;
+  HTML wraps that SVG.
+- **Rationale.** A mature, Rust-native engine avoids reinventing layout, and one
+  geometry source prevents terminal and SVG layouts from drifting apart.
+- **Alternatives rejected.** A bespoke cell renderer; a headless geometry layer with a
+  separate terminal renderer (two layout engines to keep in sync).
+- **Status.** Active. Ratatui types must not appear in output public signatures.
+
+### D4. `anyhow` now, typed errors only at the L3 split
+
+- **Context.** A single binary needs no stable error API.
+- **Decision.** Use `anyhow::Result` throughout today. When core splits, core gains a
+  typed `thiserror` enum (`Io`/`Parse`/`Schema`/`Empty`) and `anyhow` retreats to the
+  binary.
+- **Rationale.** A type taxonomy invented before its consumers exist is churn; core
+  gets a real error contract exactly when it becomes a library.
+- **Alternatives rejected.** Introducing `thiserror` now; leaking `anyhow` into core's
+  public surface after the split.
+- **Status.** Deferred to L3.
+
+### D5. `helpers/` is dissolved and must not be recreated
+
+- **Context.** `helpers/` accumulated cross-plane couplings as a migration station.
+- **Decision.** The module is gone: `resolve_*` belongs to `cli`, `build_*`/`parse_*`
+  to `chart`, `apply_filters` to `filter`, and render options to `oneshot`.
+- **Rationale.** Functions live with their owner, and the coupling L3 must delete is
+  not re-grown.
+- **Alternatives rejected.** Keeping `helpers/` as a facade; adding a new catch-all
+  `utils` module.
+- **Status.** Done.
+
+### D6. No external data engine; in-memory; no streaming
+
+- **Context.** The product charts small tabular files, and binary size is a stated
+  constraint.
+- **Decision.** Do not depend on Polars, DuckDB, or Arrow. Process data in memory. No
+  streaming mode beyond `--watch`, and `notify` is used only to power `--watch`.
+- **Rationale.** The value is visualization, not query execution; a heavy engine would
+  slow builds and bloat the binary for capabilities the product does not offer.
+- **Alternatives rejected.** An embedded query engine or columnar store for scale.
+- **Status.** Active. Revisit only if real datasets outgrow memory; row/point limits
+  exist, but no byte-size guard does.
+
+### D7. Narrow public API; breaking changes allowed
+
+- **Context.** Pre-1.0 with no downstream consumers.
+- **Decision.** `lib.rs` exports only the public modules — data plane plus `cli` — and
+  the three entry points;
+  everything else is `pub(crate)` or private. Do not add a `#[doc(hidden)]` compatibility
+  layer. Breaking changes are allowed when they improve the design.
+- **Rationale.** A small surface is the only thing that can be stabilized at the split;
+  hidden compatibility items silently become contracts.
+- **Alternatives rejected.** `#[doc(hidden)]` deprecation shims kept for compatibility.
+- **Status.** Active.
+
+### D8. `--bins` is bounded by `MAX_BINS` and defensively clamped
+
+- **Context.** A user-supplied bin count can be enormous (or zero), and the assembler is
+  callable without the CLI.
+- **Decision.** Validate `--bins` to `1..=10000` on input, and additionally clamp the
+  computed bin count to `MAX_BINS` inside the render layer.
+- **Rationale.** The bound protects memory and time, and the clamp covers library
+  callers that bypass CLI validation.
+- **Alternatives rejected.** Relying on CLI validation alone.
+- **Status.** Done.

@@ -1,67 +1,127 @@
 # Gotchas — vz
 
-Non-obvious behaviors and known failure modes, for users and operators.
-Release procedures live in [RUNBOOK.md](RUNBOOK.md).
+Non-obvious user-visible behavior, footguns, and known limitations. Full flag
+reference lives in [README.md](../README.md); design rationale in
+[DESIGN.md](DESIGN.md); release steps in [RUNBOOK.md](RUNBOOK.md).
 
-## Non-obvious Behaviors
+## Input & parsing
 
-- **No file argument shows help.** Always pass a file or `-` for stdin.
-- **Bar chart aggregates by default (sum).** Use `--agg mean` if you want averages. A lone categorical `-x city` (no numeric columns) counts rows per category (`y=count(city)`).
-- **Reversed `-x`/`-y` pairs are normalized to the canonical orientation.** `-x revenue -y date` draws `x=date` (Line); `-x revenue -y city` draws `x=city` (Bar) — the literal order no longer renders an empty chart.
-- **Type inference samples 100 evenly spaced rows (head→tail), not just the first 100.** Row order no longer flips the inferred type.
-- **`-c/--color` has no effect on bar chart data.** Grouped/stacked bars are not implemented: bars stay aggregated over all rows and an explicit `-c` only reaches the summary legend (oneshot warns; explore reports it in the status line when cycling color on a Bar). An auto-detected color column (any unused categorical column) also reaches the legend, but no longer warns; pass `-x`/`-y` explicitly to keep the legend from being inferred.
-- **Filter values starting with `>`, `<`, `=`, `!` are rejected.** A doubled operator like `-w "revenue>>100"` fails loudly instead of silently matching nothing. Empty values (`-w "city="`) still match empty cells.
-- **Column names are case-sensitive.** Check with `vz data.csv --info`. Typo'd names get a `Did you mean '...' ?` hint. Unknown `x`/`y`/`color` names are an error everywhere, including present chart blocks (previously silently charted the first columns). The 2nd+ `-y` columns are validated too (`-y revenue,revnue` fails instead of rendering a single series silently). Present chart blocks warn on unknown `type`/`sort`/`agg` and invalid or out-of-range `top`/`bins`/`height`, then fall back to auto-infer.
-- **Out-of-range `--bins`/`--top`/`--tail` fail in every mode.** `--bins` is validated as `1`–`10000` and `--top`/`--tail` as `≥ 1` before any mode runs (single-file, watch, directory, and diff), even when the chart type ignores the flag.
-- **TSV detection relies on extension or tab prevalence.** When piping, use `-f tsv` explicitly.
-- **Large datasets (>100k rows):** Use `--sample N` to keep rendering fast.
-- **JSON output includes only the first 100 rows in `data[]`.** The `chart_data` field contains the full aggregated result. JSON sets `"truncated": true` when capped.
-- **Table/Markdown output is capped at 100 rows.** Non-bar tables show the first 100 rows with an `info: showing 100/N rows` notice on stderr (`--top`/`--sort` only apply to bar aggregations; other chart types warn instead of silently ignoring). Bar tables show aggregated values with `mean(...)`/`count(...)` headers for non-sum aggs, and numbers use the same `4.2k`/`1.5M` format as charts. Markdown cells escape `|` and newlines. Spark bar output shows range only (no trend arrow — category order is not time). Line/scatter/spark trend arrows use the absolute start value as denominator: `-100 → -50` reports `↑ +50%` (improvement), not `↓`.
-- **JSON output records the resolved query.** In addition to `recommendation` (auto-inferred), `-o json` includes a `query` object with the actually-rendered `chart_type` (`-t` applied), `agg`, `sort`, `limit`, `extra_y`, `filters`, `sample`, and `bins`, so agents can reproduce the numbers in `chart_data`. Single-file and diff JSON both carry an `insights` array with the same plain-language takeaways printed as `💡` on stderr.
-- **Every chart prints plain-language takeaways.** 0–3 `💡` lines on stderr after the summary: overall move (same ±5% stable band as the trend arrow), extremes + biggest move (line/scatter), leader + share and runner-up gap (bar, same `agg` as the chart), densest bin + range (histogram), hottest cell (heatmap). With `-c`, line charts report the fastest-moving group instead of a cross-group jump. Silent when there is nothing to say (<2 points, no parseable values). Breaking change: stderr gains up to 3 lines; stdout charts are unchanged.
-- **Any Bar fallback without a chart rule warns.** Beyond `Nominal` pairs, uncovered pairs (e.g. Temporal × Temporal) also emit `warning: no chart rule for ... falling back to bar` in oneshot/present; the explorer stays silent.
-- **Numbers parse liberally everywhere (`util::parse_number`).** `1,000`, `$100`, `45%` (= 0.45), `10k`, `10GiB`, `(42)` (= -42) are Numeric on all paths — inference, bar aggregation, line/scatter series, histogram bins, `--where` comparisons, diff, sparkline, summary ranges, and JSON `data[]`/stats. Breaking change: `$100`/`45%` columns that used to infer as Text now infer as Numeric (Bar instead of Heatmap, fraction values for percents).
-- **Filter equality is numeric-aware.** `-w "revenue=2000"` matches `$2,000`/`2k`/quoted cells, and `-w "rate=0.45"` matches `45%`. Breaking change: formatted cells that used to require exact raw-string equality now compare by parsed value. Text cells keep exact string semantics.
-- **SVG data marks carry every series.** Line/scatter overlays emit one `<circle class="vz-point" data-series="…">` per vertex of every series (not just the first), positioned on the union axis span; HTML tooltips prefix the series name (`series — label: value`). Bar marks use the full min→max span so negative values sit below positives. Breaking change: snapshots with `-c` overlays now show more marks at shifted coordinates. Known approximation: tooltip labels come from the shared `x_labels` by per-series index, so overlaid series with missing x values can show the wrong label while the dot position stays correct.
-- **NaN/inf are skipped in aggregations, diffs, and every chart path** (line/scatter/histogram/spark/JSON series), and ignored in the type-inference vote like nulls. `--agg max/min` never emits `±inf`; text-only diffs report no entries instead of `0→0`. JSON `data[]` renders them as `null`, while `chart_data` series omit those points.
-- **Diff mode ignores `--where`/`--agg`/`--color`.** A `no effect in diff mode` warning is printed; filter before comparing instead.
-- **New diff entries show `▲ new` / `▼ new`, not a percentage.** When a category or point has no value on the before side, the percentage delta is undefined, so charts and tables use the `new` marker instead of an absolute delta like `▲ +800`.
-- **Explore/Present require an interactive terminal.** In CI or pipes, use one-shot mode.
+- **No file argument does *not* show help.** With a TTY stdin `vz` errors
+  `No input file specified. Usage: vz <file> or pipe data to stdin`; with piped
+  stdin it reads stdin instead. Pass a file, `-` for stdin, or pipe data.
+- **Piped stdin has three quiet fixes.** Literal `\n`/`\t` escapes are expanded
+  when the content has ≤1 real newline and ≥1 literal `\n` (shells that do not
+  expand `echo`); a leading UTF-8 BOM is stripped; and a first row whose cells
+  are *all* numeric is treated as headerless data, yielding `col1…colN`.
+  `printf '1,2\n3,4\n' | vz -` infers `col1`,`col2`.
+- **TSV needs extension or tab prevalence.** Format is auto-detected, but a
+  piped one-column TSV is CSV. Force it: `vz - -f tsv`.
 
-## Build Failures
+## Data & inference
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `error[E0658]: let chains` | Rust version too old | Update: `rustup update` (requires 1.88+) |
-| `crossterm` compile error | Missing system deps | Linux: ensure `libxcb` or similar available |
-| `ratatui` version mismatch | Lockfile stale | `cargo update` |
+- **Inference samples 100 evenly spaced rows, not the first 100.** The sample
+  spans head→tail, so reordering the file does not flip the inferred type
+  (`infer_from_data`). A 100-dates-then-garbage file infers the same backwards.
+- **Type vote ignores nulls and non-finite, needs a floor(80%) majority (min 1).**
+  ≤20 unique values ⇒ Categorical, more ⇒ Nominal; `NaN`/`inf` never vote
+  Quantitative.
+- **Numeric parsing is liberal and shared everywhere.** `1,000`, `$100`,
+  `USD 100`, `45%`→`0.45`, `10k`, `10GiB`(binary) vs `10GB`(decimal), `(42)`→-42
+  all parse as numbers in inference, aggregation, filters, diff, spark, JSON,
+  and stats. `45%`/`$100` columns infer Quantitative, not Text.
+- **`NaN`/`inf` are skipped downstream.** They infer as Nominal and are dropped
+  from every chart/aggregate; JSON `data[]` shows `null`, and JSON chart series
+  omit those points.
+- **Column names are case-sensitive.** Unknown `-x`/`-y`/`-c` names error with a
+  `Did you mean '...'?` hint; the 2nd+ `-y` columns are validated too,
+  `-y revenue,revnue` fails instead of silently rendering one series.
 
-## Development Setup
+## Filters
 
-- **Git hooks not running:** if `core.hooksPath` points to a custom path (legacy `scripts/hooks` setup), Git ignores lefthook's hooks. Run `lefthook install --reset-hooks-path` once.
-- **pre-push jobs don't receive git args automatically:** pass them explicitly via `{1}` in `run:` (see `lefthook.yml`). Hooks reading the ref list from stdin also need `use_stdin: true`; without it lefthook can hang.
-- **MSRV check:** use the explicit toolchain — `cargo +1.88.0 check --locked` (what CI's msrv job runs). Local commands may resolve a newer default channel, so a bare `cargo check` does not validate MSRV.
+- **Values starting with `>`,`<`,`=`,`!` are rejected.** `-w "revenue>>100"` or
+  `-w "city=!Tokyo"` fails loudly instead of matching nothing.
+- **Empty values are legal; multiple `--where` are ANDed.** `-w "city="` matches
+  empty cells, `-w "note=a=b"` keeps the embedded `=`, and
+  `-w city=Tokyo -w revenue>800` requires both.
+- **Equality is numeric-aware.** `-w "revenue=2000"` matches `$2,000`/`2k`, and
+  `-w "rate=0.45"` matches `45%`; text cells keep exact string semantics.
 
-## Runtime Issues
+## Charts & axes
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `No input file specified` | Missing positional arg | Provide file or pipe: `vz data.csv` or `cat f.csv \| vz -` |
-| `Could not determine chart type` | Invalid column hint | Check `-x`/`-y` column names match CSV headers |
-| `Failed to read file` | File not found or permission | Verify path and permissions |
-| Chart renders garbled | Terminal doesn't support Unicode | Try a terminal with Braille/Unicode support (iTerm2, kitty, WezTerm) |
-| Explore/Present panics | No TTY available | These modes require an interactive terminal; use one-shot mode in CI/pipes |
-| Bar chart shows no labels | Terminal too narrow | Widen terminal to ≥ 40 columns |
+- **Bar aggregates by default (sum).** Use `--agg mean` for averages. Count is
+  auto-applied when `-t bar` has no explicit Y and Y is non-quantitative, or
+  when a lone categorical `-x city` has zero quantitative columns
+  (`x=city`, `y=count(city)`).
+- **Reversed `-x`/`-y` pairs normalize to canonical orientation.** `-x revenue
+  -y date` renders `x=date` (Line) and `-x revenue -y city` renders `x=city`
+  (Bar), instead of a literal-order chart with everything skipped.
+- **`-c/--color` never splits bar data.** Grouped/stacked bars do not exist;
+  the column only reaches the summary legend and heights stay aggregated over
+  all rows. An explicit `-c` warns; an auto-detected color does not.
+- **Rule-less bar fallbacks warn.** Nominal pairs or Temporal×Temporal emit
+  `warning: no chart rule for ... falling back to bar` (oneshot/present; the
+  explore TUI stays silent).
 
-## TSV Not Detected
+## Modes & validation
 
-If a TSV file isn't auto-detected:
-- Ensure the file extension is `.tsv` or `.tab`, **or**
-- Ensure the header line contains more tab characters than commas, **or**
-- Use the `--format tsv` (or `-f tsv`) flag to force TSV parsing
+- **`--bins`/`--top`/`--tail` are range-checked in every mode path.**
+  `--bins` must be `1`–`10000` and `--top`/`--tail` `≥1`, validated before any
+  mode branches (single-file, watch, directory, diff) even when the chart type
+  ignores the flag. `--sample 0` is checked only in `render_data`, so diff
+  ignores it.
+- **`--watch` rejects stdin and missing files.** It watches the *parent*
+  directory (non-recursively), ANSI-clears the screen before each pass, and
+  keeps looping after a re-render error.
+- **Explore and Present require an interactive terminal.** They error in pipes
+  and CI; explore additionally treats the `VZ_TEST_HEADLESS` env var as a no-op
+  test seam.
 
-## Present Mode Chart Not Loading
+## Diff mode
 
-Chart source paths resolve relative to the Markdown file's directory. If charts don't render:
-1. Ensure the `source:` path in the chart block is relative to where the `.md` file lives
-2. As a fallback, the tool also tries the current working directory
+- **`--sort` is signed-Δ, not absolute.** `--sort desc` puts the largest
+  *increase* first; diff-explore's interactive sort is the exception (it uses `|Δ|`).
+- **New categories show `▲ new`/`▼ new`, not a percentage.** That marker is
+  used when before≈0 and after≠0; both-zero shows `─ 0%`, and JSON exposes
+  `pct_change: null` for the new case (no marker in JSON).
+- **Diff ignores many flags.** `--where`/`--agg`/`--color` warn and are ignored;
+  `-t`/`--labels`/`--sample`/`--all-y`/`--bins` are silently ignored (absent
+  from `DiffParams` or unused). `-o table` and `-o svg` fall through to the
+  default text renderer — diff has no table/svg format.
+
+## Directory mode
+
+- **Column order follows the first file, not the incoming file.** Files whose
+  headers match case-insensitively (trimmed) are reordered to the first file's
+  order and merged; only different column sets are skipped.
+- **`_file_date` recognizes three patterns only.** `YYYY-MM-DD`, `YYYY_MM_DD`,
+  and `YYYYMMDD` with years 1900–2099; anything else yields an empty string.
+
+## Present mode
+
+- **Chart source paths resolve against the markdown file first, then CWD.**
+  A `source: data.csv` in `slides/demo.md` loads `slides/data.csv` if it exists,
+  else `./data.csv`.
+- **Bad chart-block values warn and fall back.** Unknown `type`/`sort`/`agg` and
+  invalid `top`/`height` fall back to auto-infer; `bins` outside `1–10000` warns
+  and is ignored. Unknown keys are ignored silently.
+
+## Output & formatting
+
+- **Piped stdout forces width 80, ignoring `COLUMNS`.** The chart width is 80
+  whenever stdout is not a TTY; when stderr is piped the summary line gets 120
+  columns instead of the terminal width.
+- **Color obeys `NO_COLOR`/`FORCE_COLOR` then TTY detection.** Any non-empty
+  `NO_COLOR` disables ANSI, any non-empty `FORCE_COLOR` enables it for both the
+  stdout chart and the stderr summary.
+- **`-H/--height` 24 is the cap and fallback, not a universal default.** Bar and
+  heatmap shrink to `unique×4+2` (clamped 10–24) for ≤5 categories, line/scatter
+  to `rows×3+6` (clamped 12–24) for ≤6 rows.
+- **Insights can silently produce nothing.** They are computed on every path but
+  emit zero lines when there are <2 points, no parseable values, or unknown
+  columns — absence is not an error.
+
+## Known bug
+
+- **SVG/HTML tooltip labels can be wrong for overlaid series.** Marks are placed
+  correctly, but labels come from the shared `x_labels` by per-series index, so a
+  series missing an X value can show its neighbor's label.
