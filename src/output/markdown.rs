@@ -4,11 +4,10 @@ use anyhow::Result;
 
 use crate::chart;
 use crate::chart::data_builder;
-use crate::chart::recommend::effective_agg;
-use crate::cli;
+use crate::chart::selector::{ChartType, SortOrder};
 use crate::infer::types::Schema;
 use crate::oneshot;
-use crate::output::table::agg_header;
+use crate::output::table::{TableParams, agg_header};
 use crate::render::format_number;
 
 /// Maximum data rows printed before truncation (mirrors the JSON 100-row cap).
@@ -19,7 +18,7 @@ pub fn print_markdown(
     recommendation: &chart::selector::ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
-    cli: &cli::Cli,
+    params: &TableParams,
     schema: &Schema,
 ) -> Result<()> {
     let x_idx = data_builder::column_index(headers, &recommendation.x_column);
@@ -28,18 +27,18 @@ pub fn print_markdown(
         .as_ref()
         .and_then(|y| data_builder::column_index(headers, y));
 
-    let chart_type = oneshot::resolve_chart_type(recommendation, cli.chart_type);
+    let chart_type = oneshot::resolve_chart_type(recommendation, params.chart_type_override);
 
     // For bar charts, show aggregated data
     if chart_type == chart::selector::ChartType::Bar
         && let (Some(xi), Some(yi)) = (x_idx, y_idx)
     {
-        let agg = effective_agg(cli, recommendation, schema);
+        let agg = params.agg;
         let y_label = recommendation.y_column.as_deref().unwrap_or("value");
         let (mut bar_data, _) =
             data_builder::aggregate_bar(rows, xi, yi, None, y_label.to_string(), agg);
-        crate::oneshot::builders::sort_bar_data(&mut bar_data, cli.effective_sort());
-        crate::oneshot::builders::truncate_bar_data(&mut bar_data, cli.top.or(cli.tail));
+        crate::oneshot::builders::sort_bar_data(&mut bar_data, params.sort);
+        crate::oneshot::builders::truncate_bar_data(&mut bar_data, params.limit);
         print_markdown_two_col(
             &recommendation.x_column,
             &agg_header(y_label, agg),
@@ -51,27 +50,21 @@ pub fn print_markdown(
 
     // For other chart types: show all columns with a row cap.
     // sort/top only apply to bar charts — warn instead of silently ignoring.
-    warn_non_bar_limits(chart_type, cli);
-    print_markdown_all(
-        headers,
-        rows,
-        cli.top.or(cli.tail).or(Some(MARKDOWN_ROW_LIMIT)),
-    );
+    warn_non_bar_limits(chart_type, params.limit, params.sort_flag);
+    print_markdown_all(headers, rows, params.limit.or(Some(MARKDOWN_ROW_LIMIT)));
+    let _ = schema;
     Ok(())
 }
 
 /// Warn when row-limiting flags are used with a chart type that ignores them.
-fn warn_non_bar_limits(chart_type: chart::selector::ChartType, cli: &cli::Cli) {
-    use crate::chart::selector::ChartType;
-    if cli.top.or(cli.tail).is_some() && !matches!(chart_type, ChartType::Bar) {
+fn warn_non_bar_limits(chart_type: ChartType, limit: Option<usize>, sort_flag: Option<SortOrder>) {
+    if limit.is_some() && !matches!(chart_type, ChartType::Bar) {
         eprintln!(
             "warning: --top/--tail has no effect on {} tables (only applies to bar charts); showing first {} rows",
             chart_type, MARKDOWN_ROW_LIMIT
         );
-    } else if matches!(
-        cli.sort,
-        Some(cli::SortOrderArg::Desc) | Some(cli::SortOrderArg::Asc)
-    ) && !matches!(chart_type, ChartType::Bar)
+    } else if matches!(sort_flag, Some(SortOrder::Desc) | Some(SortOrder::Asc))
+        && !matches!(chart_type, ChartType::Bar)
     {
         eprintln!(
             "warning: --sort has no effect on {} tables (only applies to bar charts)",

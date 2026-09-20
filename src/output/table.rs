@@ -4,8 +4,7 @@ use anyhow::Result;
 
 use crate::chart;
 use crate::chart::data_builder;
-use crate::chart::recommend::effective_agg;
-use crate::cli;
+use crate::chart::selector::{AggFunction, ChartType, SortOrder};
 use crate::infer::types::Schema;
 use crate::oneshot;
 use crate::render::format_number;
@@ -13,12 +12,21 @@ use crate::render::format_number;
 /// Maximum data rows printed before truncation (mirrors the JSON 100-row cap).
 pub const TABLE_ROW_LIMIT: usize = 100;
 
+/// Resolved inputs for table output (no CLI dependency).
+pub struct TableParams {
+    pub chart_type_override: Option<crate::cli::ChartTypeArg>,
+    pub agg: AggFunction,
+    pub sort: Option<SortOrder>,
+    pub limit: Option<usize>,
+    pub sort_flag: Option<SortOrder>,
+}
+
 /// Print data as a formatted text table, respecting chart type for aggregation.
 pub fn print_table(
     recommendation: &chart::selector::ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
-    cli: &cli::Cli,
+    params: &TableParams,
     schema: &Schema,
 ) -> Result<()> {
     let x_idx = data_builder::column_index(headers, &recommendation.x_column);
@@ -27,18 +35,18 @@ pub fn print_table(
         .as_ref()
         .and_then(|y| data_builder::column_index(headers, y));
 
-    let chart_type = oneshot::resolve_chart_type(recommendation, cli.chart_type);
+    let chart_type = oneshot::resolve_chart_type(recommendation, params.chart_type_override);
 
     // For bar charts, show aggregated data
     if chart_type == chart::selector::ChartType::Bar
         && let (Some(xi), Some(yi)) = (x_idx, y_idx)
     {
-        let agg = effective_agg(cli, recommendation, schema);
+        let agg = params.agg;
         let y_label = recommendation.y_column.as_deref().unwrap_or("value");
         let (mut bar_data, _) =
             data_builder::aggregate_bar(rows, xi, yi, None, y_label.to_string(), agg);
-        crate::oneshot::builders::sort_bar_data(&mut bar_data, cli.effective_sort());
-        crate::oneshot::builders::truncate_bar_data(&mut bar_data, cli.top.or(cli.tail));
+        crate::oneshot::builders::sort_bar_data(&mut bar_data, params.sort);
+        crate::oneshot::builders::truncate_bar_data(&mut bar_data, params.limit);
         print_two_col_values(
             &recommendation.x_column,
             &agg_header(y_label, agg),
@@ -50,12 +58,9 @@ pub fn print_table(
 
     // For other chart types: show all columns (users expect full data view).
     // sort/top only apply to bar charts — warn instead of silently ignoring.
-    warn_non_bar_limits(chart_type, cli);
-    print_all_columns(
-        headers,
-        rows,
-        cli.top.or(cli.tail).or(Some(TABLE_ROW_LIMIT)),
-    );
+    warn_non_bar_limits(chart_type, params.limit, params.sort_flag);
+    print_all_columns(headers, rows, params.limit.or(Some(TABLE_ROW_LIMIT)));
+    let _ = schema;
     Ok(())
 }
 
@@ -76,8 +81,7 @@ fn print_two_col_values(x_label: &str, y_label: &str, labels: &[String], values:
 }
 
 /// Header for an aggregated column: `revenue` for sum, `mean(revenue)` otherwise.
-pub fn agg_header(y_label: &str, agg: chart::selector::AggFunction) -> String {
-    use crate::chart::selector::AggFunction;
+pub fn agg_header(y_label: &str, agg: AggFunction) -> String {
     match agg {
         AggFunction::Sum => y_label.to_string(),
         AggFunction::Mean => format!("mean({y_label})"),
@@ -88,17 +92,14 @@ pub fn agg_header(y_label: &str, agg: chart::selector::AggFunction) -> String {
 }
 
 /// Warn when row-limiting flags are used with a chart type that ignores them.
-fn warn_non_bar_limits(chart_type: chart::selector::ChartType, cli: &cli::Cli) {
-    use crate::chart::selector::ChartType;
-    if cli.top.or(cli.tail).is_some() && !matches!(chart_type, ChartType::Bar) {
+fn warn_non_bar_limits(chart_type: ChartType, limit: Option<usize>, sort_flag: Option<SortOrder>) {
+    if limit.is_some() && !matches!(chart_type, ChartType::Bar) {
         eprintln!(
             "warning: --top/--tail has no effect on {} tables (only applies to bar charts); showing first {} rows",
             chart_type, TABLE_ROW_LIMIT
         );
-    } else if matches!(
-        cli.sort,
-        Some(cli::SortOrderArg::Desc) | Some(cli::SortOrderArg::Asc)
-    ) && !matches!(chart_type, ChartType::Bar)
+    } else if matches!(sort_flag, Some(SortOrder::Desc) | Some(SortOrder::Asc))
+        && !matches!(chart_type, ChartType::Bar)
     {
         eprintln!(
             "warning: --sort has no effect on {} tables (only applies to bar charts)",
@@ -164,6 +165,34 @@ fn col_width(rows: &[Vec<String>], idx: usize, min: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chart::selector::ChartType;
+    use crate::test_helpers::make_recommendation;
+
+    fn table_params() -> TableParams {
+        TableParams {
+            chart_type_override: None,
+            agg: AggFunction::Sum,
+            sort: None,
+            limit: None,
+            sort_flag: None,
+        }
+    }
+
+    #[test]
+    fn test_print_table_bar_aggregates_without_cli() {
+        let rec = make_recommendation(ChartType::Bar, "city", Some("revenue"), None);
+        let headers = vec!["city".to_string(), "revenue".to_string()];
+        let rows = vec![
+            vec!["Tokyo".to_string(), "1000".to_string()],
+            vec!["Tokyo".to_string(), "2000".to_string()],
+            vec!["Osaka".to_string(), "1500".to_string()],
+        ];
+        let schema = crate::test_helpers::make_schema(&[
+            ("city", crate::infer::types::DataType::Categorical),
+            ("revenue", crate::infer::types::DataType::Quantitative),
+        ]);
+        assert!(print_table(&rec, &headers, &rows, &table_params(), &schema).is_ok());
+    }
 
     #[test]
     fn test_col_width_uses_max_data_length() {

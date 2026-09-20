@@ -152,7 +152,14 @@ fn dispatch_output(
 ) -> Result<()> {
     match cli.output {
         Some(cli::OutputFormat::Table) => {
-            output::table::print_table(recommendation, headers, rows, cli, schema)?;
+            let params = output::table::TableParams {
+                chart_type_override: cli.chart_type,
+                agg: recommend::effective_agg(cli, recommendation, schema),
+                sort: cli.effective_sort(),
+                limit: cli.top.or(cli.tail),
+                sort_flag: cli.sort.map(|s| s.to_sort_order()),
+            };
+            output::table::print_table(recommendation, headers, rows, &params, schema)?;
         }
         Some(cli::OutputFormat::Spark) => {
             print_spark(recommendation, headers, rows, cli, schema, y_opts);
@@ -166,7 +173,14 @@ fn dispatch_output(
             output::html::print_html(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Markdown) => {
-            output::markdown::print_markdown(recommendation, headers, rows, cli, schema)?;
+            let params = output::table::TableParams {
+                chart_type_override: cli.chart_type,
+                agg: recommend::effective_agg(cli, recommendation, schema),
+                sort: cli.effective_sort(),
+                limit: cli.top.or(cli.tail),
+                sort_flag: cli.sort.map(|s| s.to_sort_order()),
+            };
+            output::markdown::print_markdown(recommendation, headers, rows, &params, schema)?;
         }
         _ => {
             let opts = oneshot::RenderOptions::from_cli(cli, y_opts, recommendation, schema);
