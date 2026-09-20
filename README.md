@@ -69,7 +69,7 @@ kubectl top pods | vz - -f space
 
 # Fixed-width / space-aligned input (auto-detected from content)
 kubectl top pods | vz -
-df -h | vz - -f space -x "Mounted on" -y "Use%"
+df -h | vz - -x "Mounted on" -y "Use%"   # extra text columns: auto-color is legend-only on bars
 
 # TSV files (auto-detected by extension or content)
 vz data.tsv

@@ -176,10 +176,11 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
     pipeline::render_data_from_cli(cli, data, file)
 }
 
-/// Reject nonsensical render limits before any mode runs. Kept ahead of the
-/// directory early-return so directory/watch invocations validate like
+/// Reject nonsensical render limits before the render path runs. Kept ahead
+/// of the directory early-return so directory/watch invocations validate like
 /// single-file ones, and `--bins` is bounded above because each bin is
-/// allocated by `render::compute_bins`.
+/// allocated by `render::compute_bins`. Diff mode (`vz before.csv after.csv`)
+/// branches off earlier and bypasses this validation.
 fn validate_render_limits(cli: &Cli) -> Result<()> {
     match cli.bins {
         Some(0) => anyhow::bail!("--bins must be at least 1"),

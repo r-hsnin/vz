@@ -9,7 +9,7 @@ Release procedures live in [RUNBOOK.md](RUNBOOK.md).
 - **Bar chart aggregates by default (sum).** Use `--agg mean` if you want averages. A lone categorical `-x city` (no numeric columns) counts rows per category (`y=count(city)`).
 - **Reversed `-x`/`-y` pairs are normalized to the canonical orientation.** `-x revenue -y date` draws `x=date` (Line); `-x revenue -y city` draws `x=city` (Bar) — the literal order no longer renders an empty chart.
 - **Type inference samples 100 evenly spaced rows (head→tail), not just the first 100.** Row order no longer flips the inferred type.
-- **`-c/--color` has no effect on bar chart data.** Grouped/stacked bars are not implemented: bars stay aggregated over all rows and `-c` only reaches the summary legend (oneshot warns; explore reports it in the status line when cycling color on a Bar).
+- **`-c/--color` has no effect on bar chart data.** Grouped/stacked bars are not implemented: bars stay aggregated over all rows and `-c` only reaches the summary legend (oneshot warns; explore reports it in the status line when cycling color on a Bar). An auto-detected color column (any unused categorical column) triggers the same warning even without `-c`; pass `-x`/`-y` explicitly to keep the legend from being inferred.
 - **Filter values starting with `>`, `<`, `=`, `!` are rejected.** A doubled operator like `-w "revenue>>100"` fails loudly instead of silently matching nothing. Empty values (`-w "city="`) still match empty cells.
 - **Column names are case-sensitive.** Check with `vz data.csv --info`. Typo'd names get a `Did you mean '...' ?` hint. Unknown `x`/`y`/`color` names are an error everywhere, including present chart blocks (previously silently charted the first columns). The 2nd+ `-y` columns are validated too (`-y revenue,revnue` fails instead of rendering a single series silently). Present chart blocks warn on unknown `type`/`sort`/`agg` and invalid `top`/`bins`/`height`, then fall back to auto-infer.
 - **TSV detection relies on extension or tab prevalence.** When piping, use `-f tsv` explicitly.
@@ -39,7 +39,7 @@ Release procedures live in [RUNBOOK.md](RUNBOOK.md).
 
 - **Git hooks not running:** if `core.hooksPath` points to a custom path (legacy `scripts/hooks` setup), Git ignores lefthook's hooks. Run `lefthook install --reset-hooks-path` once.
 - **pre-push jobs don't receive git args automatically:** pass them explicitly via `{1}` in `run:` (see `lefthook.yml`). Hooks reading the ref list from stdin also need `use_stdin: true`; without it lefthook can hang.
-- **MSRV check:** use the explicit toolchain — `cargo +1.88.0 check --locked` (what CI's msrv job runs). If a `rust-toolchain.toml` is present it pins a newer channel for local commands, so a bare `cargo check` does not validate MSRV.
+- **MSRV check:** use the explicit toolchain — `cargo +1.88.0 check --locked` (what CI's msrv job runs). Local commands may resolve a newer default channel, so a bare `cargo check` does not validate MSRV.
 
 ## Runtime Issues
 
