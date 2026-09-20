@@ -144,6 +144,10 @@ fn run_explore_diff(before_path: &Path, after_path: &Path, cli: &Cli) -> Result<
 
 /// Run the oneshot (default) mode: load data, infer types, render chart.
 fn run_oneshot(cli: &Cli) -> Result<()> {
+    // Reject nonsensical render limits before any mode branches, so diff and
+    // directory invocations validate exactly like single-file ones.
+    validate_render_limits(cli)?;
+
     // Diff mode: two files provided
     if let Some((before, after)) = cli.diff_pair() {
         return diff::run_diff_from_cli(cli, &before, &after);
@@ -162,8 +166,6 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
 
 /// Single render pass: load → infer → render. Used by both normal and watch modes.
 fn render_once(cli: &Cli, file: &Path) -> Result<()> {
-    validate_render_limits(cli)?;
-
     if file.is_dir() {
         return directory::run_directory_from_cli(cli, file);
     }
@@ -176,11 +178,10 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
     pipeline::render_data_from_cli(cli, data, file)
 }
 
-/// Reject nonsensical render limits before the render path runs. Kept ahead
-/// of the directory early-return so directory/watch invocations validate like
-/// single-file ones, and `--bins` is bounded above because each bin is
-/// allocated by `render::compute_bins`. Diff mode (`vz before.csv after.csv`)
-/// branches off earlier and bypasses this validation.
+/// Reject nonsensical render limits before the render path runs. Called once at
+/// the top of [`run_oneshot`] so every mode (single-file, watch, directory, and
+/// diff) validates alike; `--bins` is bounded above because each bin is
+/// allocated by `render::compute_bins`.
 fn validate_render_limits(cli: &Cli) -> Result<()> {
     match cli.bins {
         Some(0) => anyhow::bail!("--bins must be at least 1"),

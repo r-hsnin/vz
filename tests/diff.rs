@@ -1241,3 +1241,43 @@ fn test_diff_ignored_flags_warn() {
         stderr
     );
 }
+
+#[test]
+fn test_diff_bins_zero_errors_like_single_file() {
+    // Diff mode must validate render limits before branching, not let
+    // `--bins 0` through while single-file mode rejects it.
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--bins",
+            "0",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--bins must be at least 1"),
+        "expected diff --bins 0 rejection, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_diff_top_zero_errors_like_single_file() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--top",
+            "0",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--top must be at least 1"),
+        "expected diff --top 0 rejection, got: {stderr}"
+    );
+}
