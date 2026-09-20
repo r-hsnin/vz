@@ -148,8 +148,6 @@ fn apply_extra_y_columns(
     rows: &[Vec<String>],
     opts: &RenderOptions<'_>,
 ) {
-    use crate::render::Axis;
-
     let axes = ResolvedAxes::from_recommendation(
         &recommendation.x_column,
         recommendation.y_column.as_deref(),
@@ -171,13 +169,7 @@ fn apply_extra_y_columns(
         })
         .collect();
     let extra = data_builder::build_multi_y_series(rows, axes.x_idx, &y_specs, x_is_non_numeric);
-    config.series.extend(extra);
-    let all_y: Vec<f64> = config
-        .series
-        .iter()
-        .flat_map(|s| s.data.iter().map(|(_, y)| *y))
-        .collect();
-    config.y_axis = Axis::from_data(&config.y_axis.label, &all_y);
+    data_builder::append_series_refit_y(config, extra);
 }
 
 #[cfg(test)]

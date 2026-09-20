@@ -260,6 +260,49 @@ fn test_build_chart_config_multi_series() {
 }
 
 #[test]
+fn test_append_series_refit_y_includes_extra_series_in_span() {
+    let rows = vec![
+        vec!["2024-01".into(), "10".into()],
+        vec!["2024-02".into(), "20".into()],
+    ];
+    let mut config = build_chart_config(&rows, 0, 1, None, "date".into(), "value".into(), None);
+    let base_x_min = config.x_axis.min;
+    let base_x_max = config.x_axis.max;
+
+    append_series_refit_y(
+        &mut config,
+        vec![Series {
+            name: "profit".into(),
+            data: vec![(0.0, 500.0)],
+        }],
+    );
+
+    assert_eq!(config.series.len(), 2);
+    assert!(config.y_axis.max >= 500.0);
+    // X span is intentionally untouched: extra-Y series share the base X coords.
+    assert_eq!(config.x_axis.min, base_x_min);
+    assert_eq!(config.x_axis.max, base_x_max);
+    assert_eq!(config.y_axis.label, "value");
+}
+
+#[test]
+fn test_append_series_refit_y_empty_is_noop() {
+    let rows = vec![
+        vec!["2024-01".into(), "10".into()],
+        vec!["2024-02".into(), "20".into()],
+    ];
+    let mut config = build_chart_config(&rows, 0, 1, None, "date".into(), "value".into(), None);
+    let base_y_min = config.y_axis.min;
+    let base_y_max = config.y_axis.max;
+
+    append_series_refit_y(&mut config, vec![]);
+
+    assert_eq!(config.series.len(), 1);
+    assert_eq!(config.y_axis.min, base_y_min);
+    assert_eq!(config.y_axis.max, base_y_max);
+}
+
+#[test]
 fn test_column_index() {
     let headers: Vec<String> = vec!["a".into(), "b".into(), "c".into()];
     assert_eq!(column_index(&headers, "b"), Some(1));

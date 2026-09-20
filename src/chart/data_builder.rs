@@ -610,6 +610,23 @@ pub fn build_multi_y_series(
         .collect()
 }
 
+/// Append extra series (e.g. the `--all-y` overlay) to a config and re-derive
+/// the Y axis span over all series, preserving the Y label. The X span is
+/// intentionally untouched: extra-Y series share the base X coordinates.
+/// Canonical because axis-span derivation must not be duplicated by adapters.
+pub fn append_series_refit_y(config: &mut ChartConfig, extra: Vec<Series>) {
+    if extra.is_empty() {
+        return;
+    }
+    config.series.extend(extra);
+    let all_y: Vec<f64> = config
+        .series
+        .iter()
+        .flat_map(|s| s.data.iter().map(|(_, y)| *y))
+        .collect();
+    config.y_axis = Axis::from_data(&config.y_axis.label, &all_y);
+}
+
 /// Build a heatmap count matrix from two categorical columns.
 /// Rows are unique values from `row_idx`, columns from `col_idx`.
 pub fn build_heatmap_data(
