@@ -718,6 +718,30 @@ fn test_diff_html_output() {
 }
 
 #[test]
+fn test_diff_html_bars_include_percent_labels() {
+    let output = vz_binary()
+        .args([
+            "fixtures/diff/sales_before.csv",
+            "fixtures/diff/sales_after.csv",
+            "--html",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // After values 1200/1350/950/600 (total 4100): Tokyo holds 29%.
+    assert!(
+        stdout.contains("(29%)"),
+        "Diff HTML bars should keep share-percent labels: {}",
+        &stdout[..600.min(stdout.len())]
+    );
+}
+
+#[test]
 fn test_diff_html_shorthand() {
     let output = vz_binary()
         .args([

@@ -71,6 +71,7 @@ pub(super) fn print_diff_html(
     );
     bar_data.series_colors = colors;
     bar_data.axis_color = Some(Color::DarkGray);
+    bar_data.show_labels = true;
 
     let area = Rect::new(0, 0, width, height);
     let mut buf = Buffer::empty(area);

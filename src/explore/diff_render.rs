@@ -62,6 +62,7 @@ fn render_diff_chart(frame: &mut Frame, app: &DiffExploreApp, area: ratatui::lay
                 Some(title),
             );
             bar_data.axis_color = Some(app.theme.axis_color);
+            bar_data.show_labels = true;
             let chart_data = ChartData::Bar(bar_data);
             frame.render_widget(ChartWidget(&chart_data), area);
         }
@@ -290,4 +291,82 @@ fn render_diff_help_overlay(frame: &mut Frame) {
     );
 
     frame.render_widget(paragraph, popup);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::diff::{DiffEntry, DiffResult};
+    use ratatui::{Terminal, backend::TestBackend};
+
+    fn categorical_app() -> DiffExploreApp {
+        let result = DiffResult {
+            entries: vec![
+                DiffEntry {
+                    label: "Tokyo".to_string(),
+                    before: 100.0,
+                    after: 150.0,
+                    delta: 50.0,
+                    pct_change: Some(50.0),
+                },
+                DiffEntry {
+                    label: "Osaka".to_string(),
+                    before: 200.0,
+                    after: 180.0,
+                    delta: -20.0,
+                    pct_change: Some(-10.0),
+                },
+                DiffEntry {
+                    label: "Nagoya".to_string(),
+                    before: 80.0,
+                    after: 80.0,
+                    delta: 0.0,
+                    pct_change: Some(0.0),
+                },
+            ],
+            x_column: "city".to_string(),
+            y_column: "revenue".to_string(),
+            before_rows: 3,
+            after_rows: 3,
+            overall_pct: Some(7.9),
+        };
+        DiffExploreApp::new(
+            DiffData::Categorical(result),
+            "before.csv".to_string(),
+            "after.csv".to_string(),
+            crate::theme::Theme::dark(),
+        )
+    }
+
+    #[test]
+    fn test_categorical_chart_shows_share_percent_labels() {
+        let app = categorical_app();
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                render_diff_chart(frame, &app, area);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer().clone();
+        let mut content = String::new();
+        for y in 0..buffer.area.height {
+            for x in 0..buffer.area.width {
+                content.push_str(buffer[(x, y)].symbol());
+            }
+            content.push('\n');
+        }
+
+        // After values 150/180/80 (total 410): Tokyo 37%, Osaka 44%.
+        assert!(
+            content.contains("37%"),
+            "Tokyo share text missing from chart: {content}"
+        );
+        assert!(
+            content.contains("44%"),
+            "Osaka share text missing from chart: {content}"
+        );
+    }
 }
