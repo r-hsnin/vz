@@ -184,7 +184,9 @@ Each mode has a **mode-specific builder layer** that adapts the shared `ChartDat
 structures before passing them to `render_chart_data()`:
 - `chart/data_builder.rs` — canonical assemblers (`build_chart_config`,
   `aggregate_bar`, `build_histogram`, `build_heatmap_data`,
-  `build_diff_line_config` since Phase 3-1)
+  `build_diff_line_config` since Phase 3-1, categorical diff annotation
+  (`diff_direction_marker`/`format_diff_change`/`build_diff_bar_data`)
+  since Phase 3-2)
 - `oneshot/builders.rs` — sorting, truncation, label fitting, theme application
   (allowed adapter on top of the canonical layer)
 - `explore/` — interactive column selection → canonical assembler calls
@@ -196,8 +198,11 @@ Unification direction (see DESIGN.md decision 1): `chart/data_builder.rs` is
 the canonical assembler; mode adapters may only sort, truncate, fit labels,
 apply theme, or wire slide/interactive state — never re-derive aggregation
 or axis spans. Temporal diff Line assembly is unified (Phase 3-1);
-categorical diff Bar annotation (▲/▼ labels + color-by-direction) is still
-mode-local.
+categorical diff Bar annotation is unified since Phase 3-2 (values = after,
+labels = `label ▲ +20%`, signed-Δ sort/limit via `build_diff_bar_data`;
+color-by-direction stays at the edge — html green/red/gray, explore table
+Dir column. Known residual divergence: explore interactive sort uses |Δ|
+(`sorted_entries`) while oneshot/present/html use signed-Δ.)
 
 Layering note: modes call into `pipeline::render_data` / `pipeline::infer_from_data`
 and `diff` column resolution (`diff::auto_x_column` et al.). `pipeline` itself
