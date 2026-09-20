@@ -618,6 +618,25 @@ mod tests {
     }
 
     #[test]
+    fn histogram_falls_back_to_y_when_x_is_categorical() {
+        // Categorical x: the insight must describe the same (y) column the
+        // histogram bins, matching the text/JSON/spark fallback.
+        let h = headers(&["month", "temperature"]);
+        let r = rows(&[&["Jan", "5"], &["Feb", "7"], &["Mar", "9"]]);
+        let out = build_insights(&req(
+            ChartType::Histogram,
+            "month",
+            Some("temperature"),
+            &h,
+            &r,
+        ));
+        assert!(
+            out.iter().any(|s| s.contains("Most temperature")),
+            "{out:?}"
+        );
+    }
+
+    #[test]
     fn heatmap_names_hottest_cell() {
         let h = headers(&["dept", "status"]);
         let r = rows(&[

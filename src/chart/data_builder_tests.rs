@@ -262,6 +262,44 @@ fn test_build_grouped_series() {
 }
 
 #[test]
+fn test_histogram_column_probe_any_numeric_in_leading_rows() {
+    // Probe semantics are `any` over the leading rows: a single numeric X in
+    // the window selects X even when earlier rows are non-numeric.
+    let rows = vec![
+        vec!["N/A".to_string(), "1000".to_string()],
+        vec!["10".to_string(), "2000".to_string()],
+        vec!["20".to_string(), "3000".to_string()],
+    ];
+    assert_eq!(histogram_column(&rows, 0, 1), 0);
+}
+
+#[test]
+fn test_histogram_column_probe_window_is_five_rows() {
+    // A numeric X first appearing on row 6 is outside the 5-row probe window,
+    // so the column falls back to Y.
+    let mut rows: Vec<Vec<String>> = (0..5)
+        .map(|_| vec!["N/A".to_string(), "1".to_string()])
+        .collect();
+    rows.push(vec!["99".to_string(), "2".to_string()]);
+    assert_eq!(histogram_column(&rows, 0, 1), 1);
+}
+
+#[test]
+fn test_histogram_column_short_rows_do_not_panic() {
+    // Rows shorter than the probed index are skipped, not panicked on.
+    let rows = vec![vec![], vec!["5".to_string(), "7".to_string()]];
+    assert_eq!(histogram_column(&rows, 0, 1), 0);
+}
+
+#[test]
+fn test_truncate_bar_data_exact_len_keeps_all() {
+    let mut data = bar_fixture();
+    truncate_bar_data(&mut data, Some(3));
+    assert_eq!(data.labels, vec!["A", "B", "C"]);
+    assert_eq!(data.values, vec![10.0, 30.0, 20.0]);
+}
+
+#[test]
 fn test_build_multi_y_series_category_index_when_grouped() {
     // Duplicate non-numeric X across groups: the grouped base series maps X to
     // the unique-category index, so an extra-Y overlay must use the same index

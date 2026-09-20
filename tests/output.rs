@@ -827,6 +827,94 @@ fn test_json_histogram_x_only_bins_the_x_column() {
 }
 
 #[test]
+fn test_json_histogram_prefers_numeric_x_over_y() {
+    // Both x and y are quantitative: canonical `histogram_column` bins x, so
+    // `-x revenue -y profit` must histogram revenue (800–2000), not profit.
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-o",
+            "json",
+            "-t",
+            "histogram",
+            "-x",
+            "revenue",
+            "-y",
+            "profit",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).expect("valid JSON");
+    let bins = json["chart_data"]["bins"].as_array().expect("bins array");
+    assert_eq!(
+        bins.first().and_then(|b| b["range"].as_str()),
+        Some("800-920"),
+        "x column must be binned: {json}"
+    );
+    assert_eq!(
+        bins.last().and_then(|b| b["range"].as_str()),
+        Some("1880-2000"),
+        "x column must be binned: {json}"
+    );
+    assert_eq!(json["query"]["x"], "revenue");
+}
+
+#[test]
+fn test_json_histogram_falls_back_to_y_when_x_non_numeric() {
+    // Categorical x + quantitative y: `histogram_column` falls back to y so the
+    // bins are populated rather than empty.
+    let output = vz_binary()
+        .args([
+            "fixtures/temperature.csv",
+            "-o",
+            "json",
+            "-t",
+            "histogram",
+            "-x",
+            "month",
+            "-y",
+            "temperature",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).expect("valid JSON");
+    let bins = json["chart_data"]["bins"].as_array().expect("bins array");
+    assert!(!bins.is_empty(), "fallback must bin temperature: {json}");
+    assert_eq!(json["query"]["y"], "temperature");
+}
+
+#[test]
+fn test_text_histogram_prefers_numeric_x_over_y() {
+    // The text renderer must title the chart after the same column it bins.
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-t",
+            "histogram",
+            "-x",
+            "revenue",
+            "-y",
+            "profit",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Distribution of revenue"),
+        "expected revenue histogram, got: {stdout}"
+    );
+    assert!(
+        !stdout.contains("Distribution of profit"),
+        "must not bin y when x is numeric: {stdout}"
+    );
+}
+
+#[test]
 fn test_stderr_summary_no_ansi_when_piped() {
     // When stderr is piped (as in test harness), summary should NOT contain ANSI escape codes
     let output = vz_binary()

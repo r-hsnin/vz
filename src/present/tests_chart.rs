@@ -156,6 +156,49 @@ fn test_load_histogram_bins_y_when_x_is_non_numeric() {
 }
 
 #[test]
+fn test_load_histogram_bins_x_when_both_quantitative() {
+    // Both x and y quantitative: canonical `histogram_column` bins x, matching
+    // oneshot text/JSON.
+    let block = ChartBlock {
+        source: "sales.csv".to_string(),
+        chart_type: Some(ChartType::Histogram),
+        x_col: Some("revenue".to_string()),
+        y_col: Some("profit".to_string()),
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
+        bins: None,
+        height: None,
+        diff: None,
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
+    assert!(
+        result.is_ok(),
+        "histogram block should load: {:?}",
+        result.err()
+    );
+    match result.unwrap() {
+        crate::render::ChartData::Histogram(data) => {
+            assert_eq!(data.x_label, "revenue");
+            let min = data.values.iter().cloned().fold(f64::INFINITY, f64::min);
+            let max = data
+                .values
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
+            assert_eq!(min, 800.0);
+            assert_eq!(max, 2000.0);
+        }
+        _ => panic!("Expected Histogram chart data"),
+    }
+}
+
+#[test]
 fn test_load_chart_data_infers_line_for_temporal() {
     // sales.csv has temporal x + quantitative y → should infer Line
     let block = ChartBlock {

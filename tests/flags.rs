@@ -606,6 +606,28 @@ fn test_bins_above_max_gives_clear_error() {
 }
 
 #[test]
+fn test_bins_at_max_is_accepted() {
+    // The inclusive upper bound must render, not be rejected alongside 10001.
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-y",
+            "revenue",
+            "-t",
+            "histogram",
+            "--bins",
+            "10000",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(
+        output.status.success(),
+        "vz --bins 10000 must be accepted: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn test_top_zero_gives_clear_error() {
     let output = vz_binary()
         .args(["fixtures/sales.csv", "--top", "0"])
