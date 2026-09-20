@@ -1329,6 +1329,42 @@ fn test_spark_bar_limit_truncates_via_canonical_adapter() {
 }
 
 #[test]
+fn test_spark_histogram_no_y_uses_canonical_bins() {
+    // Single quantitative column + no Y → histogram; --bins 4 → 4 sparkline chars
+    let output = vz_binary()
+        .args([
+            "fixtures/temperature.csv",
+            "--spark",
+            "-t",
+            "histogram",
+            "-x",
+            "temperature",
+            "--bins",
+            "4",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    let parts: Vec<&str> = trimmed.split("  ").collect();
+    assert!(parts.len() >= 2, "Expected parts, got: {}", trimmed);
+    let spark_chars: Vec<char> = parts[1].chars().collect();
+    assert_eq!(
+        spark_chars.len(),
+        4,
+        "Expected 4 histogram bins after --bins 4, got {} in: {}",
+        spark_chars.len(),
+        parts[1]
+    );
+    assert!(
+        trimmed.contains("36 rows"),
+        "Expected canonical histogram row count in: {}",
+        trimmed
+    );
+}
+
+#[test]
 fn test_output_markdown_bar_aggregated_values() {
     // Bar chart markdown should show aggregated sums
     let output = vz_binary()

@@ -43,24 +43,25 @@ pub fn print_spark(
     // Histogram with no Y column: bin the X column values and sparkline the counts
     if y_idx.is_none() && chart_type == ChartType::Histogram {
         if let Some(xi) = x_idx {
-            let values: Vec<f64> = rows
-                .iter()
-                .filter_map(|r| r.get(xi).and_then(|v| crate::util::parse_number(v)))
-                .filter(|v| v.is_finite())
-                .collect();
-            if values.is_empty() {
+            let hist = data_builder::build_histogram(
+                rows,
+                xi,
+                None,
+                recommendation.x_column.clone(),
+                params.bins,
+            );
+            if hist.values.is_empty() {
                 println!("{}", recommendation.x_column);
                 return;
             }
-            let bin_count = params.bins.unwrap_or(data_builder::DEFAULT_BINS);
-            let bins = crate::render::compute_bins(&values, bin_count);
+            let bins = crate::render::compute_bins(&hist.values, hist.bin_count);
             let counts: Vec<f64> = bins.iter().map(|(_, _, c)| *c as f64).collect();
             let spark = make_sparkline(&counts);
-            let range = util::min_max(&values)
+            let range = util::min_max(&hist.values)
                 .map(|(min, max)| format!("({}–{})", format_number(min), format_number(max)))
                 .unwrap_or_default();
             let x_name = &recommendation.x_column;
-            println!("{x_name}  {spark}  {range} {} rows", values.len());
+            println!("{x_name}  {spark}  {range} {} rows", hist.values.len());
             return;
         }
         println!("▄");
