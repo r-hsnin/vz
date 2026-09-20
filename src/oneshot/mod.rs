@@ -46,27 +46,54 @@ pub struct RenderOptions<'a> {
 }
 
 impl<'a> RenderOptions<'a> {
-    /// Build render options from CLI hints (app-plane adapter).
+    /// Build render options from the resolved pipeline params (app-plane adapter).
+    pub fn from_params(
+        params: &'a crate::cli::PipelineParams,
+        y_opts: &'a crate::chart::recommend::YOptions,
+        recommendation: &ChartRecommendation,
+        schema: &crate::infer::types::Schema,
+    ) -> Self {
+        let agg = crate::chart::recommend::effective_agg(&params.query, recommendation, schema);
+        Self {
+            chart_type_override: params.query.chart_type,
+            y_label_override: y_opts.label_override.as_deref(),
+            width: params.width,
+            height: params.height,
+            sort_order: params.sort,
+            extra_y_columns: y_opts.extra_columns.clone(),
+            limit: params.limit,
+            agg,
+            title: params.title.clone(),
+            labels: params.labels,
+            theme: crate::cli::resolve_theme_arg(params.theme),
+            bins: params.bins,
+        }
+    }
+
+    /// Build render options from CLI hints (app-plane adapter; test seam).
+    #[cfg(test)]
     pub fn from_cli(
         cli: &'a crate::cli::Cli,
         y_opts: &'a crate::chart::recommend::YOptions,
         recommendation: &ChartRecommendation,
         schema: &crate::infer::types::Schema,
     ) -> Self {
-        let agg = crate::chart::recommend::effective_agg(&cli.to_query(), recommendation, schema);
+        let params = cli.to_pipeline_params();
+        let theme = crate::cli::resolve_theme(cli);
+        let agg = crate::chart::recommend::effective_agg(&params.query, recommendation, schema);
         Self {
-            chart_type_override: cli.chart_type,
+            chart_type_override: params.query.chart_type,
             y_label_override: y_opts.label_override.as_deref(),
-            width: cli.width,
-            height: cli.height,
-            sort_order: cli.effective_sort(),
+            width: params.width,
+            height: params.height,
+            sort_order: params.sort,
             extra_y_columns: y_opts.extra_columns.clone(),
-            limit: cli.top.or(cli.tail),
+            limit: params.limit,
             agg,
-            title: cli.title.clone(),
-            labels: cli.labels,
-            theme: crate::cli::resolve_theme(cli),
-            bins: cli.bins,
+            title: params.title.clone(),
+            labels: params.labels,
+            theme,
+            bins: params.bins,
         }
     }
 }

@@ -119,7 +119,7 @@ fn parse_y_options_no_y_specified() {
     assert!(opts.extra_columns.is_empty());
 }
 
-// --- build_render_options (oneshot::RenderOptions::from_cli lives in oneshot) ---
+// --- build_render_options (oneshot::RenderOptions::from_params lives in oneshot) ---
 
 #[test]
 fn build_render_options_default_values() {

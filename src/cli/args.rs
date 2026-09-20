@@ -1,6 +1,33 @@
 use super::Cli;
 use crate::chart::selector::SortOrder;
 
+use super::OutputFormat;
+
+/// Resolved, Cli-free inputs for the single-file render pipeline.
+///
+/// Built once in the app plane (`Cli::to_pipeline_params`); downstream
+/// pipeline/output code takes this instead of `&Cli`. The `query` field is
+/// the Phase 2 `Query` seam (`to_query`); the rest are the other `Cli`
+/// resolutions the pipeline needs (sort/limit/output/flags/theme/…).
+#[derive(Debug, Clone)]
+pub struct PipelineParams {
+    pub query: crate::chart::Query,
+    pub filters: Vec<String>,
+    pub sample: Option<usize>,
+    pub info: bool,
+    pub all_y: bool,
+    pub output: Option<OutputFormat>,
+    pub sort: Option<SortOrder>,
+    pub sort_flag: Option<SortOrder>,
+    pub limit: Option<usize>,
+    pub bins: Option<usize>,
+    pub title: Option<String>,
+    pub labels: bool,
+    pub width: Option<u16>,
+    pub height: Option<u16>,
+    pub theme: Option<super::ThemeArg>,
+}
+
 impl Cli {
     /// Compute the effective sort order, considering --top (implies desc) and --tail (implies asc).
     pub fn effective_sort(&self) -> Option<SortOrder> {
@@ -45,6 +72,29 @@ impl Cli {
             agg: self.agg.map(|a| a.to_agg_function()),
         }
     }
+
+    /// Convert CLI flags into [`PipelineParams`]: the `Query` seam plus the
+    /// other resolved render inputs. Sole funnel for `Cli → pipeline`.
+    pub fn to_pipeline_params(&self) -> PipelineParams {
+        let query = self.to_query();
+        PipelineParams {
+            query,
+            filters: self.filter.clone(),
+            sample: self.sample,
+            info: self.info,
+            all_y: self.all_y,
+            output: self.output,
+            sort: self.effective_sort(),
+            sort_flag: self.sort.map(|s| s.to_sort_order()),
+            limit: self.top.or(self.tail),
+            bins: self.bins,
+            title: self.title.clone(),
+            labels: self.labels,
+            width: self.width,
+            height: self.height,
+            theme: self.theme,
+        }
+    }
 }
 
 /// Parse a column spec that may include a label override.
@@ -83,6 +133,21 @@ mod tests {
             after.contains("summary and warnings go to stderr"),
             "{after}"
         );
+    }
+
+    #[test]
+    fn test_to_pipeline_params_resolves_render_inputs() {
+        let cli = Cli::try_parse_from(["vz", "data.csv", "--top", "3", "--agg", "mean"]).unwrap();
+        let params = cli.to_pipeline_params();
+        assert_eq!(params.query.x_col, None);
+        assert_eq!(
+            params.query.agg,
+            Some(crate::chart::selector::AggFunction::Mean)
+        );
+        assert_eq!(params.sort, Some(SortOrder::Desc));
+        assert_eq!(params.limit, Some(3));
+        assert_eq!(params.sample, None);
+        assert!(!params.info);
     }
 
     #[test]

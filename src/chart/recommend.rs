@@ -4,9 +4,10 @@
 //! adjust_bar_recommendation, effective_agg, parse_y_options, YOptions}`.
 //! Plan note: the app-plane adapters (`build_recommendation`,
 //! `effective_agg`) take the Cli-free [`Query`] and return [`Warnings`]
-//! instead of printing; only the `Cli → Query` conversion lives in the app
-//! plan (`cli::args::query_from_cli`). The pure core is (`select_chart`,
-//! `adjust_bar_recommendation`, `validate_extra_y_columns`).
+//! instead of printing; the only `Cli → Query` conversion lives in the app
+//! plane (`Cli::to_query` / `Cli::to_pipeline_params`). The pure core is
+//! (`select_chart`, `adjust_bar_recommendation`,
+//! `validate_extra_y_columns`).
 
 use anyhow::Result;
 

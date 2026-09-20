@@ -4,7 +4,7 @@ use anyhow::Result;
 use std::path::Path;
 
 use crate::chart::{ChartRecommendation, recommend};
-use crate::cli::{self, Cli};
+use crate::cli::{self, Cli, PipelineParams};
 use crate::filter::apply_filters;
 use crate::infer;
 use crate::infer::types::Schema;
@@ -45,10 +45,17 @@ pub fn infer_from_data(data: &LoadedData) -> Schema {
 
 /// Shared post-load pipeline: filter → sample → validate → infer → render.
 /// Used by both single-file and directory modes.
-pub fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
+///
+/// Takes the resolved [`PipelineParams`] (app plane builds it once via
+/// `Cli::to_pipeline_params`); pure per-output resolution happens inside.
+pub fn render_data(params: &PipelineParams, data: LoadedData, file: &Path) -> Result<()> {
     let pre_filter_count = data.rows.len();
-    let data = apply_filters(data, &cli.filter)?;
-    let data = if let Some(max_rows) = cli.sample {
+    let outcome = apply_filters(data, &params.filters)?;
+    if let Some(notice) = outcome.notice {
+        eprintln!("{notice}");
+    }
+    let data = outcome.data;
+    let data = if let Some(max_rows) = params.sample {
         if max_rows == 0 {
             anyhow::bail!("--sample must be at least 1");
         }
@@ -57,15 +64,15 @@ pub fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
         data
     };
 
-    validate_loaded_data(&data, file, &cli.filter, pre_filter_count)?;
+    validate_loaded_data(&data, file, &params.filters, pre_filter_count)?;
 
     // Validate -c column exists in the loaded data
-    validate_color_column(&data.headers, cli.color_col.as_deref())?;
+    validate_color_column(&data.headers, params.query.color_col.as_deref())?;
 
     let schema = infer_from_data(&data);
 
-    if cli.info {
-        if cli.output == Some(cli::OutputFormat::Json) {
+    if params.info {
+        if params.output == Some(cli::OutputFormat::Json) {
             crate::info::print_info_json(file, &data, &schema)?;
         } else {
             crate::info::print_info(file, &data, &schema);
@@ -73,29 +80,34 @@ pub fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
         return Ok(());
     }
 
-    let query = cli.to_query();
+    let query = &params.query;
     let mut y_opts = recommend::parse_y_options(query.y_col.as_deref());
-    let (recommendation, warnings) = recommend::build_recommendation(&query, &schema, &y_opts)?;
+    let (recommendation, warnings) = recommend::build_recommendation(query, &schema, &y_opts)?;
     for w in warnings.0 {
         eprintln!("{w}");
     }
-    if cli.all_y {
+    if params.all_y {
         expand_all_y(&recommendation, &schema, &mut y_opts);
     }
 
-    if cli.output == Some(cli::OutputFormat::Json) {
-        print_chart_json(file, &data, &schema, &recommendation, cli, &y_opts)?;
+    if params.output == Some(cli::OutputFormat::Json) {
+        print_chart_json(file, &data, &schema, &recommendation, params, &y_opts)?;
         return Ok(());
     }
 
     dispatch_output(
-        cli,
+        params,
         &recommendation,
         &data.headers,
         &data.rows,
         &y_opts,
         &schema,
     )
+}
+
+/// Cli adapter for [`render_data`]: converts once, then delegates.
+pub fn render_data_from_cli(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
+    render_data(&cli.to_pipeline_params(), data, file)
 }
 
 /// Validate that loaded data is non-empty and produce clear error messages.
@@ -145,51 +157,50 @@ pub(crate) fn validate_color_column(headers: &[String], color_col: Option<&str>)
     Ok(())
 }
 
-/// Dispatch to the appropriate output renderer based on CLI flags.
+/// Dispatch to the appropriate output renderer based on resolved params.
 fn dispatch_output(
-    cli: &Cli,
+    params: &PipelineParams,
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
     y_opts: &recommend::YOptions,
     schema: &Schema,
 ) -> Result<()> {
-    match cli.output {
+    let query = &params.query;
+    match params.output {
         Some(cli::OutputFormat::Table) => {
-            let query = cli.to_query();
-            let params = output::table::TableParams {
-                chart_type_override: cli.chart_type,
-                agg: recommend::effective_agg(&query, recommendation, schema),
-                sort: cli.effective_sort(),
-                limit: cli.top.or(cli.tail),
-                sort_flag: cli.sort.map(|s| s.to_sort_order()),
+            let out_params = output::table::TableParams {
+                chart_type_override: query.chart_type,
+                agg: recommend::effective_agg(query, recommendation, schema),
+                sort: params.sort,
+                limit: params.limit,
+                sort_flag: params.sort_flag,
             };
-            output::table::print_table(recommendation, headers, rows, &params, schema)?;
+            output::table::print_table(recommendation, headers, rows, &out_params, schema)?;
         }
         Some(cli::OutputFormat::Spark) => {
-            print_spark(recommendation, headers, rows, cli, schema, y_opts);
+            print_spark(recommendation, headers, rows, params, schema, y_opts);
         }
         Some(cli::OutputFormat::Svg) => {
-            let opts = oneshot::RenderOptions::from_cli(cli, y_opts, recommendation, schema);
+            let opts = oneshot::RenderOptions::from_params(params, y_opts, recommendation, schema);
             output::svg::print_svg(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Html) => {
-            let opts = oneshot::RenderOptions::from_cli(cli, y_opts, recommendation, schema);
+            let opts = oneshot::RenderOptions::from_params(params, y_opts, recommendation, schema);
             output::html::print_html(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Markdown) => {
-            let query = cli.to_query();
-            let params = output::table::TableParams {
-                chart_type_override: cli.chart_type,
-                agg: recommend::effective_agg(&query, recommendation, schema),
-                sort: cli.effective_sort(),
-                limit: cli.top.or(cli.tail),
-                sort_flag: cli.sort.map(|s| s.to_sort_order()),
+            let out_params = output::table::TableParams {
+                chart_type_override: query.chart_type,
+                agg: recommend::effective_agg(query, recommendation, schema),
+                sort: params.sort,
+                limit: params.limit,
+                sort_flag: params.sort_flag,
             };
-            output::markdown::print_markdown(recommendation, headers, rows, &params, schema)?;
+            output::markdown::print_markdown(recommendation, headers, rows, &out_params, schema)?;
         }
         _ => {
-            let opts = oneshot::RenderOptions::from_cli(cli, y_opts, recommendation, schema);
+            let opts = oneshot::RenderOptions::from_params(params, y_opts, recommendation, schema);
             oneshot::render_oneshot(recommendation, headers, rows, &opts)?;
         }
     }
@@ -201,24 +212,24 @@ fn print_spark(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
-    cli: &Cli,
+    params: &PipelineParams,
     schema: &Schema,
     y_opts: &recommend::YOptions,
 ) {
-    let params = output::spark::SparkParams {
-        chart_type_override: cli.chart_type,
-        agg: recommend::effective_agg(&cli.to_query(), recommendation, schema),
-        sort: cli.effective_sort(),
-        limit: cli.top.or(cli.tail),
-        color_col: cli.color_col.clone(),
-        bins: cli.bins,
+    let out_params = output::spark::SparkParams {
+        chart_type_override: params.query.chart_type,
+        agg: recommend::effective_agg(&params.query, recommendation, schema),
+        sort: params.sort,
+        limit: params.limit,
+        color_col: params.query.color_col.clone(),
+        bins: params.bins,
         extra_y_columns: y_opts
             .extra_columns
             .iter()
             .map(|(n, _)| n.clone())
             .collect(),
     };
-    output::spark::print_spark(recommendation, headers, rows, &params);
+    output::spark::print_spark(recommendation, headers, rows, &out_params);
 }
 
 /// Expand `--all-y`: add all remaining quantitative columns to extra_y.
@@ -246,22 +257,23 @@ fn print_chart_json(
     data: &LoadedData,
     schema: &Schema,
     recommendation: &ChartRecommendation,
-    cli: &Cli,
+    params: &PipelineParams,
     y_opts: &recommend::YOptions,
 ) -> anyhow::Result<()> {
-    let params = output::chart_json::ChartJsonParams {
-        chart_type: cli
+    let out_params = output::chart_json::ChartJsonParams {
+        chart_type: params
+            .query
             .chart_type
             .map(|ct| ct.to_chart_type())
             .unwrap_or(recommendation.chart_type),
-        sort: cli.effective_sort(),
-        agg: recommend::effective_agg(&cli.to_query(), recommendation, schema),
-        limit: cli.top.or(cli.tail),
+        sort: params.sort,
+        agg: recommend::effective_agg(&params.query, recommendation, schema),
+        limit: params.limit,
         extra_y_columns: y_opts.extra_columns.clone(),
-        color_column: cli.color_col.clone(),
-        bins: cli.bins,
-        filters: cli.filter.clone(),
-        sample: cli.sample,
+        color_column: params.query.color_col.clone(),
+        bins: params.bins,
+        filters: params.filters.clone(),
+        sample: params.sample,
     };
     output::chart_json::print_chart_json(
         file,
@@ -270,7 +282,7 @@ fn print_chart_json(
         recommendation,
         &data.headers,
         &data.rows,
-        &params,
+        &out_params,
     )
 }
 
@@ -287,6 +299,22 @@ mod tests {
                 .map(|r| r.iter().map(|s| s.to_string()).collect())
                 .collect(),
         }
+    }
+
+    #[test]
+    fn render_data_params_take_query_not_cli() {
+        use clap::Parser as _;
+        // RED: pipeline must accept resolved params (no &Cli) and honor them.
+        let cli =
+            crate::cli::Cli::try_parse_from(["vz", "data.csv", "-x", "city", "-t", "bar"]).unwrap();
+        let params = cli.to_pipeline_params();
+        assert_eq!(params.query.x_col.as_deref(), Some("city"));
+        let data = loaded(
+            &["city", "revenue"],
+            &[&["Tokyo", "100"], &["Osaka", "200"]],
+        );
+        let dir = std::env::temp_dir();
+        assert!(render_data(&params, data, &dir.join("probe.csv")).is_ok());
     }
 
     #[test]

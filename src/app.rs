@@ -79,7 +79,11 @@ fn dispatch(cli: &Cli) -> Result<()> {
                 } else {
                     loader::load_data(path)?
                 };
-                let data = apply_filters(data, filter)?;
+                let outcome = apply_filters(data, filter)?;
+                if let Some(notice) = outcome.notice {
+                    eprintln!("{notice}");
+                }
+                let data = outcome.data;
                 let schema = pipeline::infer_from_data(&data);
                 explore::run_explore(schema, data.rows, resolve_theme(cli))?;
             }
@@ -177,5 +181,5 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
     }
 
     let data = loader::load_data_full(file, cli.no_header, format_override(cli))?;
-    pipeline::render_data(cli, data, file)
+    pipeline::render_data_from_cli(cli, data, file)
 }

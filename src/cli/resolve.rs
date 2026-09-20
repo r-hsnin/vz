@@ -13,7 +13,12 @@ use crate::theme;
 
 /// Resolve the theme from CLI args.
 pub fn resolve_theme(cli: &Cli) -> theme::Theme {
-    match cli.theme {
+    resolve_theme_arg(cli.theme)
+}
+
+/// Resolve the theme from an already-extracted theme arg (Cli-free).
+pub fn resolve_theme_arg(arg: Option<ThemeArg>) -> theme::Theme {
+    match arg {
         Some(ThemeArg::Light) => theme::Theme::light(),
         Some(ThemeArg::HighContrast) => theme::Theme::high_contrast(),
         _ => theme::Theme::dark(),

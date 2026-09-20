@@ -182,13 +182,21 @@ fn matches_row(row: &[String], col_idx: usize, op: &FilterOp, value: &str) -> bo
     }
 }
 
+/// Result of [`apply_filters`]: the filtered data plus the `info:` notice
+/// that used to print inline. Callers print the notice at the edge.
+#[derive(Debug)]
+pub struct FilterOutcome {
+    pub data: LoadedData,
+    pub notice: Option<String>,
+}
+
 /// Parse and apply `--where` filters to loaded data.
 ///
-/// Empty filter lists return the data unchanged. Reports the filter result to
-/// stderr so users see what was excluded.
-pub fn apply_filters(data: LoadedData, filters: &[String]) -> Result<LoadedData> {
+/// Empty filter lists return the data unchanged with no notice. The
+/// `info: filtered N/M rows (...)` notice is returned (not printed).
+pub fn apply_filters(data: LoadedData, filters: &[String]) -> Result<FilterOutcome> {
     if filters.is_empty() {
-        return Ok(data);
+        return Ok(FilterOutcome { data, notice: None });
     }
     let original_count = data.rows.len();
     let predicates: Vec<Predicate> = filters
@@ -196,13 +204,16 @@ pub fn apply_filters(data: LoadedData, filters: &[String]) -> Result<LoadedData>
         .map(|expr| parse_predicate(expr))
         .collect::<Result<Vec<_>>>()?;
     let filtered = filter_data(data, &predicates)?;
-    eprintln!(
+    let notice = format!(
         "info: filtered {}/{} rows ({})",
         filtered.rows.len(),
         original_count,
         filters.join(" & ")
     );
-    Ok(filtered)
+    Ok(FilterOutcome {
+        data: filtered,
+        notice: Some(notice),
+    })
 }
 
 #[cfg(test)]
@@ -219,8 +230,9 @@ mod tests {
             ],
         };
         let filters: Vec<String> = vec![];
-        let result = apply_filters(data, &filters).unwrap();
-        assert_eq!(result.rows.len(), 2);
+        let outcome = apply_filters(data, &filters).unwrap();
+        assert_eq!(outcome.data.rows.len(), 2);
+        assert_eq!(outcome.notice, None);
     }
 
     #[test]
@@ -234,9 +246,13 @@ mod tests {
             ],
         };
         let filters = vec!["city=Tokyo".to_string()];
-        let result = apply_filters(data, &filters).unwrap();
-        assert_eq!(result.rows.len(), 2);
-        assert!(result.rows.iter().all(|r| r[0] == "Tokyo"));
+        let outcome = apply_filters(data, &filters).unwrap();
+        assert_eq!(outcome.data.rows.len(), 2);
+        assert!(outcome.data.rows.iter().all(|r| r[0] == "Tokyo"));
+        assert_eq!(
+            outcome.notice.as_deref(),
+            Some("info: filtered 2/3 rows (city=Tokyo)")
+        );
     }
 
     #[test]
