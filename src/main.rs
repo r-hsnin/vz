@@ -6,7 +6,7 @@ use std::path::Path;
 use vz::cli::{self, Cli, Command, format_override, resolve_input_file, resolve_theme};
 use vz::diagnostics;
 use vz::directory;
-use vz::helpers::apply_filters;
+use vz::filter::apply_filters;
 use vz::loader;
 use vz::pipeline;
 use vz::watch;

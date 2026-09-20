@@ -5,9 +5,9 @@ use std::path::Path;
 
 use crate::chart::ChartRecommendation;
 use crate::cli::{self, Cli};
+use crate::filter::apply_filters;
 use crate::helpers::{
-    YOptions, apply_filters, build_recommendation, build_render_options, effective_agg,
-    parse_y_options,
+    YOptions, build_recommendation, build_render_options, effective_agg, parse_y_options,
 };
 use crate::infer;
 use crate::infer::types::Schema;

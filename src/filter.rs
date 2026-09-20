@@ -182,9 +182,73 @@ fn matches_row(row: &[String], col_idx: usize, op: &FilterOp, value: &str) -> bo
     }
 }
 
+/// Parse and apply `--where` filters to loaded data.
+///
+/// Empty filter lists return the data unchanged. Reports the filter result to
+/// stderr so users see what was excluded.
+pub fn apply_filters(data: LoadedData, filters: &[String]) -> Result<LoadedData> {
+    if filters.is_empty() {
+        return Ok(data);
+    }
+    let original_count = data.rows.len();
+    let predicates: Vec<Predicate> = filters
+        .iter()
+        .map(|expr| parse_predicate(expr))
+        .collect::<Result<Vec<_>>>()?;
+    let filtered = filter_data(data, &predicates)?;
+    eprintln!(
+        "info: filtered {}/{} rows ({})",
+        filtered.rows.len(),
+        original_count,
+        filters.join(" & ")
+    );
+    Ok(filtered)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn apply_filters_empty_filters_returns_unchanged() {
+        let data = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "100".into()],
+                vec!["Osaka".into(), "200".into()],
+            ],
+        };
+        let filters: Vec<String> = vec![];
+        let result = apply_filters(data, &filters).unwrap();
+        assert_eq!(result.rows.len(), 2);
+    }
+
+    #[test]
+    fn apply_filters_single_equality_filter() {
+        let data = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "100".into()],
+                vec!["Osaka".into(), "200".into()],
+                vec!["Tokyo".into(), "300".into()],
+            ],
+        };
+        let filters = vec!["city=Tokyo".to_string()];
+        let result = apply_filters(data, &filters).unwrap();
+        assert_eq!(result.rows.len(), 2);
+        assert!(result.rows.iter().all(|r| r[0] == "Tokyo"));
+    }
+
+    #[test]
+    fn apply_filters_invalid_filter_returns_error() {
+        let data = LoadedData {
+            headers: vec!["city".into()],
+            rows: vec![],
+        };
+        let filters = vec!["no_operator_here".to_string()];
+        let result = apply_filters(data, &filters);
+        assert!(result.is_err());
+    }
 
     #[test]
     fn test_parse_predicate_eq() {

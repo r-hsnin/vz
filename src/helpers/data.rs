@@ -1,32 +1,11 @@
-use anyhow::Result;
-
+use crate::chart;
 use crate::cli::{self, Cli};
 use crate::infer::types::Schema;
-use crate::loader::LoadedData;
-use crate::{chart, filter};
 
 use super::args::YOptions;
+use anyhow::Result;
 
-/// Parse and apply --where filters to loaded data.
-pub fn apply_filters(data: LoadedData, filters: &[String]) -> Result<LoadedData> {
-    if filters.is_empty() {
-        return Ok(data);
-    }
-    let original_count = data.rows.len();
-    let predicates: Vec<filter::Predicate> = filters
-        .iter()
-        .map(|expr| filter::parse_predicate(expr))
-        .collect::<Result<Vec<_>>>()?;
-    let filtered = filter::filter_data(data, &predicates)?;
-    eprintln!(
-        "info: filtered {}/{} rows ({})",
-        filtered.rows.len(),
-        original_count,
-        filters.join(" & ")
-    );
-    Ok(filtered)
-}
-
+/// Build the chart recommendation from CLI hints and schema.
 pub fn build_recommendation(
     cli: &Cli,
     schema: &Schema,
@@ -132,54 +111,10 @@ mod tests {
     use crate::chart::selector::ChartType;
     use crate::cli::Cli;
     use crate::infer::types::DataType;
-    use crate::loader::LoadedData;
     use crate::test_helpers::{make_recommendation, make_schema};
     use clap::Parser;
 
     use super::super::args::parse_y_options;
-
-    // --- apply_filters ---
-
-    #[test]
-    fn apply_filters_empty_filters_returns_unchanged() {
-        let data = LoadedData {
-            headers: vec!["city".into(), "revenue".into()],
-            rows: vec![
-                vec!["Tokyo".into(), "100".into()],
-                vec!["Osaka".into(), "200".into()],
-            ],
-        };
-        let filters: Vec<String> = vec![];
-        let result = apply_filters(data, &filters).unwrap();
-        assert_eq!(result.rows.len(), 2);
-    }
-
-    #[test]
-    fn apply_filters_single_equality_filter() {
-        let data = LoadedData {
-            headers: vec!["city".into(), "revenue".into()],
-            rows: vec![
-                vec!["Tokyo".into(), "100".into()],
-                vec!["Osaka".into(), "200".into()],
-                vec!["Tokyo".into(), "300".into()],
-            ],
-        };
-        let filters = vec!["city=Tokyo".to_string()];
-        let result = apply_filters(data, &filters).unwrap();
-        assert_eq!(result.rows.len(), 2);
-        assert!(result.rows.iter().all(|r| r[0] == "Tokyo"));
-    }
-
-    #[test]
-    fn apply_filters_invalid_filter_returns_error() {
-        let data = LoadedData {
-            headers: vec!["city".into()],
-            rows: vec![],
-        };
-        let filters = vec!["no_operator_here".to_string()];
-        let result = apply_filters(data, &filters);
-        assert!(result.is_err());
-    }
 
     // --- adjust_bar_recommendation ---
 
