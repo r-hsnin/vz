@@ -186,6 +186,12 @@ cargo bench -- --baseline before
 - Keep functions under 50 lines where possible
 - Keep files focused and under 800 lines
 - Use descriptive names; no abbreviations in public APIs
+- **Planes first**: put new logic in its owning plane
+  ([ARCHITECTURE.md](docs/ARCHITECTURE.md#planes-and-dependency-rules)).
+  Data/output code takes plain `*Params` structs, never `&Cli`;
+  `println!/eprintln!` stays at the app-plane edge.
+- Do not add `pub mod` to `src/lib.rs` (default `pub(crate)`) or new files
+  under `src/helpers/` (it dissolves toward `cli`/`chart`/`filter`).
 
 ## Pull Request Checklist
 

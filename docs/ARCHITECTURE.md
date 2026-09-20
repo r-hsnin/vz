@@ -64,9 +64,68 @@ src/
 ├── sparkline.rs            — shared sparkline generation
 ├── util.rs                 — shared numeric utilities
 └── diagnostics.rs          — error hints & file suggestions
+```
 
 Unit tests live beside their module (`tests.rs` / `*_tests.rs`); end-to-end tests in `tests/`.
+
+## Planes and Dependency Rules
+
+Structural grouping; the reasons behind it live in
+[DESIGN.md](DESIGN.md#module-boundaries-intent-layout-lives-in-architecturemd).
+
+- **Data plane** (must be `Cli`-free, no stdout/stderr, no TUI loop):
+  `loader/`, `infer/`, `filter.rs`, `chart/`, `util.rs`, `sparkline.rs`,
+  pure parts of `insights.rs` / `info.rs` / `diagnostics.rs`.
+- **Render plane** (sole owner of cell geometry): `render/`
+  (`Buffer`/`Rect` layout; `SERIES_COLORS`, `ChartData`, `render_chart_data`).
+  `output/svg.rs` mirrors this geometry for the text-grid layer.
+- **Output plane** (headless producers + thin print wrappers): `output/`.
+- **App plane** (owns `Cli`, stdout/stderr, TUI loops, mode dispatch):
+  `main.rs`, `pipeline.rs`, `cli/`, `helpers/`, `oneshot/`, `diff/`,
+  `directory/`, `explore/`, `present/`, `watch.rs`.
+
+Allowed direction (enforced at L3 by crate split; today by review):
+
 ```
+app plane ──uses──▶ render/output planes ──uses──▶ data plane
+main.rs → pipeline/cli/helpers → {oneshot, diff, directory, explore, present, watch}
+        → chart/infer/loader/filter → util
+```
+
+Forbidden (compiler-unchecked today — do not add new instances):
+
+- `&Cli` parameters outside `cli/` + binary adapters. Known instances:
+  `pipeline::render_data` / `dispatch_output` helpers (`pipeline.rs`),
+  `diff::run_diff` (`diff/mod.rs`), `directory::run_directory`
+  (`directory/mod.rs`), `output/markdown.rs` + `output/table.rs`,
+  `diagnostics::error_hint`.
+- `println!/eprintln!` in data/render planes. Known instances:
+  `output/markdown.rs` + `output/table.rs` warnings,
+  `helpers/data.rs` recommendation notice. Precedent to copy:
+  `output/chart_json.rs` (`ChartJsonParams`) and `output/spark.rs`
+  (`SparkParams`) take plain params structs and keep printing at the edge.
+- `render/` geometry invented anywhere else; `ratatui` types in `output/`
+  public signatures (only `output/svg.rs` touches `Buffer`, via the shared
+  cell-geometry contract).
+
+### L3 Crate Mapping (target, not yet implemented)
+
+| Current `src/` path | Target crate | Notes |
+|---|---|---|
+| `loader/`, `infer/`, `filter.rs`, `util.rs`, `sparkline.rs` | `vz-core` | Move as-is; drop `Cli` uses on the way |
+| `chart/` (selector + data_builder) | `vz-core` | Canonical `ChartData` assembler lives here |
+| `render/` | `vz-core` | Keep ratatui inside; hide from public signatures |
+| `output/` | `vz-core` | Convert to `String`/value returns; print wrappers stay in bin |
+| `diff/compute.rs`, `diff/schema.rs` (+ pure types) | `vz-core` | `run_diff` CLI behavior stays in bin |
+| `diff/render/` | `vz` (bin) | TUI/CLI-coupled rendering |
+| `present/parser.rs` | `vz-core` | Markdown → `Presentation` only |
+| `present/` rest, `explore/`, `oneshot/`, `directory/` | `vz` (bin) | Mode dispatch + loops |
+| `pipeline.rs`, `helpers/`, `cli/`, `watch.rs` | `vz` (bin) | `Cli → Query` conversion in one adapter |
+| `theme.rs`, `insights.rs`, pure `info.rs`/`diagnostics.rs` | `vz-core` | `error_hint` CLI part stays in bin |
+| `tests/`, `tests/common`, `fixtures/`, `benches/` | workspace root | Shared; never copy per crate |
+
+At split time `release-manifest.txt` must change from `src/` to
+`crates/*/src` + `crates/*/Cargo.toml` (publication-scope change).
 
 ## Data Flow & Dependencies
 
@@ -96,11 +155,15 @@ structures before passing them to `render_chart_data()`:
 - `explore/mod.rs` — interactive column selection → ChartData construction
 - `present/chart_loader.rs` — Markdown chart block → ChartData
 
+Unification direction (see DESIGN.md decision 1): `oneshot/builders.rs` is the
+canonical assembler; the other two re-assemble the same chain inline (debt).
+
 Layering note: modes call into `pipeline::render_data` / `pipeline::infer_from_data`
-and `diff` column resolution (`diff::auto_x_column` et al.). This direction is
-intentional — `pipeline` and `diff::schema` are shared services, not layers above
-the modes. `pipeline` itself never depends on `diff` / `directory` / `present` /
-`explore`, so the module graph stays acyclic.
+and `diff` column resolution (`diff::auto_x_column` et al.). `pipeline` itself
+never depends on `diff` / `directory` / `present` / `explore`, so the module
+graph stays acyclic. `pipeline` is the app-plane orchestrator (it owns `Cli`);
+the `Cli`-free functions it calls (`infer_from_data`, `diff::schema`
+resolution) are the shared services that will move to `vz-core` at L3.
 
 ### Change Impact Map
 
@@ -118,5 +181,5 @@ the modes. `pipeline` itself never depends on `diff` / `directory` / `present` /
 ## Performance Characteristics
 
 - Data is processed in-memory; files up to ~1GB are fine
-- Type inference samples the first 100 rows
+- Type inference samples 100 evenly spaced rows (head→tail); see DESIGN.md
 - No streaming mode; the entire file is loaded before rendering
