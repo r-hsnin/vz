@@ -190,10 +190,12 @@ cargo bench -- --baseline before
   ([ARCHITECTURE.md](docs/ARCHITECTURE.md#planes-and-dependency-rules)).
   Data/output code takes plain `*Params` structs, never `&Cli`;
   `println!/eprintln!` stays at the app-plane edge.
-- Do not add `pub mod` to `src/lib.rs` (default `pub(crate)`).
-  `src/helpers/` was dissolved in Phase 1 (`resolve_*`→`cli/resolve.rs`,
-  `build_*/parse_*`→`chart/recommend.rs`, `apply_filters`→`filter.rs`) —
-  do not recreate it; put new logic in its owning plane.
+- Public surface is narrow by design (`lib.rs`: `chart`, `cli`, `filter`,
+  `infer`, `loader`, `theme`, `util`, `run`, `apply_output_shorthands`,
+  `infer_from_data`). New modules default to `pub(crate)` or private;
+  do not add `pub mod` without a data-plane reuse case.
+  `src/helpers/` was dissolved in Phase 1 and must not be recreated;
+  put new logic in its owning plane.
 
 ## Pull Request Checklist
 

@@ -41,29 +41,35 @@ Design intent and rationale live in [DESIGN.md](DESIGN.md).
 
 ```
 src/
-├── main.rs                 — binary entry, CLI dispatch
-├── lib.rs                  — library crate re-exports (for benches/tests)
-├── pipeline.rs             — render pipeline: infer → select → build → render → output
+├── main.rs                 — thin binary entry (parse → apply_output_shorthands → run)
+├── app.rs                  — binary dispatch (owns Cli end-to-end; private to crate)
+├── lib.rs                  — narrow surface: data-plane modules + run/Cli/infer_from_data
+├── pipeline.rs             — render pipeline: infer → select → build → render → output (crate-private)
 ├── cli/                    — clap definitions + Cli-derived resolutions (mod.rs, args.rs, types.rs, resolve.rs)
 ├── loader/                 — CSV/TSV/JSON/NDJSON/space unified loader, format auto-detect
 ├── filter.rs               — --where predicate engine + apply_filters
 ├── infer/                  — type inference (types.rs: Schema/ColumnMeta, detector.rs)
-├── chart/                  — selector.rs (types → chart), data_builder.rs (rows → chart data), recommend.rs (CLI hints → recommendation)
-├── render/                 — ratatui widgets: line, bar, scatter, histogram, heatmap, nice_numbers
-├── oneshot/                — stdout rendering: builders, summary, ansi (+ RenderOptions::from_cli adapter)
-├── insights.rs             — plain-language takeaways (pure logic; oneshot stderr + JSON `insights` + diff)
-├── info.rs                 — --info column metadata
-├── output/                 — machine-readable exporters: chart_json, markdown, spark, stats_text, svg, html, table
-├── diff/                   — two-file comparison: schema, compute, render/{bar,line,spark,json,markdown,html}
-├── directory/              — directory mode: scanner, combiner, catalog, date_extract
-├── explore/                — interactive TUI: app, state, render, diff, diff_render
-├── present/                — slides: parser, render, chart_loader
-├── watch.rs                — --watch auto-redraw
+├── chart/                  — selector.rs (types → chart + AggFunction/SortOrder home), data_builder.rs (rows → chart data), recommend.rs (CLI hints → recommendation)
+├── render/                 — ratatui widgets: line, bar, scatter, histogram, heatmap, nice_numbers (crate-private)
+├── oneshot/                — stdout rendering: builders, summary, ansi (+ RenderOptions::from_cli adapter; crate-private)
+├── insights.rs             — plain-language takeaways (pure logic; oneshot stderr + JSON `insights` + diff; crate-private)
+├── info.rs                 — --info column metadata (crate-private)
+├── output/                 — machine-readable exporters: chart_json, markdown, spark, stats_text, svg, html, table (crate-private)
+├── diff/                   — two-file comparison: schema, compute, render/{bar,line,spark,json,markdown,html} (crate-private)
+├── directory/              — directory mode: scanner, combiner, catalog, date_extract (crate-private)
+├── explore/                — interactive TUI: app, state, render, diff, diff_render (crate-private)
+├── present/                — slides: parser, render, chart_loader (crate-private)
+├── watch.rs                — --watch auto-redraw (crate-private)
 ├── theme.rs                — color themes (dark/light/high-contrast)
-├── sparkline.rs            — shared sparkline generation
+├── sparkline.rs            — shared sparkline generation (crate-private)
 ├── util.rs                 — shared numeric utilities
-└── diagnostics.rs          — error hints & file suggestions
+└── diagnostics.rs          — error hints & file suggestions (crate-private)
 ```
+
+Public surface (`lib.rs`): `chart`, `cli`, `filter`, `infer`, `loader`,
+`theme`, `util`, `run`, `apply_output_shorthands`, `infer_from_data`
+(benches use the last). Everything else is `pub(crate)` or private —
+no `#[doc(hidden)]` compat layer (postcompat rebuild, no downstream).
 
 Unit tests live beside their module (`tests.rs` / `*_tests.rs`); end-to-end tests in `tests/`.
 
@@ -80,17 +86,20 @@ Structural grouping; the reasons behind it live in
   `output/svg.rs` mirrors this geometry for the text-grid layer.
 - **Output plane** (headless producers + thin print wrappers): `output/`.
 - **App plane** (owns `Cli`, stdout/stderr, TUI loops, mode dispatch):
-  `main.rs`, `pipeline.rs`, `cli/`, `oneshot/`, `diff/`,
-  `directory/`, `explore/`, `present/`, `watch.rs`.
+  `app.rs`, `pipeline.rs`, `cli/`, `oneshot/`, `diff/`,
+  `directory/`, `explore/`, `present/`, `watch.rs`, `main.rs` (thin entry).
   (`helpers/` was dissolved in Phase 1: `resolve_*`→`cli/resolve.rs`,
   `build_*/parse_*`→`chart/recommend.rs`, `apply_filters`→`filter.rs`,
   `build_render_options`→`oneshot::RenderOptions::from_cli`.)
+  `AggFunction`/`SortOrder` live in `chart::selector` (CLI spellings are
+  `AggFunctionArg`/`SortOrderArg` + `to_*` converters); all other modules
+  are `pub(crate)` or private.
 
 Allowed direction (enforced at L3 by crate split; today by review):
 
 ```
 app plane ──uses──▶ render/output planes ──uses──▶ data plane
-main.rs → pipeline/cli → {oneshot, diff, directory, explore, present, watch}
+app.rs → pipeline/cli → {oneshot, diff, directory, explore, present, watch}
         → chart/infer/loader/filter → util
 ```
 
@@ -136,7 +145,7 @@ At split time `release-manifest.txt` must change from `src/` to
 ## Data Flow & Dependencies
 
 ```
-main.rs ─── cli/        (parse args)
+app.rs ─── cli/        (parse args)
    │
    ├──────── loader/    (file → LoadedData{headers, rows})
    │
