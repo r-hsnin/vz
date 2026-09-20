@@ -144,7 +144,14 @@ fn apply_extra_y_columns(
         recommendation.color_column.as_deref(),
         headers,
     );
-    let raw_x: Vec<String> = rows
+    // Mirror the canonical base sampling exactly: for non-numeric X the
+    // coordinate is the sampled row index, so unsampled extra series would
+    // misalign with the base series and overrun its X span. The sampling
+    // notice is the base config's (`maybe_sample`); stay silent here.
+    let sampled = (rows.len() > data_builder::MAX_CHART_POINTS)
+        .then(|| data_builder::sample_rows(rows, data_builder::MAX_CHART_POINTS));
+    let effective_rows = sampled.as_deref().unwrap_or(rows);
+    let raw_x: Vec<String> = effective_rows
         .iter()
         .filter_map(|r| r.get(axes.x_idx).cloned())
         .collect();
@@ -158,7 +165,8 @@ fn apply_extra_y_columns(
             Some((idx, name))
         })
         .collect();
-    let extra = data_builder::build_multi_y_series(rows, axes.x_idx, &y_specs, x_is_non_numeric);
+    let extra =
+        data_builder::build_multi_y_series(effective_rows, axes.x_idx, &y_specs, x_is_non_numeric);
     data_builder::append_series_refit_y(config, extra);
 }
 
@@ -262,6 +270,73 @@ mod tests {
         let data = build_histogram_data(&rec, &headers, &rows);
         assert_eq!(data.values, vec![5.0, 7.0]);
         assert_eq!(data.x_label, "temperature");
+    }
+
+    #[test]
+    fn test_extra_y_series_share_base_sampling() {
+        use ratatui::layout::Rect;
+
+        // >MAX_CHART_POINTS rows with a non-numeric X: the base series is
+        // sampled (X = sampled row index), so the extra-Y series must be
+        // built from the same sampled rows or it misaligns and overruns.
+        let headers = vec![
+            "date".to_string(),
+            "revenue".to_string(),
+            "profit".to_string(),
+        ];
+        let rows: Vec<Vec<String>> = (0..data_builder::MAX_CHART_POINTS + 1)
+            .map(|i| {
+                vec![
+                    format!("2024-01-{:02}", i % 28 + 1),
+                    i.to_string(),
+                    (i * 2).to_string(),
+                ]
+            })
+            .collect();
+        let rec = ChartRecommendation {
+            chart_type: ChartType::Line,
+            x_column: "date".to_string(),
+            y_column: Some("revenue".to_string()),
+            color_column: None,
+        };
+        let opts = RenderOptions {
+            chart_type_override: None,
+            y_label_override: None,
+            width: None,
+            height: None,
+            sort_order: None,
+            extra_y_columns: vec![("profit".to_string(), None)],
+            limit: None,
+            agg: AggFunction::Sum,
+            title: None,
+            labels: false,
+            theme: crate::theme::Theme::dark(),
+            bins: None,
+        };
+        let config = build_line_scatter_config(
+            &rec,
+            &headers,
+            &rows,
+            &opts,
+            Rect::new(0, 0, 80, 24),
+            ChartType::Line,
+        );
+
+        assert_eq!(config.series.len(), 2);
+        let (base, extra) = (&config.series[0].data, &config.series[1].data);
+        assert_eq!(base.len(), data_builder::MAX_CHART_POINTS);
+        assert_eq!(
+            extra.len(),
+            base.len(),
+            "extra-Y must be built from the same sampled rows as the base series"
+        );
+        for (b, e) in base.iter().zip(extra) {
+            assert_eq!(e.0, b.0, "extra-Y X must match the base X coordinate");
+            assert!(
+                (e.1 - b.1 * 2.0).abs() < f64::EPSILON,
+                "extra-Y point must come from the same row as the base point"
+            );
+        }
     }
 
     #[test]

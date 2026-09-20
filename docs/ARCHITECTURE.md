@@ -207,7 +207,9 @@ categorical diff Bar annotation is unified since Phase 3-2 (values = after,
 labels = `label ▲ +20%`, signed-Δ sort/limit via `build_diff_bar_data`;
 color-by-direction stays at the edge — html green/red/gray, explore table
 Dir column). Bar post-aggregation and extra-Y span refit are unified since
-Phase 3-3; Line/Scatter/Histogram/Heatmap adapters only resolve their input
+Phase 3-3 (extra-Y series reuse the base config's sampled rows, so
+non-numeric X coordinates — the row index — stay aligned with the base
+series); Line/Scatter/Histogram/Heatmap adapters only resolve their input
 plane and derive titles on top of canonical calls.
 
 Known residual divergences (documented, intentional until decided otherwise):
