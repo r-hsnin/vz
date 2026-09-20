@@ -44,14 +44,13 @@ src/
 ├── main.rs                 — binary entry, CLI dispatch
 ├── lib.rs                  — library crate re-exports (for benches/tests)
 ├── pipeline.rs             — render pipeline: infer → select → build → render → output
-├── cli/                    — clap definitions (mod.rs, args.rs, types.rs)
-├── helpers/                — CLI arg processing, format detection, data transforms
+├── cli/                    — clap definitions + Cli-derived resolutions (mod.rs, args.rs, types.rs, resolve.rs)
 ├── loader/                 — CSV/TSV/JSON/NDJSON/space unified loader, format auto-detect
-├── filter.rs               — --where predicate engine
+├── filter.rs               — --where predicate engine + apply_filters
 ├── infer/                  — type inference (types.rs: Schema/ColumnMeta, detector.rs)
-├── chart/                  — selector.rs (types → chart), data_builder.rs (rows → chart data)
+├── chart/                  — selector.rs (types → chart), data_builder.rs (rows → chart data), recommend.rs (CLI hints → recommendation)
 ├── render/                 — ratatui widgets: line, bar, scatter, histogram, heatmap, nice_numbers
-├── oneshot/                — stdout rendering: builders, summary, ansi
+├── oneshot/                — stdout rendering: builders, summary, ansi (+ RenderOptions::from_cli adapter)
 ├── insights.rs             — plain-language takeaways (pure logic; oneshot stderr + JSON `insights` + diff)
 ├── info.rs                 — --info column metadata
 ├── output/                 — machine-readable exporters: chart_json, markdown, spark, stats_text, svg, html, table
@@ -81,14 +80,17 @@ Structural grouping; the reasons behind it live in
   `output/svg.rs` mirrors this geometry for the text-grid layer.
 - **Output plane** (headless producers + thin print wrappers): `output/`.
 - **App plane** (owns `Cli`, stdout/stderr, TUI loops, mode dispatch):
-  `main.rs`, `pipeline.rs`, `cli/`, `helpers/`, `oneshot/`, `diff/`,
+  `main.rs`, `pipeline.rs`, `cli/`, `oneshot/`, `diff/`,
   `directory/`, `explore/`, `present/`, `watch.rs`.
+  (`helpers/` was dissolved in Phase 1: `resolve_*`→`cli/resolve.rs`,
+  `build_*/parse_*`→`chart/recommend.rs`, `apply_filters`→`filter.rs`,
+  `build_render_options`→`oneshot::RenderOptions::from_cli`.)
 
 Allowed direction (enforced at L3 by crate split; today by review):
 
 ```
 app plane ──uses──▶ render/output planes ──uses──▶ data plane
-main.rs → pipeline/cli/helpers → {oneshot, diff, directory, explore, present, watch}
+main.rs → pipeline/cli → {oneshot, diff, directory, explore, present, watch}
         → chart/infer/loader/filter → util
 ```
 
@@ -98,10 +100,14 @@ Forbidden (compiler-unchecked today — do not add new instances):
   `pipeline::render_data` / `dispatch_output` helpers (`pipeline.rs`),
   `diff::run_diff` (`diff/mod.rs`), `directory::run_directory`
   (`directory/mod.rs`), `output/markdown.rs` + `output/table.rs`,
-  `diagnostics::error_hint`.
+  `diagnostics::error_hint`, `chart/recommend.rs` (`build_recommendation`,
+  `effective_agg`, `parse_y_options` — app-plane adapters parked in `chart/`
+  until the Phase 2 `Query` seam; see `recommend.rs` header).
 - `println!/eprintln!` in data/render planes. Known instances:
   `output/markdown.rs` + `output/table.rs` warnings,
-  `helpers/data.rs` recommendation notice. Precedent to copy:
+  `chart/recommend.rs` recommendation notices, `chart/data_builder.rs:325`,
+  `filter::apply_filters` info notice (kept with the function until Phase 2
+  separates notification from filtering). Precedent to copy:
   `output/chart_json.rs` (`ChartJsonParams`) and `output/spark.rs`
   (`SparkParams`) take plain params structs and keep printing at the edge.
 - `render/` geometry invented anywhere else; `ratatui` types in `output/`
@@ -113,14 +119,14 @@ Forbidden (compiler-unchecked today — do not add new instances):
 | Current `src/` path | Target crate | Notes |
 |---|---|---|
 | `loader/`, `infer/`, `filter.rs`, `util.rs`, `sparkline.rs` | `vz-core` | Move as-is; drop `Cli` uses on the way |
-| `chart/` (selector + data_builder) | `vz-core` | Canonical `ChartData` assembler lives here |
+| `chart/` (selector + data_builder + recommend) | `vz-core` | Canonical `ChartData` assembler lives here; `&Cli`-bound adapters in `recommend.rs` move to bin at Phase 2 |
 | `render/` | `vz-core` | Keep ratatui inside; hide from public signatures |
 | `output/` | `vz-core` | Convert to `String`/value returns; print wrappers stay in bin |
 | `diff/compute.rs`, `diff/schema.rs` (+ pure types) | `vz-core` | `run_diff` CLI behavior stays in bin |
 | `diff/render/` | `vz` (bin) | TUI/CLI-coupled rendering |
 | `present/parser.rs` | `vz-core` | Markdown → `Presentation` only |
 | `present/` rest, `explore/`, `oneshot/`, `directory/` | `vz` (bin) | Mode dispatch + loops |
-| `pipeline.rs`, `helpers/`, `cli/`, `watch.rs` | `vz` (bin) | `Cli → Query` conversion in one adapter |
+| `pipeline.rs`, `cli/`, `watch.rs` | `vz` (bin) | `Cli → Query` conversion in one adapter |
 | `theme.rs`, `insights.rs`, pure `info.rs`/`diagnostics.rs` | `vz-core` | `error_hint` CLI part stays in bin |
 | `tests/`, `tests/common`, `fixtures/`, `benches/` | workspace root | Shared; never copy per crate |
 
