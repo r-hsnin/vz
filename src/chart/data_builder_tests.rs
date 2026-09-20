@@ -450,6 +450,120 @@ fn test_build_diff_line_config_two_series_before_after() {
 }
 
 #[test]
+fn test_diff_direction_marker_delta_sign() {
+    assert_eq!(diff_direction_marker(200.0), "▲");
+    assert_eq!(diff_direction_marker(-150.0), "▼");
+    assert_eq!(diff_direction_marker(0.0), "─");
+}
+
+#[test]
+fn test_format_diff_change_pct_and_new() {
+    assert_eq!(format_diff_change(Some(20.0), 200.0), "▲ +20%");
+    assert_eq!(format_diff_change(Some(-10.0), -150.0), "▼ -10%");
+    assert_eq!(format_diff_change(Some(0.0), 0.0), "─ 0%");
+    assert_eq!(format_diff_change(None, 800.0), "▲ new");
+    assert_eq!(format_diff_change(None, -800.0), "▼ new");
+    assert_eq!(format_diff_change(None, 0.0), "─");
+}
+
+#[test]
+fn test_build_diff_bar_data_categorical_annotation() {
+    fn to_tuples(entries: &[crate::diff::DiffEntry]) -> Vec<(String, f64, Option<f64>, f64)> {
+        entries
+            .iter()
+            .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
+            .collect()
+    }
+    let entries = vec![
+        crate::diff::DiffEntry {
+            label: "Tokyo".to_string(),
+            before: 1000.0,
+            after: 1200.0,
+            delta: 200.0,
+            pct_change: Some(20.0),
+        },
+        crate::diff::DiffEntry {
+            label: "Osaka".to_string(),
+            before: 1500.0,
+            after: 1350.0,
+            delta: -150.0,
+            pct_change: Some(-10.0),
+        },
+        crate::diff::DiffEntry {
+            label: "Fukuoka".to_string(),
+            before: 600.0,
+            after: 600.0,
+            delta: 0.0,
+            pct_change: Some(0.0),
+        },
+        crate::diff::DiffEntry {
+            label: "New".to_string(),
+            before: 0.0,
+            after: 800.0,
+            delta: 800.0,
+            pct_change: None,
+        },
+    ];
+    let data = build_diff_bar_data(
+        &to_tuples(&entries),
+        None,
+        None,
+        "revenue".to_string(),
+        None,
+    );
+    assert_eq!(data.values, vec![1200.0, 1350.0, 600.0, 800.0]);
+    assert_eq!(
+        data.labels,
+        vec!["Tokyo ▲ +20%", "Osaka ▼ -10%", "Fukuoka ─ 0%", "New ▲ new",]
+    );
+    assert_eq!(data.y_label, "revenue");
+}
+
+#[test]
+fn test_build_diff_bar_data_sort_desc_signed_delta() {
+    fn to_tuples(entries: &[crate::diff::DiffEntry]) -> Vec<(String, f64, Option<f64>, f64)> {
+        entries
+            .iter()
+            .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
+            .collect()
+    }
+    let entries = vec![
+        crate::diff::DiffEntry {
+            label: "Nagoya".to_string(),
+            before: 800.0,
+            after: 950.0,
+            delta: 150.0,
+            pct_change: Some(18.75),
+        },
+        crate::diff::DiffEntry {
+            label: "Tokyo".to_string(),
+            before: 1000.0,
+            after: 1200.0,
+            delta: 200.0,
+            pct_change: Some(20.0),
+        },
+        crate::diff::DiffEntry {
+            label: "Osaka".to_string(),
+            before: 1500.0,
+            after: 1350.0,
+            delta: -150.0,
+            pct_change: Some(-10.0),
+        },
+    ];
+    // signed-Δ desc (oneshot/present/html contract): +200, +150, -150.
+    let data = build_diff_bar_data(
+        &to_tuples(&entries),
+        Some(crate::chart::selector::SortOrder::Desc),
+        Some(2),
+        "revenue".to_string(),
+        None,
+    );
+    assert_eq!(data.values, vec![1200.0, 950.0]);
+    assert_eq!(data.labels[0], "Tokyo ▲ +20%");
+    assert_eq!(data.labels[1], "Nagoya ▲ +19%");
+}
+
+#[test]
 fn test_build_histogram_skips_non_finite() {
     let rows = vec![
         vec!["10".to_string()],

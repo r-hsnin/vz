@@ -363,14 +363,20 @@ fn test_load_diff_chart_data_categorical() {
     if let Ok(crate::render::ChartData::Bar(bar)) = result {
         assert!(!bar.labels.is_empty());
         assert!(!bar.values.is_empty());
-        // Labels should contain diff annotations (▲ or ▼)
-        let has_annotation = bar
-            .labels
-            .iter()
-            .any(|l| l.contains('▲') || l.contains('▼') || l.contains('='));
+        // Canonical categorical-diff labels: "label ▲ +20%" (unchanged "─ 0%").
         assert!(
-            has_annotation,
+            bar.labels.iter().any(|l| l.contains('▲')),
             "Labels should have diff annotations: {:?}",
+            bar.labels
+        );
+        assert!(
+            bar.labels.iter().any(|l| l.contains("Tokyo ▲ +20%")),
+            "Canonical annotation must match data_builder contract: {:?}",
+            bar.labels
+        );
+        assert!(
+            bar.labels.iter().any(|l| l.contains("Fukuoka ─ 0%")),
+            "Unchanged entries use ─: {:?}",
             bar.labels
         );
     } else {

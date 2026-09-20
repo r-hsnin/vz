@@ -36,44 +36,32 @@ pub fn draw_diff_ui(frame: &mut Frame, app: &DiffExploreApp) {
 }
 
 fn render_diff_chart(frame: &mut Frame, app: &DiffExploreApp, area: ratatui::layout::Rect) {
-    use crate::render::{BarChartData, ChartData, ChartWidget};
+    use crate::render::{ChartData, ChartWidget};
 
     match &app.diff_data {
         DiffData::Categorical(result) => {
-            let entries = app.sorted_entries();
-            let labels: Vec<String> = entries
+            // Canonical categorical-diff bars; interactive sort state stays
+            // at the edge (explore sorts by |Δ|, not signed-Δ).
+            let mut entries = app.sorted_entries();
+            if entries.is_empty() {
+                entries = result.entries.iter().collect();
+            }
+            let tuples: Vec<(String, f64, Option<f64>, f64)> = entries
                 .iter()
-                .map(|e| {
-                    let dir = if e.delta > 0.0 {
-                        "▲"
-                    } else if e.delta < 0.0 {
-                        "▼"
-                    } else {
-                        "─"
-                    };
-                    let pct = e
-                        .pct_change
-                        .map(|p| format!("{:+.0}%", p))
-                        .unwrap_or_else(|| "new".to_string());
-                    format!("{} {} {}", e.label, dir, pct)
-                })
+                .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
                 .collect();
-            let values: Vec<f64> = entries.iter().map(|e| e.after).collect();
-
             let title = format!(
                 "Diff: {} by {} ({} vs {})",
                 result.y_column, result.x_column, app.before_name, app.after_name
             );
-
-            let bar_data = BarChartData {
-                labels,
-                values,
-                title: Some(title),
-                y_label: result.y_column.clone(),
-                show_labels: true,
-                series_colors: vec![],
-                axis_color: Some(app.theme.axis_color),
-            };
+            let mut bar_data = crate::chart::data_builder::build_diff_bar_data(
+                &tuples,
+                None,
+                None,
+                result.y_column.clone(),
+                Some(title),
+            );
+            bar_data.axis_color = Some(app.theme.axis_color);
             let chart_data = ChartData::Bar(bar_data);
             frame.render_widget(ChartWidget(&chart_data), area);
         }

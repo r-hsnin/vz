@@ -1,14 +1,12 @@
 use std::path::Path;
 
-use crate::chart::selector::SortOrder;
-use crate::cli::DiffParams;
-use crate::diff::{DiffEntry, DiffResult, DiffTimeSeries};
-
-use super::apply_sort_and_limit;
 use super::html::{print_diff_html, print_diff_line_html};
 use super::json::print_diff_line_json;
 use super::markdown::{print_diff_line_markdown, print_diff_markdown};
 use super::spark::{print_diff_line_spark, print_diff_spark};
+use crate::chart::selector::SortOrder;
+use crate::cli::DiffParams;
+use crate::diff::{DiffEntry, DiffResult, DiffTimeSeries};
 
 fn diff_params(sort: Option<SortOrder>, limit: Option<usize>) -> DiffParams {
     DiffParams {
@@ -68,25 +66,55 @@ fn test_diff_spark_format() {
 #[test]
 fn test_apply_sort_desc() {
     let entries = sample_entries();
-    let sorted = apply_sort_and_limit(Some(SortOrder::Desc), None, &entries);
-    assert_eq!(sorted[0].label, "Tokyo"); // delta +200
-    assert_eq!(sorted[1].label, "Nagoya"); // delta +150
-    assert_eq!(sorted[2].label, "Osaka"); // delta -150
+    let tuples: Vec<(String, f64, Option<f64>, f64)> = entries
+        .iter()
+        .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
+        .collect();
+    let data = crate::chart::data_builder::build_diff_bar_data(
+        &tuples,
+        Some(SortOrder::Desc),
+        None,
+        "revenue".into(),
+        None,
+    );
+    assert_eq!(data.labels[0], "Tokyo ▲ +20%"); // delta +200
+    assert_eq!(data.labels[1], "Nagoya ▲ +19%"); // delta +150
+    assert_eq!(data.labels[2], "Osaka ▼ -10%"); // delta -150
 }
 
 #[test]
 fn test_apply_sort_asc() {
     let entries = sample_entries();
-    let sorted = apply_sort_and_limit(Some(SortOrder::Asc), None, &entries);
-    assert_eq!(sorted[0].label, "Osaka"); // delta -150
+    let tuples: Vec<(String, f64, Option<f64>, f64)> = entries
+        .iter()
+        .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
+        .collect();
+    let data = crate::chart::data_builder::build_diff_bar_data(
+        &tuples,
+        Some(SortOrder::Asc),
+        None,
+        "revenue".into(),
+        None,
+    );
+    assert!(data.labels[0].starts_with("Osaka")); // delta -150
 }
 
 #[test]
 fn test_apply_top_limit() {
     let entries = sample_entries();
-    let sorted = apply_sort_and_limit(Some(SortOrder::Desc), Some(2), &entries);
-    assert_eq!(sorted.len(), 2);
-    assert_eq!(sorted[0].label, "Tokyo"); // highest delta
+    let tuples: Vec<(String, f64, Option<f64>, f64)> = entries
+        .iter()
+        .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
+        .collect();
+    let data = crate::chart::data_builder::build_diff_bar_data(
+        &tuples,
+        Some(SortOrder::Desc),
+        Some(2),
+        "revenue".into(),
+        None,
+    );
+    assert_eq!(data.labels.len(), 2);
+    assert_eq!(data.labels[0], "Tokyo ▲ +20%"); // highest delta
 }
 
 // --- render_diff_line tests ---

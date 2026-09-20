@@ -6,8 +6,6 @@ use crate::cli::DiffParams;
 use crate::diff::{DiffResult, DiffTimeSeries};
 use crate::render::format_number;
 
-use super::apply_sort_and_limit;
-
 /// Format percentage change as a ▲/▼/─ string.
 fn format_change(pct_change: Option<f64>, delta: f64) -> String {
     match pct_change {
@@ -32,19 +30,44 @@ pub(super) fn print_diff_markdown(
     _before_path: &Path,
     _after_path: &Path,
 ) {
-    let entries = apply_sort_and_limit(params.sort, params.limit, &diff.entries);
+    // Canonical sort/limit + direction labels; this edge keeps only the
+    // Markdown table layout.
+    let tuples: Vec<(String, f64, Option<f64>, f64)> = diff
+        .entries
+        .iter()
+        .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
+        .collect();
+    let data = crate::chart::data_builder::build_diff_bar_data(
+        &tuples,
+        params.sort,
+        params.limit,
+        diff.y_column.clone(),
+        None,
+    );
+    let by_label: std::collections::HashMap<&str, &crate::diff::DiffEntry> =
+        diff.entries.iter().map(|e| (e.label.as_str(), e)).collect();
 
     let x_col = escape_cell(&diff.x_column);
     println!("| {} | Before | After | Change |", x_col);
     println!("|---|---|---|---|");
 
-    for entry in &entries {
+    for (label_with_change, after) in data.labels.iter().zip(data.values.iter()) {
+        let mut parts = label_with_change.rsplitn(3, ' ');
+        let change = parts.next().unwrap_or("");
+        let marker = parts.next().unwrap_or("");
+        let label = parts.next().unwrap_or(label_with_change.as_str());
+        let change_str = if marker.is_empty() {
+            change.to_string()
+        } else {
+            format!("{marker} {change}")
+        };
+        let before = by_label.get(label).map(|e| e.before).unwrap_or(0.0);
         println!(
             "| {} | {} | {} | {} |",
-            escape_cell(&entry.label),
-            format_number(entry.before),
-            format_number(entry.after),
-            format_change(entry.pct_change, entry.delta),
+            escape_cell(label),
+            format_number(before),
+            format_number(*after),
+            change_str,
         );
     }
 

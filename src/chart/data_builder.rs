@@ -485,6 +485,86 @@ pub fn build_diff_line_config(
         label_color: Some(ratatui::style::Color::DarkGray),
     }
 }
+/// Direction marker for a diff delta: ▲ increase, ▼ decrease, ─ unchanged.
+pub fn diff_direction_marker(delta: f64) -> &'static str {
+    if delta > 0.0 {
+        "▲"
+    } else if delta < 0.0 {
+        "▼"
+    } else {
+        "─"
+    }
+}
+
+/// Formatted change suffix for categorical diff labels: pct when available
+/// (`▲ +20%` / `▼ -10%` / `─ 0%`), else the new-category marker (`▲ new` /
+/// `▼ new`) or plain `─` when nothing moved. Takes plain values (never
+/// `&DiffEntry`) so the data plane stays free of app-plane diff types.
+pub fn format_diff_change(pct_change: Option<f64>, delta: f64) -> String {
+    let direction = diff_direction_marker(delta);
+    match pct_change {
+        Some(pct) if pct > 0.0 => format!("{} +{:.0}%", direction, pct),
+        Some(pct) if pct < 0.0 => format!("{} {:.0}%", direction, pct),
+        Some(_) => format!("{} 0%", direction),
+        None if delta != 0.0 => format!("{} new", direction),
+        None => direction.to_string(),
+    }
+}
+
+/// Build a categorical diff `BarChartData`: values are the after figures,
+/// labels carry the direction annotation (`label ▲ +20%`). Sort/limit follow
+/// the signed-Δ oneshot/present/html contract (`--sort desc` = biggest
+/// increase first); callers keep a copy of the sorted entries when they need
+/// aligned colors (html). Takes plain value tuples (never `&DiffEntry`) so
+/// the data plane stays free of app-plane diff types.
+pub fn build_diff_bar_data(
+    entries: &[(String, f64, Option<f64>, f64)],
+    sort: Option<crate::chart::selector::SortOrder>,
+    limit: Option<usize>,
+    y_label: String,
+    title: Option<String>,
+) -> BarChartData {
+    let mut idx: Vec<usize> = (0..entries.len()).collect();
+    match sort {
+        Some(crate::chart::selector::SortOrder::Desc) => {
+            idx.sort_by(|a, b| {
+                entries[*b]
+                    .3
+                    .partial_cmp(&entries[*a].3)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
+        Some(crate::chart::selector::SortOrder::Asc) => {
+            idx.sort_by(|a, b| {
+                entries[*a]
+                    .3
+                    .partial_cmp(&entries[*b].3)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
+        _ => {}
+    }
+    if let Some(n) = limit {
+        idx.truncate(n);
+    }
+    let labels: Vec<String> = idx
+        .iter()
+        .map(|&i| {
+            let (label, _, pct_change, delta) = &entries[i];
+            format!("{} {}", label, format_diff_change(*pct_change, *delta))
+        })
+        .collect();
+    let values: Vec<f64> = idx.iter().map(|&i| entries[i].1).collect();
+    BarChartData {
+        title,
+        labels,
+        values,
+        y_label,
+        show_labels: false,
+        series_colors: vec![],
+        axis_color: None,
+    }
+}
 /// Each (y_idx, label) pair produces one Series.
 pub fn build_multi_y_series(
     rows: &[Vec<String>],

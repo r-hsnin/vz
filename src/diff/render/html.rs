@@ -8,10 +8,8 @@ use crate::cli::{DiffParams, resolve_theme_arg};
 use crate::diff::{DiffResult, DiffTimeSeries};
 use crate::oneshot::{self, fit_labels_to_width};
 use crate::output;
-use crate::render::{self, BarChartData, ChartData};
+use crate::render::{self, ChartData};
 use crate::util::path_label;
-
-use super::apply_sort_and_limit;
 
 /// Render categorical diff as an SVG bar chart wrapped in HTML.
 ///
@@ -25,20 +23,38 @@ pub(super) fn print_diff_html(
     let before_name = path_label(before_path);
     let after_name = path_label(after_path);
 
-    let entries = apply_sort_and_limit(params.sort, params.limit, &diff.entries);
-
     let theme = resolve_theme_arg(params.theme);
     let bg = theme.svg_background();
     let width = params.width.unwrap_or_else(oneshot::terminal_width);
     let height = params.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
 
-    // Color each bar by delta direction: green=increase, red=decrease, gray=unchanged
-    let colors: Vec<Color> = entries
+    // Canonical categorical-diff bars (after values + direction-annotated
+    // labels); color each bar by delta direction at the edge. Keep the
+    // sorted entries aligned so colors match the (possibly sorted) bars.
+    let mut tuples: Vec<(String, f64, Option<f64>, f64)> = diff
+        .entries
         .iter()
-        .map(|e| {
-            if e.delta > 0.0 {
+        .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
+        .collect();
+    match params.sort {
+        Some(crate::chart::selector::SortOrder::Desc) => {
+            tuples.sort_by(|a, b| b.3.partial_cmp(&a.3).unwrap_or(std::cmp::Ordering::Equal));
+        }
+        Some(crate::chart::selector::SortOrder::Asc) => {
+            tuples.sort_by(|a, b| a.3.partial_cmp(&b.3).unwrap_or(std::cmp::Ordering::Equal));
+        }
+        _ => {}
+    }
+    if let Some(n) = params.limit {
+        tuples.truncate(n);
+    }
+    // Color each bar by delta direction: green=increase, red=decrease, gray=unchanged
+    let colors: Vec<Color> = tuples
+        .iter()
+        .map(|(_, _, _, delta)| {
+            if *delta > 0.0 {
                 Color::Green
-            } else if e.delta < 0.0 {
+            } else if *delta < 0.0 {
                 Color::Red
             } else {
                 Color::DarkGray
@@ -46,15 +62,15 @@ pub(super) fn print_diff_html(
         })
         .collect();
 
-    let bar_data = BarChartData {
-        title: Some(format!("{} vs {}", before_name, after_name)),
-        labels: entries.iter().map(|e| e.label.clone()).collect(),
-        values: entries.iter().map(|e| e.after).collect(),
-        y_label: diff.y_column.clone(),
-        show_labels: true,
-        series_colors: colors,
-        axis_color: Some(Color::DarkGray),
-    };
+    let mut bar_data = crate::chart::data_builder::build_diff_bar_data(
+        &tuples,
+        None,
+        None,
+        diff.y_column.clone(),
+        Some(format!("{} vs {}", before_name, after_name)),
+    );
+    bar_data.series_colors = colors;
+    bar_data.axis_color = Some(Color::DarkGray);
 
     let area = Rect::new(0, 0, width, height);
     let mut buf = Buffer::empty(area);

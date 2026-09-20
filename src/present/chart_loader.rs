@@ -94,74 +94,30 @@ fn load_diff_chart_data(
         config.label_color = Some(theme.label_color);
         Ok(ChartData::Line(config))
     } else {
-        // Categorical diff → bar chart with after values and annotated labels.
-        let mut diff = compute_diff(&before, &after, &x_col, &y_col)?;
-
-        // Apply sort/top from chart block.
-        if let Some(sort) = block.sort {
-            match sort {
-                crate::chart::selector::SortOrder::Desc => {
-                    diff.entries.sort_by(|a, b| {
-                        b.delta
-                            .partial_cmp(&a.delta)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    });
-                }
-                crate::chart::selector::SortOrder::Asc => {
-                    diff.entries.sort_by(|a, b| {
-                        a.delta
-                            .partial_cmp(&b.delta)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    });
-                }
-                _ => {}
-            }
-        } else if block.top.is_some() {
-            // Imply desc sort when top is specified.
-            diff.entries.sort_by(|a, b| {
-                b.delta
-                    .abs()
-                    .partial_cmp(&a.delta.abs())
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-        }
-        if let Some(n) = block.top {
-            diff.entries.truncate(n);
-        }
-
-        // Build bar chart: labels annotated with direction, values = after.
-        let labels: Vec<String> = diff
+        // Categorical diff → bar chart with after values and annotated
+        // labels (canonical assembler; sort/limit + theme stay at the edge).
+        let diff = compute_diff(&before, &after, &x_col, &y_col)?;
+        // `top:` implies desc sort (same funnel as `Cli::effective_sort`).
+        let sort = block
+            .sort
+            .or(block.top.map(|_| crate::chart::selector::SortOrder::Desc));
+        let tuples: Vec<(String, f64, Option<f64>, f64)> = diff
             .entries
             .iter()
-            .map(|e| {
-                let arrow = if e.delta > 0.0 {
-                    "▲"
-                } else if e.delta < 0.0 {
-                    "▼"
-                } else {
-                    "="
-                };
-                let pct = e
-                    .pct_change
-                    .map(|p| format!("{:+.0}%", p))
-                    .unwrap_or_default();
-                format!("{} {}{}", e.label, arrow, pct)
-            })
+            .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
             .collect();
-        let values: Vec<f64> = diff.entries.iter().map(|e| e.after).collect();
-
-        let bar_data = crate::render::BarChartData {
-            title: block
+        let mut bar_data = data_builder::build_diff_bar_data(
+            &tuples,
+            sort,
+            block.top,
+            y_col,
+            block
                 .title
                 .clone()
                 .or_else(|| Some(format!("Diff: {} vs {}", block.source, diff_source))),
-            labels,
-            values,
-            y_label: y_col,
-            show_labels: false,
-            series_colors: theme.series_colors.clone(),
-            axis_color: Some(theme.axis_color),
-        };
+        );
+        bar_data.series_colors = theme.series_colors.clone();
+        bar_data.axis_color = Some(theme.axis_color);
         Ok(ChartData::Bar(bar_data))
     }
 }

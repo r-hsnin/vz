@@ -13,9 +13,8 @@ mod tests;
 use anyhow::Result;
 use std::path::Path;
 
-use crate::chart::selector::SortOrder;
 use crate::cli::{self, DiffParams};
-use crate::diff::{DiffEntry, DiffResult, DiffTimeSeries};
+use crate::diff::{DiffResult, DiffTimeSeries};
 
 /// Render the diff result based on CLI output format.
 pub(crate) fn render_diff(
@@ -71,37 +70,4 @@ pub(crate) fn render_diff_line(
         }
     }
     Ok(())
-}
-
-/// Apply sort and limit (--top, --tail, --sort) to diff entries.
-pub(super) fn apply_sort_and_limit(
-    sort: Option<SortOrder>,
-    limit: Option<usize>,
-    entries: &[DiffEntry],
-) -> Vec<DiffEntry> {
-    let mut sorted = entries.to_vec();
-
-    match sort {
-        Some(SortOrder::Desc) => {
-            sorted.sort_by(|a, b| {
-                b.delta
-                    .partial_cmp(&a.delta)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-        }
-        Some(SortOrder::Asc) => {
-            sorted.sort_by(|a, b| {
-                a.delta
-                    .partial_cmp(&b.delta)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-        }
-        _ => {} // preserve original order
-    }
-
-    if let Some(n) = limit {
-        sorted.truncate(n);
-    }
-
-    sorted
 }
