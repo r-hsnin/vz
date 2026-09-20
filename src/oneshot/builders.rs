@@ -105,19 +105,9 @@ pub(crate) fn build_histogram_data_with_bins(
         headers,
     );
 
-    // For histogram, prefer the quantitative column.
-    let x_numeric_count = rows
-        .iter()
-        .take(5)
-        .filter_map(|r| r.get(axes.x_idx))
-        .filter(|v| crate::util::parse_number(v).is_some())
-        .count();
-
-    let use_idx = if x_numeric_count > 0 {
-        axes.x_idx
-    } else {
-        axes.y_idx
-    };
+    // For histogram, bin the quantitative column (canonical choice: X when
+    // numeric, otherwise Y — shared with JSON/present/insights).
+    let use_idx = data_builder::histogram_column(rows, axes.x_idx, axes.y_idx);
     let label = headers.get(use_idx).cloned().unwrap_or_default();
     let title = format!("Distribution of {}", label);
 
@@ -254,6 +244,24 @@ mod tests {
         let data = build_histogram_data(&rec, &sales_headers(), &sales_rows());
         assert!(!data.values.is_empty());
         assert!(data.title.unwrap_or_default().contains("revenue"));
+    }
+
+    #[test]
+    fn test_build_histogram_data_non_numeric_x_uses_y() {
+        let headers = vec!["month".to_string(), "temperature".to_string()];
+        let rows = vec![
+            vec!["Jan".into(), "5".into()],
+            vec!["Feb".into(), "7".into()],
+        ];
+        let rec = ChartRecommendation {
+            chart_type: ChartType::Histogram,
+            x_column: "month".to_string(),
+            y_column: Some("temperature".to_string()),
+            color_column: None,
+        };
+        let data = build_histogram_data(&rec, &headers, &rows);
+        assert_eq!(data.values, vec![5.0, 7.0]);
+        assert_eq!(data.x_label, "temperature");
     }
 
     #[test]

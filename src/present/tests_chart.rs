@@ -120,6 +120,42 @@ fn test_load_chart_data_infers_type_when_not_specified() {
 }
 
 #[test]
+fn test_load_histogram_bins_y_when_x_is_non_numeric() {
+    // A histogram over a categorical x must bin the quantitative y
+    // (canonical `histogram_column` contract), matching oneshot text output.
+    let block = ChartBlock {
+        source: "temperature.csv".to_string(),
+        chart_type: Some(ChartType::Histogram),
+        x_col: Some("month".to_string()),
+        y_col: Some("temperature".to_string()),
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
+        bins: None,
+        height: None,
+        diff: None,
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
+    assert!(
+        result.is_ok(),
+        "histogram block should load: {:?}",
+        result.err()
+    );
+    match result.unwrap() {
+        crate::render::ChartData::Histogram(data) => {
+            assert_eq!(data.x_label, "temperature");
+            assert!(!data.values.is_empty(), "temperature values must be binned");
+        }
+        _ => panic!("Expected Histogram chart data"),
+    }
+}
+
+#[test]
 fn test_load_chart_data_infers_line_for_temporal() {
     // sales.csv has temporal x + quantitative y → should infer Line
     let block = ChartBlock {

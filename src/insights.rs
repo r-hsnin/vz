@@ -278,14 +278,17 @@ fn bar_insights(req: &InsightRequest<'_>) -> Vec<String> {
 }
 
 /// Histogram: where values cluster (densest bin) + range.
+/// Bins the same column as the rendered chart (canonical `histogram_column`),
+/// so the sentence can never describe a different column than the bars.
 fn histogram_insights(req: &InsightRequest<'_>) -> Vec<String> {
-    let col_idx = req
-        .y_column
-        .and_then(|c| data_builder::column_index(req.headers, c))
-        .or_else(|| data_builder::column_index(req.headers, req.x_column));
-    let Some(idx) = col_idx else {
+    let Some(x_idx) = data_builder::column_index(req.headers, req.x_column) else {
         return vec![];
     };
+    let y_idx = req
+        .y_column
+        .and_then(|c| data_builder::column_index(req.headers, c))
+        .unwrap_or(x_idx);
+    let idx = data_builder::histogram_column(req.rows, x_idx, y_idx);
     let hist = data_builder::build_histogram(req.rows, idx, None, String::new(), req.bins);
     if hist.values.len() < 2 {
         return vec![];
@@ -304,7 +307,7 @@ fn histogram_insights(req: &InsightRequest<'_>) -> Vec<String> {
         .max_by_key(|(_, b)| b.2)
         .unwrap_or((0, &bins[0]));
     let _ = bi;
-    let name = req.y_column.unwrap_or(req.x_column);
+    let name = req.headers.get(idx).map(String::as_str).unwrap_or("value");
     let share = c as f64 / total as f64 * 100.0;
     let (min, max) = crate::util::min_max(&hist.values).unwrap_or((s, e));
     vec![
@@ -592,6 +595,26 @@ mod tests {
         let out = build_insights(&req(ChartType::Histogram, "age", None, &h, &r));
         assert!(out.iter().any(|s| s.contains("Most age values")), "{out:?}");
         assert!(out.iter().any(|s| s.contains("spans")), "{out:?}");
+    }
+
+    #[test]
+    fn histogram_bins_the_x_column_when_both_numeric() {
+        // Canonical contract: the x column wins when both x and y are
+        // quantitative, so the insight must describe the same column the
+        // histogram bins.
+        let h = headers(&["temperature", "humidity"]);
+        let r = rows(&[&["10", "80"], &["20", "70"], &["30", "60"]]);
+        let out = build_insights(&req(
+            ChartType::Histogram,
+            "temperature",
+            Some("humidity"),
+            &h,
+            &r,
+        ));
+        assert!(
+            out.iter().any(|s| s.contains("Most temperature")),
+            "{out:?}"
+        );
     }
 
     #[test]

@@ -797,6 +797,36 @@ fn test_json_histogram_produces_nonempty_bins() {
 }
 
 #[test]
+fn test_json_histogram_x_only_bins_the_x_column() {
+    // `-x <quantitative>` alone must bin the x column, like oneshot text does
+    // (regression: JSON fell back to the Y slot and produced `"bins": []`).
+    let output = vz_binary()
+        .args([
+            "fixtures/temperature.csv",
+            "-o",
+            "json",
+            "-t",
+            "histogram",
+            "-x",
+            "temperature",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Should be valid JSON");
+    let bins = json["chart_data"]["bins"]
+        .as_array()
+        .expect("chart_data.bins should be an array");
+    assert!(
+        !bins.is_empty(),
+        "`-x temperature` histogram must bin temperature, got: {}",
+        serde_json::to_string_pretty(&json["chart_data"]).unwrap()
+    );
+    assert_eq!(json["query"]["x"], "temperature");
+}
+
+#[test]
 fn test_stderr_summary_no_ansi_when_piped() {
     // When stderr is piped (as in test harness), summary should NOT contain ANSI escape codes
     let output = vz_binary()

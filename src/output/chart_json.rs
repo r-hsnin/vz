@@ -122,7 +122,11 @@ fn build_chart_data(
 ) -> serde_json::Value {
     match params.chart_type {
         ChartType::Bar => build_bar_json(rows, x_idx, y_idx, params),
-        ChartType::Histogram => build_histogram_json(rows, y_idx, params.bins),
+        ChartType::Histogram => {
+            // Same bin-column choice as oneshot text/present (canonical).
+            let col_idx = data_builder::histogram_column(rows, x_idx, y_idx);
+            build_histogram_json(rows, col_idx, params.bins)
+        }
         _ => build_series_json(headers, rows, x_idx, y_idx, params),
     }
 }

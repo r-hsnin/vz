@@ -387,6 +387,24 @@ pub fn build_histogram(
     }
 }
 
+/// Leading rows probed to decide whether a column is quantitative when
+/// picking the histogram bin column.
+const HISTOGRAM_PROBE_ROWS: usize = 5;
+
+/// Pick the column to bin for a histogram: X when it holds numeric values in
+/// the leading sample (the usual `-t histogram -x temperature` case),
+/// otherwise Y so an explicit `-x city -y revenue` still bins revenue.
+/// Canonical because every mode (oneshot text, JSON, present, insights) must
+/// bin the same column or their outputs silently disagree.
+pub fn histogram_column(rows: &[Vec<String>], x_idx: usize, y_idx: usize) -> usize {
+    let x_has_numbers = rows
+        .iter()
+        .take(HISTOGRAM_PROBE_ROWS)
+        .filter_map(|r| r.get(x_idx))
+        .any(|v| crate::util::parse_number(v).is_some());
+    if x_has_numbers { x_idx } else { y_idx }
+}
+
 /// Find the index of a column name in headers.
 pub fn column_index(headers: &[String], name: &str) -> Option<usize> {
     headers.iter().position(|h| h == name)

@@ -184,6 +184,7 @@ Each mode has a **mode-specific builder layer** that adapts the shared `ChartDat
 structures before passing them to `render_chart_data()`:
 - `chart/data_builder.rs` — canonical assemblers (`build_chart_config`,
   `aggregate_bar`, `build_histogram`, `build_heatmap_data`,
+  `histogram_column` (bin-column choice shared by every histogram consumer),
   `build_diff_line_config` since Phase 3-1, categorical diff annotation
   (`diff_direction_marker`/`format_diff_change`/`build_diff_bar_data`)
   since Phase 3-2, post-aggregation Bar adapters
@@ -191,8 +192,7 @@ structures before passing them to `render_chart_data()`:
   (`append_series_refit_y`) since Phase 3-3)
 - `oneshot/builders.rs` — axis resolution from the recommendation, title
   derivation, extra-Y wiring (series via `build_multi_y_series`, span refit
-  via `append_series_refit_y`), histogram column choice for `-t histogram`
-  overrides, label fitting, theme application
+  via `append_series_refit_y`), label fitting, theme application
 - `explore/` — interactive column selection → canonical assembler calls;
   deliberately not routed through `oneshot/builders.rs` (oneshot-only
   concerns such as extra-Y/fitting must not leak into other modes)

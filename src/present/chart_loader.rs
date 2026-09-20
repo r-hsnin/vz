@@ -239,11 +239,18 @@ fn build_chart_data_for_type(
             Ok(ChartData::Bar(data))
         }
         ChartType::Histogram => {
+            // Same bin-column choice as oneshot/JSON (canonical).
+            let col_idx = data_builder::histogram_column(rows, cols.x_idx, cols.y_idx);
+            let label = if col_idx == cols.y_idx {
+                cols.y_label.clone()
+            } else {
+                cols.x_label.clone()
+            };
             let mut data = data_builder::build_histogram(
                 rows,
-                cols.x_idx,
+                col_idx,
                 block.title.clone(),
-                cols.x_label.clone(),
+                label,
                 block.bins,
             );
             data.axis_color = Some(theme.axis_color);

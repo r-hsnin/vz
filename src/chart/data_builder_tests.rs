@@ -335,6 +335,30 @@ fn test_column_index() {
 }
 
 #[test]
+fn test_histogram_column_prefers_numeric_x() {
+    let rows = vec![
+        vec!["5".to_string(), "1000".to_string()],
+        vec!["7".to_string(), "2000".to_string()],
+    ];
+    assert_eq!(histogram_column(&rows, 0, 1), 0);
+}
+
+#[test]
+fn test_histogram_column_falls_back_to_y_when_x_non_numeric() {
+    let rows = vec![
+        vec!["Jan".to_string(), "5".to_string()],
+        vec!["Feb".to_string(), "7".to_string()],
+    ];
+    assert_eq!(histogram_column(&rows, 0, 1), 1);
+}
+
+#[test]
+fn test_histogram_column_empty_rows_fall_back_to_y() {
+    let rows: Vec<Vec<String>> = vec![];
+    assert_eq!(histogram_column(&rows, 0, 1), 1);
+}
+
+#[test]
 fn test_sample_rows_under_threshold() {
     // Under threshold: no sampling
     let rows: Vec<Vec<String>> = (0..100)

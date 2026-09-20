@@ -126,12 +126,12 @@ never reverses**. Concretely:
    `chart/data_builder.rs` is the canonical assembler
    (`ResolvedAxes` → `aggregate_bar`/`build_chart_config`/`build_histogram`/
    `build_heatmap_data`/`build_diff_line_config`/`build_diff_bar_data` →
-   `ChartData`, plus post-aggregation `sort_bar_data`/`truncate_bar_data`
+   `ChartData`, the histogram bin-column choice `histogram_column`, plus
+   post-aggregation `sort_bar_data`/`truncate_bar_data`
    shared by every Bar consumer and extra-Y span refit
    `append_series_refit_y`, all since Phase 3-3);
    `oneshot/builders.rs` adapts on top (axis resolution from a
-   recommendation, title derivation, extra-Y wiring, histogram column choice
-   for `-t histogram`, label fitting, theme).
+   recommendation, title derivation, extra-Y wiring, label fitting, theme).
    Explore and present call the canonical assembler directly: routing them
    through `oneshot/builders.rs` would drag oneshot-only concerns (extra-Y,
    terminal-width fitting) into other modes. An adapter resolves its input
