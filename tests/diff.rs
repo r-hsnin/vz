@@ -2,7 +2,7 @@
 
 #[path = "common/mod.rs"]
 mod common;
-use common::vz_binary;
+use common::{temp_csv, vz_binary};
 
 #[test]
 fn test_diff_insights_names_biggest_mover() {
@@ -563,6 +563,46 @@ fn test_diff_markdown_with_sort_and_top() {
         2,
         "Expected 2 data rows with --top 2, got: {:?}",
         data_lines
+    );
+}
+
+#[test]
+fn test_diff_markdown_temporal_zero_before_uses_new_marker() {
+    let before = temp_csv(&[
+        "date,revenue",
+        "2024-01-01,0",
+        "2024-01-02,5",
+        "2024-01-03,10",
+    ]);
+    let after = temp_csv(&[
+        "date,revenue",
+        "2024-01-01,10",
+        "2024-01-02,6",
+        "2024-01-03,11",
+    ]);
+    let output = vz_binary()
+        .args([
+            before.path().to_str().unwrap(),
+            after.path().to_str().unwrap(),
+            "--markdown",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("▲ new"),
+        "Zero-before rows should use the canonical new marker: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("▲ +20%"),
+        "Non-zero before rows should keep percentage deltas: {}",
+        stdout
     );
 }
 

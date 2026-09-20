@@ -6,18 +6,6 @@ use crate::cli::DiffParams;
 use crate::diff::{DiffResult, DiffTimeSeries};
 use crate::render::format_number;
 
-/// Format percentage change as a ▲/▼/─ string.
-fn format_change(pct_change: Option<f64>, delta: f64) -> String {
-    match pct_change {
-        Some(pct) if pct > 0.0 => format!("▲ +{:.0}%", pct),
-        Some(pct) if pct < 0.0 => format!("▼ {:.0}%", pct),
-        Some(_) => "─ 0%".to_string(),
-        None if delta > 0.0 => format!("▲ +{}", format_number(delta)),
-        None if delta < 0.0 => format!("▼ {}", format_number(delta)),
-        None => "─".to_string(),
-    }
-}
-
 /// Escape pipe characters in a cell value for valid GFM tables.
 fn escape_cell(s: &str) -> String {
     s.replace('|', "\\|")
@@ -117,11 +105,15 @@ pub(super) fn print_diff_line_markdown(
                 (
                     format_number(b),
                     format_number(a),
-                    format_change(pct, delta),
+                    crate::chart::data_builder::format_diff_change(pct, delta),
                 )
             }
             (Some(b), None) => (format_number(b), "—".to_string(), "—".to_string()),
-            (None, Some(a)) => ("—".to_string(), format_number(a), "▲ new".to_string()),
+            (None, Some(a)) => (
+                "—".to_string(),
+                format_number(a),
+                crate::chart::data_builder::format_diff_change(None, a),
+            ),
             (None, None) => ("—".to_string(), "—".to_string(), "—".to_string()),
         };
 
@@ -149,16 +141,6 @@ pub(super) fn print_diff_line_markdown(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn format_change_covers_all_branches() {
-        assert_eq!(format_change(Some(25.0), 5.0), "▲ +25%");
-        assert_eq!(format_change(Some(-10.0), -2.0), "▼ -10%");
-        assert_eq!(format_change(Some(0.0), 0.0), "─ 0%");
-        assert_eq!(format_change(None, 1500.0), "▲ +1.5k");
-        assert_eq!(format_change(None, -3.0), "▼ -3");
-        assert_eq!(format_change(None, 0.0), "─");
-    }
 
     #[test]
     fn escape_cell_escapes_pipes() {
