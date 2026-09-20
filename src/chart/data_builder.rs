@@ -165,6 +165,48 @@ fn apply_agg(values: &[f64], agg: AggFunction) -> f64 {
     }
 }
 
+/// Canonical X coordinate for one row.
+///
+/// * numeric X: the parsed value (row index when missing/non-finite)
+/// * non-numeric X with a non-empty `categorical_x`: the index into that
+///   unique-category list (rows sharing an X label share a coordinate)
+/// * non-numeric X otherwise: the row index
+///
+/// Single, grouped, and extra-Y series all resolve X through here so an
+/// overlay can never land on a different X scale than the series it annotates.
+fn x_coordinate(
+    row: &[String],
+    row_index: usize,
+    x_idx: usize,
+    x_is_non_numeric: bool,
+    categorical_x: &[String],
+) -> f64 {
+    if x_is_non_numeric {
+        if categorical_x.is_empty() {
+            return row_index as f64;
+        }
+        let x_val = row.get(x_idx).map(String::as_str).unwrap_or("");
+        categorical_x
+            .iter()
+            .position(|v| v == x_val)
+            .unwrap_or(row_index) as f64
+    } else {
+        row.get(x_idx)
+            .and_then(|v| crate::util::parse_number(v))
+            .filter(|v| v.is_finite())
+            .unwrap_or(row_index as f64)
+    }
+}
+
+/// Unique X values in first-appearance order, or empty for numeric X.
+fn categorical_x_for(rows: &[Vec<String>], x_idx: usize, x_is_non_numeric: bool) -> Vec<String> {
+    if !x_is_non_numeric {
+        return Vec::new();
+    }
+    let raw: Vec<String> = rows.iter().filter_map(|r| r.get(x_idx).cloned()).collect();
+    unique_ordered(&raw)
+}
+
 /// Build grouped series by a color column.
 /// Returns a Vec of named Series, each containing (x, y) data points.
 pub fn build_grouped_series(
@@ -174,26 +216,13 @@ pub fn build_grouped_series(
     color_idx: usize,
     x_is_non_numeric: bool,
 ) -> Vec<Series> {
-    let unique_x: Vec<String> = if x_is_non_numeric {
-        let raw: Vec<String> = rows.iter().filter_map(|r| r.get(x_idx).cloned()).collect();
-        unique_ordered(&raw)
-    } else {
-        Vec::new()
-    };
+    let unique_x = categorical_x_for(rows, x_idx, x_is_non_numeric);
 
     let mut groups: Vec<(String, Vec<(f64, f64)>)> = Vec::new();
 
     for (i, row) in rows.iter().enumerate() {
         let group_name = row.get(color_idx).cloned().unwrap_or_default();
-        let x = if x_is_non_numeric {
-            let x_val = row.get(x_idx).cloned().unwrap_or_default();
-            unique_x.iter().position(|v| *v == x_val).unwrap_or(i) as f64
-        } else {
-            row.get(x_idx)
-                .and_then(|v| crate::util::parse_number(v))
-                .filter(|v| v.is_finite())
-                .unwrap_or(i as f64)
-        };
+        let x = x_coordinate(row, i, x_idx, x_is_non_numeric, &unique_x);
         // Skip non-finite (NaN/inf): never leak them into axes or series.
         let y = match row.get(y_idx).and_then(|v| crate::util::parse_number(v)) {
             Some(v) if v.is_finite() => v,
@@ -226,14 +255,7 @@ pub fn build_single_series(
         .iter()
         .enumerate()
         .filter_map(|(i, row)| {
-            let x = if x_is_non_numeric {
-                i as f64
-            } else {
-                row.get(x_idx)
-                    .and_then(|v| crate::util::parse_number(v))
-                    .filter(|v| v.is_finite())
-                    .unwrap_or(i as f64)
-            };
+            let x = x_coordinate(row, i, x_idx, x_is_non_numeric, &[]);
             // Skip non-finite (NaN/inf): never leak them into axes or series.
             let y = row
                 .get(y_idx)
@@ -614,16 +636,47 @@ pub fn build_diff_bar_data(
     }
 }
 /// Each (y_idx, label) pair produces one Series.
+///
+/// `grouped` must mirror the base config: when the base config has a color
+/// column its X coordinates are the unique-category index
+/// ([`build_grouped_series`]), so extra-Y overlays have to use that mapping
+/// too — otherwise the overlay is drawn on a different X scale than the
+/// series it annotates. When `grouped` is false the row-index mapping of
+/// [`build_single_series`] applies.
 pub fn build_multi_y_series(
     rows: &[Vec<String>],
     x_idx: usize,
     y_specs: &[(usize, String)],
     x_is_non_numeric: bool,
+    grouped: bool,
 ) -> Vec<Series> {
+    let categorical_x = if grouped {
+        categorical_x_for(rows, x_idx, x_is_non_numeric)
+    } else {
+        Vec::new()
+    };
     y_specs
         .iter()
         .map(|(y_idx, label)| {
-            build_single_series(rows, x_idx, *y_idx, x_is_non_numeric, label.clone())
+            let data: Vec<(f64, f64)> = rows
+                .iter()
+                .enumerate()
+                .filter_map(|(i, row)| {
+                    // Skip non-finite (NaN/inf): never leak them into axes or series.
+                    let y = row
+                        .get(*y_idx)
+                        .and_then(|v| crate::util::parse_number(v))
+                        .filter(|v| v.is_finite())?;
+                    Some((
+                        x_coordinate(row, i, x_idx, x_is_non_numeric, &categorical_x),
+                        y,
+                    ))
+                })
+                .collect();
+            Series {
+                name: label.clone(),
+                data,
+            }
         })
         .collect()
 }

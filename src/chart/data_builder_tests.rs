@@ -262,6 +262,48 @@ fn test_build_grouped_series() {
 }
 
 #[test]
+fn test_build_multi_y_series_category_index_when_grouped() {
+    // Duplicate non-numeric X across groups: the grouped base series maps X to
+    // the unique-category index, so an extra-Y overlay must use the same index
+    // rather than the raw row index (the extra-Y + color bug).
+    let rows = vec![
+        vec!["2024-01".into(), "100".into(), "10".into()],
+        vec!["2024-01".into(), "200".into(), "20".into()],
+        vec!["2024-02".into(), "150".into(), "15".into()],
+    ];
+    let extra = build_multi_y_series(&rows, 0, &[(2, "profit".into())], true, true);
+    assert_eq!(extra.len(), 1);
+    assert_eq!(
+        extra[0].data,
+        vec![(0.0, 10.0), (0.0, 20.0), (1.0, 15.0)],
+        "grouped overlay must share the base's unique-category X index"
+    );
+}
+
+#[test]
+fn test_build_multi_y_series_row_index_when_ungrouped() {
+    // Without a color column the base uses raw row indices, so the overlay must
+    // too (duplicate X labels stay distinct points).
+    let rows = vec![
+        vec!["2024-01".into(), "100".into(), "10".into()],
+        vec!["2024-01".into(), "200".into(), "20".into()],
+        vec!["2024-02".into(), "150".into(), "15".into()],
+    ];
+    let extra = build_multi_y_series(&rows, 0, &[(2, "profit".into())], true, false);
+    assert_eq!(extra[0].data, vec![(0.0, 10.0), (1.0, 20.0), (2.0, 15.0)]);
+}
+
+#[test]
+fn test_build_multi_y_series_numeric_x_uses_parsed_values() {
+    let rows = vec![
+        vec!["1".into(), "100".into(), "10".into()],
+        vec!["2".into(), "200".into(), "20".into()],
+    ];
+    let extra = build_multi_y_series(&rows, 0, &[(2, "profit".into())], false, false);
+    assert_eq!(extra[0].data, vec![(1.0, 10.0), (2.0, 20.0)]);
+}
+
+#[test]
 fn test_build_chart_config_single_series() {
     let rows = vec![
         vec!["2024-01".into(), "100".into()],

@@ -165,8 +165,16 @@ fn apply_extra_y_columns(
             Some((idx, name))
         })
         .collect();
-    let extra =
-        data_builder::build_multi_y_series(effective_rows, axes.x_idx, &y_specs, x_is_non_numeric);
+    // A color column makes the base config's non-numeric X a unique-category
+    // index (`build_grouped_series`); mirror that mapping for the overlay.
+    let grouped = axes.color_idx.is_some();
+    let extra = data_builder::build_multi_y_series(
+        effective_rows,
+        axes.x_idx,
+        &y_specs,
+        x_is_non_numeric,
+        grouped,
+    );
     data_builder::append_series_refit_y(config, extra);
 }
 
@@ -336,6 +344,125 @@ mod tests {
                 (e.1 - b.1 * 2.0).abs() < f64::EPSILON,
                 "extra-Y point must come from the same row as the base point"
             );
+        }
+    }
+
+    #[test]
+    fn test_extra_y_series_match_grouped_base_x_mapping() {
+        use ratatui::layout::Rect;
+
+        // Color column present: base series are grouped and use unique-category
+        // X indices, so the extra-Y overlay must share those coordinates.
+        let headers = vec![
+            "date".to_string(),
+            "city".to_string(),
+            "revenue".to_string(),
+            "profit".to_string(),
+        ];
+        let rows = vec![
+            vec!["2024-01".into(), "East".into(), "100".into(), "10".into()],
+            vec!["2024-02".into(), "East".into(), "150".into(), "15".into()],
+            vec!["2024-01".into(), "West".into(), "200".into(), "20".into()],
+            vec!["2024-02".into(), "West".into(), "250".into(), "25".into()],
+        ];
+        let rec = ChartRecommendation {
+            chart_type: ChartType::Line,
+            x_column: "date".to_string(),
+            y_column: Some("revenue".to_string()),
+            color_column: Some("city".to_string()),
+        };
+        let opts = RenderOptions {
+            chart_type_override: None,
+            y_label_override: None,
+            width: None,
+            height: None,
+            sort_order: None,
+            extra_y_columns: vec![("profit".to_string(), None)],
+            limit: None,
+            agg: AggFunction::Sum,
+            title: None,
+            labels: false,
+            theme: crate::theme::Theme::dark(),
+            bins: None,
+        };
+        let config = build_line_scatter_config(
+            &rec,
+            &headers,
+            &rows,
+            &opts,
+            Rect::new(0, 0, 80, 24),
+            ChartType::Line,
+        );
+
+        // Two grouped base series (East, West) + one extra-Y overlay.
+        assert_eq!(config.series.len(), 3);
+        let extra = config.series.last().unwrap();
+        assert_eq!(extra.name, "profit");
+        assert_eq!(
+            extra.data,
+            vec![(0.0, 10.0), (1.0, 15.0), (0.0, 20.0), (1.0, 25.0)],
+            "overlay X must be the unique-category index, not the row index"
+        );
+        // Every overlay coordinate resolves onto a base X tick.
+        let base_x: Vec<f64> = config
+            .series
+            .iter()
+            .take(2)
+            .flat_map(|s| s.data.iter().map(|(x, _)| *x))
+            .collect();
+        assert!(
+            extra.data.iter().all(|(x, _)| base_x.contains(x)),
+            "overlay X {extra:?} must lie on the base X scale {base_x:?}"
+        );
+    }
+
+    #[test]
+    fn test_extra_y_series_numeric_x_over_sample_limit_aligned() {
+        use ratatui::layout::Rect;
+
+        // Numeric X above MAX_CHART_POINTS: both base and overlay parse the same
+        // sampled X values, so their coordinates must match exactly.
+        let headers = vec![
+            "time".to_string(),
+            "revenue".to_string(),
+            "profit".to_string(),
+        ];
+        let rows: Vec<Vec<String>> = (0..data_builder::MAX_CHART_POINTS + 1)
+            .map(|i| vec![i.to_string(), (i * 3).to_string(), (i * 7).to_string()])
+            .collect();
+        let rec = ChartRecommendation {
+            chart_type: ChartType::Line,
+            x_column: "time".to_string(),
+            y_column: Some("revenue".to_string()),
+            color_column: None,
+        };
+        let opts = RenderOptions {
+            chart_type_override: None,
+            y_label_override: None,
+            width: None,
+            height: None,
+            sort_order: None,
+            extra_y_columns: vec![("profit".to_string(), None)],
+            limit: None,
+            agg: AggFunction::Sum,
+            title: None,
+            labels: false,
+            theme: crate::theme::Theme::dark(),
+            bins: None,
+        };
+        let config = build_line_scatter_config(
+            &rec,
+            &headers,
+            &rows,
+            &opts,
+            Rect::new(0, 0, 80, 24),
+            ChartType::Line,
+        );
+        let (base, extra) = (&config.series[0].data, &config.series[1].data);
+        assert_eq!(base.len(), data_builder::MAX_CHART_POINTS);
+        assert_eq!(extra.len(), base.len());
+        for (b, e) in base.iter().zip(extra) {
+            assert_eq!(b.0, e.0, "numeric extra-Y X must equal the base X value");
         }
     }
 
