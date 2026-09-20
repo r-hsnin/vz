@@ -108,20 +108,20 @@ Forbidden (compiler-unchecked today — do not add new instances):
 - `&Cli` parameters outside `cli/` + binary adapters. Known instances:
   `pipeline::render_data` / `dispatch_output` helpers (`pipeline.rs`),
   `diff::run_diff` (`diff/mod.rs`), `directory::run_directory`
-  (`directory/mod.rs`),
-  `chart/recommend.rs` (`build_recommendation`,
-  `effective_agg`, `parse_y_options` — app-plane adapters parked in `chart/`
-  until the Phase 2 `Query` seam; see `recommend.rs` header).
+  (`directory/mod.rs`).
   (Done: `diagnostics::error_hint` takes `Option<&Path>` since Phase 2-1;
-  `output/table.rs` + `output/markdown.rs` take `TableParams` since Phase 2-2.)
+  `output/table.rs` + `output/markdown.rs` take `TableParams` since Phase 2-2;
+  `chart/recommend.rs` takes `Query` + returns `Warnings` since Phase 2-3,
+  with the sole `Cli → Query` conversion at `Cli::to_query`.)
 - `println!/eprintln!` in data/render planes. Known instances:
   `output/markdown.rs` + `output/table.rs` warnings,
-  `chart/recommend.rs` recommendation notices, `chart/data_builder.rs:325`,
+  `chart/data_builder.rs:325`,
   `filter::apply_filters` info notice (kept with the function until Phase 2
   separates notification from filtering). Precedent to copy:
   `output/chart_json.rs` (`ChartJsonParams`), `output/spark.rs`
-  (`SparkParams`), and `output/table.rs` (`TableParams`, shared with
-  `output/markdown.rs`) take plain params structs and keep printing at the edge.
+  (`SparkParams`), `output/table.rs` (`TableParams`, shared with
+  `output/markdown.rs`), and `chart/recommend.rs` (`Query` in / `Warnings`
+  out) take plain params structs and keep printing at the edge.
 - `render/` geometry invented anywhere else; `ratatui` types in `output/`
   public signatures (only `output/svg.rs` touches `Buffer`, via the shared
   cell-geometry contract).
@@ -131,7 +131,7 @@ Forbidden (compiler-unchecked today — do not add new instances):
 | Current `src/` path | Target crate | Notes |
 |---|---|---|
 | `loader/`, `infer/`, `filter.rs`, `util.rs`, `sparkline.rs` | `vz-core` | Move as-is; drop `Cli` uses on the way |
-| `chart/` (selector + data_builder + recommend) | `vz-core` | Canonical `ChartData` assembler lives here; `&Cli`-bound adapters in `recommend.rs` move to bin at Phase 2 |
+| `chart/` (selector + data_builder + recommend) | `vz-core` | Canonical `ChartData` assembler lives here; `Query`/`Warnings` seam done at Phase 2-3 |
 | `render/` | `vz-core` | Keep ratatui inside; hide from public signatures |
 | `output/` | `vz-core` | Convert to `String`/value returns; print wrappers stay in bin |
 | `diff/compute.rs`, `diff/schema.rs` (+ pure types) | `vz-core` | `run_diff` CLI behavior stays in bin |
