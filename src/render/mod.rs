@@ -196,8 +196,16 @@ pub fn gradient_color(t: f64) -> Color {
     Color::Rgb(r, g, b)
 }
 
+/// Maximum accepted histogram bin count. Beyond this a histogram has no
+/// readable resolution while [`compute_bins`] would allocate unbounded memory;
+/// the CLI rejects larger `--bins` values and [`compute_bins`] clamps
+/// defensively so no other caller (present chart blocks, insights) can
+/// trigger a pathological allocation.
+pub const MAX_BINS: usize = 10_000;
+
 /// Compute histogram bins from raw values.
 pub fn compute_bins(values: &[f64], bin_count: usize) -> Vec<(f64, f64, usize)> {
+    let bin_count = bin_count.min(MAX_BINS);
     if values.is_empty() || bin_count == 0 {
         return vec![];
     }

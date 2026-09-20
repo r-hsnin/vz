@@ -148,7 +148,7 @@ vz present slides.md
 | | `--sample` | Sample at most N rows (systematic sampling) |
 | | `--watch` | Watch file for changes and auto-redraw |
 | | `--theme` | Color theme: `dark` (default), `light`, `high-contrast` |
-| | `--bins` | Number of bins for histogram charts (default: 10) |
+| | `--bins` | Number of bins for histogram charts (1-10000, default: 10) |
 | | `--json` | Shorthand for `--output json` |
 | | `--spark` | Shorthand for `--output spark` |
 | | `--svg` | Shorthand for `--output svg` |

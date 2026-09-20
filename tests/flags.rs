@@ -582,6 +582,30 @@ fn test_bins_zero_gives_clear_error() {
 }
 
 #[test]
+fn test_bins_above_max_gives_clear_error() {
+    // Unbounded bin counts allocate without limit (OOM-class); reject clearly.
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "-y",
+            "revenue",
+            "-t",
+            "histogram",
+            "--bins",
+            "10001",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--bins must be between 1 and 10000"),
+        "Expected clear error for --bins 10001, got: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_top_zero_gives_clear_error() {
     let output = vz_binary()
         .args(["fixtures/sales.csv", "--top", "0"])

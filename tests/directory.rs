@@ -20,6 +20,23 @@ fn test_directory_same_schema_renders_chart() {
 }
 
 #[test]
+fn test_directory_bins_zero_gives_clear_error() {
+    // Limit validation runs before the directory branch, so directory mode
+    // no longer silently renders an empty histogram for --bins 0.
+    let output = vz_binary()
+        .args(["fixtures/dir_test/same_schema/", "--bins", "0"])
+        .output()
+        .expect("Failed to run vz");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--bins must be at least 1"),
+        "Expected clear error for directory --bins 0, got: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_directory_with_color_source() {
     let output = vz_binary()
         .args(["fixtures/dir_test/same_schema/", "-c", "_source", "--spark"])

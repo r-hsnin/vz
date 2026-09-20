@@ -137,7 +137,7 @@ pub struct Cli {
     #[arg(long = "theme", value_enum)]
     pub theme: Option<ThemeArg>,
 
-    /// Number of bins for histogram charts (default: 10).
+    /// Number of bins for histogram charts (1-10000, default: 10).
     #[arg(long = "bins", value_name = "N")]
     pub bins: Option<usize>,
 

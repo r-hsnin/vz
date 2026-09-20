@@ -162,6 +162,8 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
 
 /// Single render pass: load → infer → render. Used by both normal and watch modes.
 fn render_once(cli: &Cli, file: &Path) -> Result<()> {
+    validate_render_limits(cli)?;
+
     if file.is_dir() {
         return directory::run_directory_from_cli(cli, file);
     }
@@ -170,8 +172,22 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
         anyhow::bail!("--catalog requires a directory argument, not a file");
     }
 
-    if cli.bins == Some(0) {
-        anyhow::bail!("--bins must be at least 1");
+    let data = loader::load_data_full(file, cli.no_header, format_override(cli))?;
+    pipeline::render_data_from_cli(cli, data, file)
+}
+
+/// Reject nonsensical render limits before any mode runs. Kept ahead of the
+/// directory early-return so directory/watch invocations validate like
+/// single-file ones, and `--bins` is bounded above because each bin is
+/// allocated by `render::compute_bins`.
+fn validate_render_limits(cli: &Cli) -> Result<()> {
+    match cli.bins {
+        Some(0) => anyhow::bail!("--bins must be at least 1"),
+        Some(n) if n > crate::render::MAX_BINS => anyhow::bail!(
+            "--bins must be between 1 and {} (got {n})",
+            crate::render::MAX_BINS
+        ),
+        _ => {}
     }
     if cli.top == Some(0) {
         anyhow::bail!("--top must be at least 1");
@@ -179,7 +195,5 @@ fn render_once(cli: &Cli, file: &Path) -> Result<()> {
     if cli.tail == Some(0) {
         anyhow::bail!("--tail must be at least 1");
     }
-
-    let data = loader::load_data_full(file, cli.no_header, format_override(cli))?;
-    pipeline::render_data_from_cli(cli, data, file)
+    Ok(())
 }
