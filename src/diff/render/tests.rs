@@ -64,7 +64,7 @@ fn test_diff_spark_format() {
 }
 
 #[test]
-fn test_apply_sort_desc() {
+fn test_build_diff_bar_data_sort_desc() {
     let entries = sample_entries();
     let tuples: Vec<(String, f64, Option<f64>, f64)> = entries
         .iter()
@@ -83,7 +83,7 @@ fn test_apply_sort_desc() {
 }
 
 #[test]
-fn test_apply_sort_asc() {
+fn test_build_diff_bar_data_sort_asc() {
     let entries = sample_entries();
     let tuples: Vec<(String, f64, Option<f64>, f64)> = entries
         .iter()
@@ -100,7 +100,7 @@ fn test_apply_sort_asc() {
 }
 
 #[test]
-fn test_apply_top_limit() {
+fn test_build_diff_bar_data_top_limit() {
     let entries = sample_entries();
     let tuples: Vec<(String, f64, Option<f64>, f64)> = entries
         .iter()
@@ -149,53 +149,6 @@ fn test_diff_line_json_structure() {
     // Verify the JSON function succeeds
     let result = print_diff_line_json(&ts, Path::new("before.csv"), Path::new("after.csv"));
     assert!(result.is_ok());
-}
-
-#[test]
-fn test_diff_line_chart_builds_two_series() {
-    // Verify the ChartConfig construction logic
-    let ts = sample_ts();
-    use ratatui::style::Color;
-
-    let all_y: Vec<f64> = ts
-        .before
-        .iter()
-        .chain(ts.after.iter())
-        .map(|(_, y)| *y)
-        .collect();
-    let y_axis = crate::render::Axis::from_data(&ts.y_column, &all_y);
-    let x_max = (ts.x_labels.len() - 1) as f64;
-
-    let config = crate::render::ChartConfig {
-        title: Some("before vs after".into()),
-        x_axis: crate::render::Axis {
-            label: "date".into(),
-            min: 0.0,
-            max: x_max,
-        },
-        y_axis,
-        series: vec![
-            crate::render::Series {
-                name: "before".into(),
-                data: ts.before.clone(),
-            },
-            crate::render::Series {
-                name: "after".into(),
-                data: ts.after.clone(),
-            },
-        ],
-        x_labels: Some(ts.x_labels.clone()),
-        series_colors: vec![Color::DarkGray, Color::Cyan],
-        axis_color: Some(Color::DarkGray),
-        label_color: Some(Color::DarkGray),
-    };
-
-    assert_eq!(config.series.len(), 2);
-    assert_eq!(config.series[0].name, "before");
-    assert_eq!(config.series[1].name, "after");
-    assert_eq!(config.series_colors, vec![Color::DarkGray, Color::Cyan]);
-    assert_eq!(config.series[0].data.len(), 3);
-    assert_eq!(config.series[1].data.len(), 3);
 }
 
 // --- Markdown output tests ---

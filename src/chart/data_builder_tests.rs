@@ -15,6 +15,13 @@ fn bar_fixture() -> BarChartData {
     }
 }
 
+fn to_tuples(entries: &[crate::diff::DiffEntry]) -> Vec<(String, f64, Option<f64>, f64)> {
+    entries
+        .iter()
+        .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
+        .collect()
+}
+
 #[test]
 fn test_sort_bar_data_desc_orders_by_value() {
     let mut data = bar_fixture();
@@ -69,6 +76,24 @@ fn test_truncate_bar_data_limit() {
     assert_eq!(data.values.len(), 2);
     truncate_bar_data(&mut data, None);
     assert_eq!(data.labels.len(), 2);
+}
+
+#[test]
+fn test_truncate_bar_data_larger_than_data() {
+    let mut data = bar_fixture();
+    truncate_bar_data(&mut data, Some(10));
+    assert_eq!(data.labels.len(), 3);
+    assert_eq!(data.values.len(), 3);
+}
+
+#[test]
+fn test_truncate_bar_data_zero_empties() {
+    // `--top 0`/`--tail 0` are rejected at the CLI, but present chart blocks
+    // reach here directly — pin the canonical contract as empty, not no-op.
+    let mut data = bar_fixture();
+    truncate_bar_data(&mut data, Some(0));
+    assert!(data.labels.is_empty());
+    assert!(data.values.is_empty());
 }
 
 #[test]
@@ -581,12 +606,6 @@ fn test_format_diff_change_pct_and_new() {
 
 #[test]
 fn test_build_diff_bar_data_categorical_annotation() {
-    fn to_tuples(entries: &[crate::diff::DiffEntry]) -> Vec<(String, f64, Option<f64>, f64)> {
-        entries
-            .iter()
-            .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
-            .collect()
-    }
     let entries = vec![
         crate::diff::DiffEntry {
             label: "Tokyo".to_string(),
@@ -634,12 +653,6 @@ fn test_build_diff_bar_data_categorical_annotation() {
 
 #[test]
 fn test_build_diff_bar_data_sort_desc_signed_delta() {
-    fn to_tuples(entries: &[crate::diff::DiffEntry]) -> Vec<(String, f64, Option<f64>, f64)> {
-        entries
-            .iter()
-            .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
-            .collect()
-    }
     let entries = vec![
         crate::diff::DiffEntry {
             label: "Nagoya".to_string(),
