@@ -162,6 +162,8 @@ vz present slides.md
 | | `--glob` | Glob pattern to filter files in directory mode (e.g. `"sales_*.csv"`) |
 | | `--no-limit` | Bypass auto-sampling row limit in directory mode |
 
+`--bins` is validated as `1`–`10000` and `--top`/`--tail` as `≥ 1` before any mode runs (single-file, watch, directory, and diff), even when the chart type does not use the flag.
+
 ### Subcommands
 
 | Command | Description |
@@ -265,7 +267,7 @@ revenue  ▁▂▃▅▇  (100–500) ↑ +400%
 | Categorical | Categorical | Heatmap |
 | Nominal | *any* | Bar (fallback, warns on stderr) |
 
-When axes are specified in reverse order (e.g. `-x revenue -y date`), vz normalizes to the canonical orientation (`x=date`). Bar charts ignore `-c` for aggregation (grouped bars are not supported): bars stay summed over all rows and the color column only appears in the summary legend, with a warning on stderr.
+When axes are specified in reverse order (e.g. `-x revenue -y date`), vz normalizes to the canonical orientation (`x=date`). Bar charts ignore `-c` for aggregation (grouped bars are not supported): bars stay summed over all rows and the color column only appears in the summary legend. An explicit `-c` warns on stderr; an auto-detected color column reaches the legend without a warning.
 
 ## Explore Mode Keybindings
 
