@@ -35,7 +35,7 @@ pub(crate) fn build_line_scatter_config(
 }
 
 /// Build base ChartConfig from recommendation.
-fn build_chart_config(
+pub(crate) fn build_chart_config(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],

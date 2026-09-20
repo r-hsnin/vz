@@ -455,34 +455,9 @@ fn count_skipped_y_rows(
 
 // Re-export builder functions for use in tests
 #[cfg(test)]
-use crate::render::ChartConfig;
-#[cfg(test)]
-use builders::{build_bar_data, build_histogram_data, build_histogram_data_with_bins};
-
-/// Build ChartConfig for line/scatter charts (used by tests).
-#[cfg(test)]
-fn build_chart_config(
-    recommendation: &ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-) -> ChartConfig {
-    let axes = data_builder::ResolvedAxes::from_recommendation(
-        &recommendation.x_column,
-        recommendation.y_column.as_deref(),
-        recommendation.color_column.as_deref(),
-        headers,
-    );
-    let title = format!("{} vs {}", axes.y_label, axes.x_label);
-    data_builder::build_chart_config(
-        rows,
-        axes.x_idx,
-        axes.y_idx,
-        axes.color_idx,
-        axes.x_label,
-        axes.y_label,
-        Some(title),
-    )
-}
+use builders::{
+    build_bar_data, build_chart_config, build_histogram_data, build_histogram_data_with_bins,
+};
 
 #[cfg(test)]
 #[path = "tests.rs"]
