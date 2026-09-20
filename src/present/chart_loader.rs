@@ -31,7 +31,7 @@ fn load_diff_chart_data(
     theme: &crate::theme::Theme,
 ) -> Result<crate::render::ChartData> {
     use crate::diff::{compute_diff, compute_diff_temporal, validate_schema};
-    use crate::render::{Axis, ChartConfig, ChartData, Series};
+    use crate::render::ChartData;
 
     let before_path = resolve_chart_source_path(&block.source, base_dir);
     let after_path = resolve_chart_source_path(diff_source, base_dir);
@@ -76,47 +76,22 @@ fn load_diff_chart_data(
     let x_is_temporal = crate::diff::is_temporal_column(&schema, &x_col);
 
     if x_is_temporal {
-        // Temporal diff → 2-series line chart overlay.
+        // Temporal diff → 2-series line chart overlay (canonical assembler;
+        // title defaults to the Diff pair, theme comes from the slide).
         let ts = compute_diff_temporal(&before, &after, &x_col, &y_col)?;
-
-        let all_y: Vec<f64> = ts
-            .before
-            .iter()
-            .chain(ts.after.iter())
-            .map(|(_, y)| *y)
-            .collect();
-        let x_axis = Axis {
-            label: x_col,
-            min: 0.0,
-            max: (ts.x_labels.len().saturating_sub(1)) as f64,
-        };
-        let y_axis = Axis::from_data(&y_col, &all_y);
-
-        let mut config = ChartConfig {
-            title: block
+        let mut config = data_builder::build_diff_line_config(
+            &ts.before,
+            &ts.after,
+            &ts.x_labels,
+            &ts.x_column,
+            &ts.y_column,
+            block
                 .title
                 .clone()
                 .or_else(|| Some(format!("Diff: {} vs {}", block.source, diff_source))),
-            x_axis,
-            y_axis,
-            series: vec![
-                Series {
-                    name: "before".to_string(),
-                    data: ts.before,
-                },
-                Series {
-                    name: "after".to_string(),
-                    data: ts.after,
-                },
-            ],
-            x_labels: Some(ts.x_labels),
-            series_colors: vec![ratatui::style::Color::DarkGray, ratatui::style::Color::Cyan],
-            axis_color: Some(theme.axis_color),
-            label_color: Some(theme.label_color),
-        };
-        config
-            .series_colors
-            .extend(theme.series_colors.iter().skip(2));
+        );
+        config.axis_color = Some(theme.axis_color);
+        config.label_color = Some(theme.label_color);
         Ok(ChartData::Line(config))
     } else {
         // Categorical diff → bar chart with after values and annotated labels.

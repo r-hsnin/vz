@@ -36,7 +36,7 @@ pub fn draw_diff_ui(frame: &mut Frame, app: &DiffExploreApp) {
 }
 
 fn render_diff_chart(frame: &mut Frame, app: &DiffExploreApp, area: ratatui::layout::Rect) {
-    use crate::render::{Axis, BarChartData, ChartConfig, ChartData, ChartWidget, Series};
+    use crate::render::{BarChartData, ChartData, ChartWidget};
 
     match &app.diff_data {
         DiffData::Categorical(result) => {
@@ -78,51 +78,25 @@ fn render_diff_chart(frame: &mut Frame, app: &DiffExploreApp, area: ratatui::lay
             frame.render_widget(ChartWidget(&chart_data), area);
         }
         DiffData::Temporal(ts) => {
+            use crate::render::ChartWidget;
             let title = format!(
                 "Diff: {} over {} ({} vs {})",
                 ts.y_column, ts.x_column, app.before_name, app.after_name
             );
-
-            // Compute Y axis from combined data
-            let all_y: Vec<f64> = ts
-                .before
-                .iter()
-                .chain(ts.after.iter())
-                .map(|(_, y)| *y)
-                .collect();
-            let y_axis = Axis::from_data(&ts.y_column, &all_y);
-
-            // X axis spans the label indices
-            let x_max = if ts.x_labels.is_empty() {
-                1.0
-            } else {
-                (ts.x_labels.len() - 1) as f64
-            };
-            let x_axis = Axis {
-                label: ts.x_column.clone(),
-                min: 0.0,
-                max: x_max,
-            };
-
-            let config = ChartConfig {
-                series: vec![
-                    Series {
-                        name: app.before_name.clone(),
-                        data: ts.before.clone(),
-                    },
-                    Series {
-                        name: app.after_name.clone(),
-                        data: ts.after.clone(),
-                    },
-                ],
-                x_labels: Some(ts.x_labels.clone()),
-                title: Some(title),
-                x_axis,
-                y_axis,
-                series_colors: vec![Color::DarkGray, Color::Cyan],
-                axis_color: Some(app.theme.axis_color),
-                label_color: Some(app.theme.label_color),
-            };
+            // Canonical temporal-diff config; interactive TUI keeps full
+            // union labels (no terminal-width fitting here).
+            let mut config = crate::chart::data_builder::build_diff_line_config(
+                &ts.before,
+                &ts.after,
+                &ts.x_labels,
+                &ts.x_column,
+                &ts.y_column,
+                Some(title),
+            );
+            config.series[0].name = app.before_name.clone();
+            config.series[1].name = app.after_name.clone();
+            config.axis_color = Some(app.theme.axis_color);
+            config.label_color = Some(app.theme.label_color);
             let chart_data = ChartData::Line(config);
             frame.render_widget(ChartWidget(&chart_data), area);
         }

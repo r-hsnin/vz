@@ -426,6 +426,30 @@ fn test_build_grouped_series_skips_non_finite() {
 }
 
 #[test]
+fn test_build_diff_line_config_two_series_before_after() {
+    let before = vec![(0.0, 100.0), (1.0, 120.0)];
+    let after = vec![(0.0, 110.0), (1.0, 130.0)];
+    let labels = vec!["2024-01".to_string(), "2024-02".to_string()];
+    let config = build_diff_line_config(
+        &before,
+        &after,
+        &labels,
+        "date",
+        "revenue",
+        Some("before vs after".into()),
+    );
+    assert_eq!(config.series.len(), 2);
+    assert_eq!(config.series[0].name, "before");
+    assert_eq!(config.series[1].name, "after");
+    assert_eq!(config.x_labels, Some(labels));
+    assert_eq!(config.x_axis.label, "date");
+    assert_eq!(config.y_axis.label, "revenue");
+    assert_eq!(config.title.as_deref(), Some("before vs after"));
+    assert_eq!(config.x_axis.min, 0.0);
+    assert_eq!(config.x_axis.max, 1.0);
+}
+
+#[test]
 fn test_build_histogram_skips_non_finite() {
     let rows = vec![
         vec!["10".to_string()],

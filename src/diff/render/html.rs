@@ -8,7 +8,7 @@ use crate::cli::{DiffParams, resolve_theme_arg};
 use crate::diff::{DiffResult, DiffTimeSeries};
 use crate::oneshot::{self, fit_labels_to_width};
 use crate::output;
-use crate::render::{self, Axis, BarChartData, ChartConfig, ChartData, Series};
+use crate::render::{self, BarChartData, ChartData};
 use crate::util::path_label;
 
 use super::apply_sort_and_limit;
@@ -85,54 +85,31 @@ pub(super) fn print_diff_line_html(
     let width = params.width.unwrap_or_else(oneshot::terminal_width);
     let height = params.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
 
-    // Build Y axis from all values in both series
-    let all_y: Vec<f64> = ts
-        .before
-        .iter()
-        .chain(ts.after.iter())
-        .map(|(_, y)| *y)
-        .collect();
-    let y_axis = Axis::from_data(&ts.y_column, &all_y);
+    // Build Y axis from all values in both series (canonical assembler);
+    // title falls back to the Diff pair.
+    let mut config = crate::chart::data_builder::build_diff_line_config(
+        &ts.before,
+        &ts.after,
+        &ts.x_labels,
+        &ts.x_column,
+        &ts.y_column,
+        params.title.clone().or_else(|| {
+            Some(format!(
+                "{} vs {}",
+                path_label(before_path),
+                path_label(after_path)
+            ))
+        }),
+    );
 
-    // Build X axis from index range
-    let x_max = if ts.x_labels.is_empty() {
-        1.0
-    } else {
-        (ts.x_labels.len() - 1) as f64
-    };
-    let x_axis = Axis {
-        label: ts.x_column.clone(),
-        min: 0.0,
-        max: x_max,
-    };
-
-    // Fit labels to available width
-    let fitted_labels = fit_labels_to_width(&ts.x_labels, width.saturating_sub(12) as usize);
-
-    let config = ChartConfig {
-        title: Some(
-            params
-                .title
-                .clone()
-                .unwrap_or_else(|| format!("{} vs {}", before_name, after_name)),
-        ),
-        x_axis,
-        y_axis,
-        series: vec![
-            Series {
-                name: before_name.to_string(),
-                data: ts.before.clone(),
-            },
-            Series {
-                name: after_name.to_string(),
-                data: ts.after.clone(),
-            },
-        ],
-        x_labels: Some(fitted_labels),
-        series_colors: vec![Color::DarkGray, Color::Cyan],
-        axis_color: Some(Color::DarkGray),
-        label_color: Some(Color::DarkGray),
-    };
+    // Fit labels to available width (edge concern; span stays on the
+    // full union set built by the canonical assembler).
+    config.x_labels = Some(fit_labels_to_width(
+        &ts.x_labels,
+        width.saturating_sub(12) as usize,
+    ));
+    config.series[0].name = before_name.to_string();
+    config.series[1].name = after_name.to_string();
 
     let area = Rect::new(0, 0, width, height);
     let mut buf = Buffer::empty(area);

@@ -433,7 +433,58 @@ fn resolve_named_column(
     })
 }
 
-/// Build multiple series from multiple Y columns, sharing the same X axis.
+/// Build a 2-series before/after line overlay config from temporal diff data.
+///
+/// Canonical assembler for temporal diff Line charts (Phase 3). Every
+/// consumer of temporal diff output builds its `ChartConfig` through this
+/// function so axis spans, series names, and label handling cannot diverge
+/// between oneshot-diff, explore-diff, and present-diff paths. Takes plain
+/// slices (never `&DiffTimeSeries`) so the data plane stays free of
+/// app-plane diff types. `x_labels` is the full union label set: the X
+/// span (`max = len - 1`) derives from it. Label fitting to terminal width
+/// stays at the edge (callers overwrite `config.x_labels` afterwards).
+/// Series colors follow the diff convention (before=DarkGray, after=Cyan);
+/// callers supply the title and adjust theme colors afterwards (edge
+/// concerns only).
+pub fn build_diff_line_config(
+    before: &[(f64, f64)],
+    after: &[(f64, f64)],
+    x_labels: &[String],
+    x_col: &str,
+    y_col: &str,
+    title: Option<String>,
+) -> ChartConfig {
+    let all_y: Vec<f64> = before.iter().chain(after.iter()).map(|(_, y)| *y).collect();
+    let y_axis = Axis::from_data(y_col, &all_y);
+    let x_max = if x_labels.is_empty() {
+        1.0
+    } else {
+        (x_labels.len() - 1) as f64
+    };
+    ChartConfig {
+        title,
+        x_axis: Axis {
+            label: x_col.to_string(),
+            min: 0.0,
+            max: x_max,
+        },
+        y_axis,
+        series: vec![
+            Series {
+                name: "before".to_string(),
+                data: before.to_vec(),
+            },
+            Series {
+                name: "after".to_string(),
+                data: after.to_vec(),
+            },
+        ],
+        x_labels: Some(x_labels.to_vec()),
+        series_colors: vec![ratatui::style::Color::DarkGray, ratatui::style::Color::Cyan],
+        axis_color: Some(ratatui::style::Color::DarkGray),
+        label_color: Some(ratatui::style::Color::DarkGray),
+    }
+}
 /// Each (y_idx, label) pair produces one Series.
 pub fn build_multi_y_series(
     rows: &[Vec<String>],
