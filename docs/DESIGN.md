@@ -123,13 +123,16 @@ never reverses**. Concretely:
 ## Decision Records (why the boundaries exist)
 
 1. **Shared `ChartData` with thin mode adapters** (extends decision 6 above).
-   `oneshot/builders.rs` is the canonical assembler
-   (`ResolvedAxes` → `data_builder` → `ChartData`); `present/chart_loader.rs`
-   and `explore/diff_render.rs` re-assemble the same chain inline. That
-   duplication is debt: unify toward one assembler so a `data_builder` change
-   cannot diverge between modes. A mode adapter may only sort, truncate, fit
-   labels, apply theme, or wire slide/interactive state — never re-derive
-   aggregation.
+  `chart/data_builder.rs` is the canonical assembler
+  (`ResolvedAxes` → `aggregate_bar`/`build_chart_config`/`build_histogram`/
+  `build_heatmap_data`/`build_diff_line_config` → `ChartData`);
+  `oneshot/builders.rs` adapts on top (sort/truncate/label fitting/theme).
+  Temporal diff Line assembly is unified since Phase 3-1 (oneshot-diff,
+  explore-diff, present-diff all build through `build_diff_line_config`);
+  categorical diff Bar annotation (▲/▼ labels, color-by-direction) is
+  still mode-local. A mode adapter may only sort, truncate, fit
+  labels, apply theme, or wire slide/interactive state — never re-derive
+  aggregation or axis spans.
 2. **`Cli` must not leak below the app plane.** Every `&Cli` parameter in
   data/output code forces tests through `Cli::try_parse_from`, blocks reuse
   from other products, and blocks the L3 crate split. Phase 2 removed all
