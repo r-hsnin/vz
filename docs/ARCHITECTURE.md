@@ -6,8 +6,8 @@ rules, data flow, the canonical assembler boundary, and change impact.
 This document owns **where code lives and what depends on what**. It does not
 own design rationale ([DESIGN.md](DESIGN.md)), user-facing CLI/usage
 ([README.md](../README.md)), dev commands/tests ([CONTRIBUTING.md](../CONTRIBUTING.md)),
-release steps ([RUNBOOK.md](RUNBOOK.md)), or behavioural traps
-([GOTCHAS.md](GOTCHAS.md)). When this document and the code disagree, `src/` wins.
+or behavioural traps ([GOTCHAS.md](GOTCHAS.md)). When this document and the code
+disagree, `src/` wins.
 
 ## Crate Layout
 
@@ -26,20 +26,6 @@ library surface is deliberately narrow and its doc-comment calls it "the future
 - `cli/` is an **app-plane module that is `pub`** because the binary entry and library API both need `Cli` and its value enums; it is the only app-plane module exposed publicly.
 - Public items are reachable through their modules (e.g. `vz::cli::Cli`, `vz::chart::Query`, `vz::loader::load_data`), not re-exported at the root.
 - There is no `#[doc(hidden)]` compatibility layer; breaking changes are allowed, so no compat shims are maintained.
-
-### Target split (not yet implemented)
-
-The intended end state is **two crates, never more**: a `vz-core` library and a
-`vz` binary depending on it. Today this is a target only.
-
-| Plane material | Target crate |
-|---|---|
-| `loader/`, `infer/`, `filter.rs`, `util.rs`, `sparkline.rs`, `theme.rs`, pure `insights`/`info` | `vz-core` |
-| `chart/` (selector + recommend + **canonical data_builder**), `render/` (ratatui stays internal), `output/` (value/String returns), `diff/compute` + `diff/schema`, `present/parser` | `vz-core` |
-| `cli/`, `app.rs`, `pipeline.rs`, `watch.rs`, `oneshot/`, `directory/`, `explore/`, `present/` rest, `diff/render/` | `vz` (bin) |
-
-At split time `release-manifest.txt` must change from `src/` to `crates/*/src`
-(a publication-scope change; see AGENTS/`RUNBOOK.md`).
 
 ## Module Map by Plane
 
@@ -112,7 +98,7 @@ Owns `Cli`, stdin/stdout/stderr, TUI loops, and mode dispatch.
 ## Plane Dependency Rules
 
 Intended direction (enforced by review today; compiler-enforced only after the
-L3 split):
+crate split):
 
 ```
 app plane ──uses──▶ render / output planes ──uses──▶ data plane
@@ -161,11 +147,6 @@ Conversion happens once, in the app plane (`Cli::to_query`,
 `to_pipeline_params`, `to_directory_params`, `to_diff_params`). `RenderOptions`
 has production `from_params` (takes `PipelineParams`) plus a `#[cfg(test)]`-only
 `from_cli` test seam.
-
-**Residual:** `output/table.rs` and `output/markdown.rs` still accept an unused
-`schema: &Schema` parameter (discarded with `let _ = schema;`). This is minor
-debt, not the documented pattern (`chart_json.rs` uses its parameter). Remove it
-when touching those exporters.
 
 ## Data Flow
 
@@ -292,12 +273,3 @@ Data is processed fully in memory; there is no streaming mode. Type inference
 samples up to 100 **evenly spaced** rows (first and last kept). The claim that
 "files up to ~1 GB are fine" is **UNVERIFIED**: the code enforces row/point/bin
 limits only, with no byte-size guard.
-
-## Known Debt and Structural Constraints
-
-- **`helpers/` must not be recreated.** Dissolved; its functions live in `cli/resolve.rs`, `chart/recommend.rs`, and `filter.rs`.
-- **No `thiserror` until the L3 split.** `anyhow` throughout; typed errors are deferred to the `vz-core`/`vz` separation.
-- **No external data engine.** No Polars/DuckDB; in-memory only. `notify` exists solely for `--watch`.
-- **Release-freeze policy is out of scope** (AGENTS/`RUNBOOK.md`); only its structural consequence — the L3 split would change `release-manifest.txt` — belongs here.
-- **Unused `schema` parameter** in `output/table.rs` / `output/markdown.rs` is residual debt (see the `Cli` boundary section).
-- **Line-number references are fragile.** Prefer module/function names over `file:line`, which drift as code moves.

@@ -2,7 +2,7 @@
 
 Everything needed to build, test, lint, bench, and submit changes. For module structure see
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); for design rationale see
-[docs/DESIGN.md](docs/DESIGN.md); for releases see [docs/RUNBOOK.md](docs/RUNBOOK.md). User-facing
+[docs/DESIGN.md](docs/DESIGN.md). User-facing
 CLI behavior is documented in [README.md](README.md); do not duplicate it here.
 
 ## Prerequisites
@@ -168,20 +168,9 @@ core stays deliberately dependency-light (no external data engine).
 
 ## Local hooks
 
-Hooks are managed by [lefthook](https://github.com/evilmartians/lefthook) via `lefthook.yml`:
-
-- **pre-commit**: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`
-- **pre-push**: origin guard (`scripts/hooks/guard-origin-push.sh`) + `cargo test`
-
-Install once per clone:
-
-```bash
-bun add -g lefthook     # or: npm i -g lefthook
-lefthook install        # add --reset-hooks-path if core.hooksPath is stale
-```
-
-Hooks only run when installed (`core.hooksPath` points at them), so do not assume they are active —
-run the pre-commit commands manually if unsure. Manual invocation: `lefthook run pre-commit`.
+Maintainers wire the verification commands into local Git hooks. Hooks only run when installed in a
+clone, so do not assume they are active — run the commands in
+[Pre-commit verification](#pre-commit-verification) manually if unsure.
 
 ## Continuous integration
 
@@ -193,7 +182,7 @@ and on manual dispatch:
 | `test` (ubuntu, toolchain 1.97.0) | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` |
 | `msrv` (ubuntu, toolchain 1.88.0) | `cargo +1.88.0 check --locked` |
 
-There is no release job; releases are handled manually per [docs/RUNBOOK.md](docs/RUNBOOK.md).
+There is no release job; releases are handled manually by the maintainers.
 
 ## Commit and pull request conventions
 
@@ -202,9 +191,7 @@ There is no release job; releases are handled manually per [docs/RUNBOOK.md](doc
 - Keep commits logical and focused — do not mix unrelated concerns.
 - Stage files explicitly (`git add <paths>`); do not blanket-add.
 - Do **not** change the `version` in `Cargo.toml` except as part of a release.
-- External contributors: fork the repository and open a pull request against `main`. The separate
-  `dev`/`origin` maintainer workflow and release process are handled internally — see
-  [docs/RUNBOOK.md](docs/RUNBOOK.md) for releases.
+- External contributors: fork the repository and open a pull request against `main`.
 - Documentation is part of the change: update `README.md` for CLI changes,
   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for structure, [docs/DESIGN.md](docs/DESIGN.md) for
   design decisions, and [docs/GOTCHAS.md](docs/GOTCHAS.md) for non-obvious pitfalls.

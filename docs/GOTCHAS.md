@@ -2,7 +2,7 @@
 
 Non-obvious user-visible behavior, footguns, and known limitations. Full flag
 reference lives in [README.md](../README.md); design rationale in
-[DESIGN.md](DESIGN.md); release steps in [RUNBOOK.md](RUNBOOK.md).
+[DESIGN.md](DESIGN.md).
 
 ## Input & parsing
 

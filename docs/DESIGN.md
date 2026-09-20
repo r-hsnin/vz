@@ -3,8 +3,7 @@
 Rationale, intent, and the decisions behind vz. Structural facts (module map, data flow,
 change impact) live in [ARCHITECTURE.md](ARCHITECTURE.md). CLI reference is in
 [README.md](../README.md), development commands in [CONTRIBUTING.md](../CONTRIBUTING.md),
-known pitfalls in [GOTCHAS.md](GOTCHAS.md), and release/publication procedure in
-[RUNBOOK.md](RUNBOOK.md). Where prose and code disagree, code wins.
+and known pitfalls in [GOTCHAS.md](GOTCHAS.md). Where prose and code disagree, code wins.
 
 ## What This Document Owns
 
@@ -51,7 +50,7 @@ exists belongs here.
 - Streaming or real-time data beyond `--watch`.
 - Data transformation/ETL, joins, or reshaping.
 - Custom color palettes beyond the built-in themes.
-- Release and publication mechanics (see [RUNBOOK.md](RUNBOOK.md)).
+- Release and publication mechanics.
 
 ## Type System and Inference Rationale
 
@@ -213,14 +212,11 @@ Accepted residual divergences (deliberate tradeoffs, not oversights):
 - **Alternatives rejected.** A many-crate split (data/chart/render/output) would make
   one fix bump three or four crates, turn cross-crate renames into breaking changes, and
   raise onboarding cost for a single-product tool.
-- **Status.** Intent. Today the code is a single crate. At split time the publication
-  manifest must change from `src/` to `crates/*/src`; publication procedure is owned by
-  [RUNBOOK.md](RUNBOOK.md).
 
 ### D2. `Cli` must not leak below the app plane
 
 - **Context.** `&Cli` parameters in data and output code force every test through
-  `Cli::try_parse_from`, block reuse from other products, and block the L3 split.
+  `Cli::try_parse_from`, block reuse from other products, and block the crate split.
 - **Decision.** `Cli` lives only in the app plane and `cli/`. Everything downstream
   takes plain structures — `PipelineParams`, `DirectoryParams`, `DiffParams`,
   `TableParams`, `ChartJsonParams`, `SparkParams`, `Query`, and `FilterOutcome`. Each
@@ -229,7 +225,7 @@ Accepted residual divergences (deliberate tradeoffs, not oversights):
   point is the seam the crate split will cut along.
 - **Alternatives rejected.** Passing `&Cli` into core; a global configuration
   singleton.
-- **Status.** Done. New code must not add a `&Cli` parameter below the app plane.
+- **Rule.** New code must not add a `&Cli` parameter below the app plane.
 
 ### D3. Ratatui is the render engine; SVG/HTML mirror its cell geometry
 
@@ -242,9 +238,9 @@ Accepted residual divergences (deliberate tradeoffs, not oversights):
   geometry source prevents terminal and SVG layouts from drifting apart.
 - **Alternatives rejected.** A bespoke cell renderer; a headless geometry layer with a
   separate terminal renderer (two layout engines to keep in sync).
-- **Status.** Active. Ratatui types must not appear in output public signatures.
+- **Rule.** Ratatui types must not appear in output public signatures.
 
-### D4. `anyhow` now, typed errors only at the L3 split
+### D4. `anyhow` now, typed errors only at the crate split
 
 - **Context.** A single binary needs no stable error API.
 - **Decision.** Use `anyhow::Result` throughout today. When core splits, core gains a
@@ -254,18 +250,16 @@ Accepted residual divergences (deliberate tradeoffs, not oversights):
   gets a real error contract exactly when it becomes a library.
 - **Alternatives rejected.** Introducing `thiserror` now; leaking `anyhow` into core's
   public surface after the split.
-- **Status.** Deferred to L3.
 
 ### D5. `helpers/` is dissolved and must not be recreated
 
 - **Context.** `helpers/` accumulated cross-plane couplings as a migration station.
 - **Decision.** The module is gone: `resolve_*` belongs to `cli`, `build_*`/`parse_*`
   to `chart`, `apply_filters` to `filter`, and render options to `oneshot`.
-- **Rationale.** Functions live with their owner, and the coupling L3 must delete is
-  not re-grown.
+- **Rationale.** Functions live with their owner, and the coupling the crate split must
+  delete is not re-grown.
 - **Alternatives rejected.** Keeping `helpers/` as a facade; adding a new catch-all
   `utils` module.
-- **Status.** Done.
 
 ### D6. No external data engine; in-memory; no streaming
 
@@ -275,9 +269,9 @@ Accepted residual divergences (deliberate tradeoffs, not oversights):
   streaming mode beyond `--watch`, and `notify` is used only to power `--watch`.
 - **Rationale.** The value is visualization, not query execution; a heavy engine would
   slow builds and bloat the binary for capabilities the product does not offer.
-- **Alternatives rejected.** An embedded query engine or columnar store for scale.
-- **Status.** Active. Revisit only if real datasets outgrow memory; row/point limits
-  exist, but no byte-size guard does.
+- **Alternatives rejected.** An embedded query engine or columnar store for scale;
+  revisit only if real datasets outgrow memory (row/point limits exist, but no byte-size
+  guard does).
 
 ### D7. Narrow public API; breaking changes allowed
 
@@ -289,7 +283,6 @@ Accepted residual divergences (deliberate tradeoffs, not oversights):
 - **Rationale.** A small surface is the only thing that can be stabilized at the split;
   hidden compatibility items silently become contracts.
 - **Alternatives rejected.** `#[doc(hidden)]` deprecation shims kept for compatibility.
-- **Status.** Active.
 
 ### D8. `--bins` is bounded by `MAX_BINS` and defensively clamped
 
@@ -300,4 +293,3 @@ Accepted residual divergences (deliberate tradeoffs, not oversights):
 - **Rationale.** The bound protects memory and time, and the clamp covers library
   callers that bypass CLI validation.
 - **Alternatives rejected.** Relying on CLI validation alone.
-- **Status.** Done.

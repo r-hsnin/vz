@@ -9,7 +9,7 @@ CLI BI tool with smart visualization and terminal presentation.
 `vz data.csv` loads a tabular file, infers each column's type, picks a chart, and renders it in the terminal.
 Convention over configuration: column types determine the visualization automatically.
 
-[Contributing](CONTRIBUTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Design](docs/DESIGN.md) · [Gotchas](docs/GOTCHAS.md) · [Runbook](docs/RUNBOOK.md)
+[Contributing](CONTRIBUTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Design](docs/DESIGN.md) · [Gotchas](docs/GOTCHAS.md)
 
 ## Features
 
@@ -378,7 +378,6 @@ data, and synthetic headers `col1…colN` are generated; `--no-header` forces he
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — module structure and data flow.
 - [docs/DESIGN.md](docs/DESIGN.md) — design rationale, philosophy, and scope.
 - [docs/GOTCHAS.md](docs/GOTCHAS.md) — surprising behaviors and known bugs.
-- [docs/RUNBOOK.md](docs/RUNBOOK.md) — release process and recovery.
 
 ## License
 
