@@ -23,5 +23,8 @@ pub mod theme;
 pub mod util;
 pub mod watch;
 
+mod app;
+pub use app::{apply_output_shorthands, run};
+
 #[cfg(test)]
 mod test_helpers;
