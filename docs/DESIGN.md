@@ -128,11 +128,12 @@ never reverses**. Concretely:
    from other products, and blocks the L3 crate split. Current violations are
    debt, not examples to follow: `pipeline::render_data(&Cli)` (the worst —
    the whole pipeline hangs off CLI), `diff::run_diff(&Cli)`,
-    `directory::run_directory(&Cli)`, `output/markdown.rs` + `output/table.rs`
-    taking `&Cli` (`diagnostics::error_hint(_, Option<&Path>)` done in
-    Phase 2-1). New code must take a
-   plain `*Params`/`*Options` struct (precedent: `ChartJsonParams`,
-   `SparkParams`) or `Option<&Path>` instead.
+    `directory::run_directory(&Cli)`
+    (done: `diagnostics::error_hint(_, Option<&Path>)` in Phase 2-1,
+    `output/table.rs` + `output/markdown.rs` via `TableParams` in Phase 2-2).
+    New code must take a
+    plain `*Params`/`*Options` struct (precedent: `ChartJsonParams`,
+    `SparkParams`, `TableParams`) or `Option<&Path>` instead.
 3. **Ratatui stays inside the render contract.** SVG/HTML/JSON exist so
    agents and reports can consume charts without a terminal; exposing
    `Buffer`/`Rect`/`Color` in their signatures would drag the TUI stack into

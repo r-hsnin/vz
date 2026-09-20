@@ -108,18 +108,20 @@ Forbidden (compiler-unchecked today — do not add new instances):
 - `&Cli` parameters outside `cli/` + binary adapters. Known instances:
   `pipeline::render_data` / `dispatch_output` helpers (`pipeline.rs`),
   `diff::run_diff` (`diff/mod.rs`), `directory::run_directory`
-  (`directory/mod.rs`), `output/markdown.rs` + `output/table.rs`,
+  (`directory/mod.rs`),
   `chart/recommend.rs` (`build_recommendation`,
   `effective_agg`, `parse_y_options` — app-plane adapters parked in `chart/`
   until the Phase 2 `Query` seam; see `recommend.rs` header).
-  (`diagnostics::error_hint` done: takes `Option<&Path>` since Phase 2-1.)
+  (Done: `diagnostics::error_hint` takes `Option<&Path>` since Phase 2-1;
+  `output/table.rs` + `output/markdown.rs` take `TableParams` since Phase 2-2.)
 - `println!/eprintln!` in data/render planes. Known instances:
   `output/markdown.rs` + `output/table.rs` warnings,
   `chart/recommend.rs` recommendation notices, `chart/data_builder.rs:325`,
   `filter::apply_filters` info notice (kept with the function until Phase 2
   separates notification from filtering). Precedent to copy:
-  `output/chart_json.rs` (`ChartJsonParams`) and `output/spark.rs`
-  (`SparkParams`) take plain params structs and keep printing at the edge.
+  `output/chart_json.rs` (`ChartJsonParams`), `output/spark.rs`
+  (`SparkParams`), and `output/table.rs` (`TableParams`, shared with
+  `output/markdown.rs`) take plain params structs and keep printing at the edge.
 - `render/` geometry invented anywhere else; `ratatui` types in `output/`
   public signatures (only `output/svg.rs` touches `Buffer`, via the shared
   cell-geometry contract).
