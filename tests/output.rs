@@ -1296,6 +1296,39 @@ fn test_spark_bar_aggregation_values() {
 }
 
 #[test]
+fn test_spark_bar_limit_truncates_via_canonical_adapter() {
+    // --top 2 keeps 2 categories → 2 sparkline chars/range (3.3k–4.2k)
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "--spark",
+            "-t",
+            "bar",
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "--top",
+            "2",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    let parts: Vec<&str> = trimmed.split("  ").collect();
+    assert!(parts.len() >= 2, "Expected parts, got: {}", trimmed);
+    let spark_chars: Vec<char> = parts[1].chars().collect();
+    assert_eq!(
+        spark_chars.len(),
+        2,
+        "Expected 2 sparkline chars after --top 2, got {} in: {}",
+        spark_chars.len(),
+        parts[1]
+    );
+}
+
+#[test]
 fn test_output_markdown_bar_aggregated_values() {
     // Bar chart markdown should show aggregated sums
     let output = vz_binary()

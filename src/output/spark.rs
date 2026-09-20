@@ -81,10 +81,7 @@ pub fn print_spark(
         let (mut bar_data, _) =
             data_builder::aggregate_bar(rows, xi, yi, None, String::new(), params.agg);
         data_builder::sort_bar_data(&mut bar_data, params.sort);
-        if let Some(n) = params.limit {
-            bar_data.labels.truncate(n);
-            bar_data.values.truncate(n);
-        }
+        data_builder::truncate_bar_data(&mut bar_data, params.limit);
         let spark = make_sparkline(&bar_data.values);
         let suffix = range_suffix(&bar_data.values);
         println!("{y_name}  {spark}{suffix}");
@@ -94,10 +91,7 @@ pub fn print_spark(
                 let (mut extra_data, _) =
                     data_builder::aggregate_bar(rows, xi, eyi, None, String::new(), params.agg);
                 data_builder::sort_bar_data(&mut extra_data, params.sort);
-                if let Some(n) = params.limit {
-                    extra_data.labels.truncate(n);
-                    extra_data.values.truncate(n);
-                }
+                data_builder::truncate_bar_data(&mut extra_data, params.limit);
                 let spark = make_sparkline(&extra_data.values);
                 let suffix = range_suffix(&extra_data.values);
                 println!("{extra}  {spark}{suffix}");

@@ -137,10 +137,7 @@ fn build_bar_json(
     let (mut bar_data, _) =
         data_builder::aggregate_bar(rows, x_idx, y_idx, None, String::new(), params.agg);
     data_builder::sort_bar_data(&mut bar_data, params.sort);
-    if let Some(n) = params.limit {
-        bar_data.labels.truncate(n);
-        bar_data.values.truncate(n);
-    }
+    data_builder::truncate_bar_data(&mut bar_data, params.limit);
     json!({ "type": "bar", "categories": bar_data.labels, "values": bar_data.values })
 }
 
