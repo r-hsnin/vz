@@ -2,7 +2,7 @@ mod args;
 mod resolve;
 mod types;
 
-pub use args::{PipelineParams, parse_column_spec, parse_multi_y_specs};
+pub use args::{DiffParams, PipelineParams, parse_column_spec, parse_multi_y_specs};
 pub use resolve::{format_override, resolve_input_file, resolve_theme, resolve_theme_arg};
 pub use types::{
     AggFunctionArg, ChartTypeArg, InputFormatArg, OutputFormat, SortOrderArg, ThemeArg,

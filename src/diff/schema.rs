@@ -3,7 +3,7 @@
 use anyhow::{Result, bail};
 use std::path::Path;
 
-use crate::cli::Cli;
+use crate::chart::Query;
 use crate::loader::LoadedData;
 
 /// Validate that two datasets have compatible schemas (same column names, case-insensitive).
@@ -87,11 +87,11 @@ pub fn is_temporal_column(schema: &crate::infer::types::Schema, col: &str) -> bo
 
 /// Resolve which column to use as X axis for diff comparison.
 pub(crate) fn resolve_x_column(
-    cli: &Cli,
+    query: &Query,
     data: &LoadedData,
     schema: &crate::infer::types::Schema,
 ) -> Result<String> {
-    if let Some(ref x) = cli.x_col {
+    if let Some(ref x) = query.x_col {
         let (col, _) = crate::cli::parse_column_spec(x);
         if !data.headers.iter().any(|h| h == col) {
             let suffix = crate::diagnostics::format_column_suffix(
@@ -114,12 +114,12 @@ pub(crate) fn resolve_x_column(
 
 /// Resolve which column to use as Y axis for diff comparison.
 pub(crate) fn resolve_y_column(
-    cli: &Cli,
+    query: &Query,
     data: &LoadedData,
     schema: &crate::infer::types::Schema,
     x_col: &str,
 ) -> Result<String> {
-    if let Some(ref y) = cli.y_col {
+    if let Some(ref y) = query.y_col {
         let (col, _) = crate::cli::parse_column_spec(y);
         if !data.headers.iter().any(|h| h == col) {
             let suffix = crate::diagnostics::format_column_suffix(
@@ -241,36 +241,38 @@ mod tests {
 
     #[test]
     fn resolve_x_column_suggests_close_match() {
-        use crate::cli::Cli;
-        use clap::Parser;
         let schema = make_schema(&[
             ("date", DataType::Temporal),
             ("revenue", DataType::Quantitative),
         ]);
-        let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-x", "revnue"]).unwrap();
+        let query = Query {
+            x_col: Some("revnue".to_string()),
+            ..Default::default()
+        };
         let data = crate::loader::LoadedData {
             headers: headers(&["date", "revenue"]),
             rows: vec![],
         };
-        let err = resolve_x_column(&cli, &data, &schema).unwrap_err();
+        let err = resolve_x_column(&query, &data, &schema).unwrap_err();
         let msg = format!("{:#}", err);
         assert!(msg.contains("Did you mean 'revenue'?"), "{msg}");
     }
 
     #[test]
     fn resolve_y_column_marks_case_sensitivity() {
-        use crate::cli::Cli;
-        use clap::Parser;
         let schema = make_schema(&[
             ("date", DataType::Temporal),
             ("revenue", DataType::Quantitative),
         ]);
-        let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-y", "Revenue"]).unwrap();
+        let query = Query {
+            y_col: Some("Revenue".to_string()),
+            ..Default::default()
+        };
         let data = crate::loader::LoadedData {
             headers: headers(&["date", "revenue"]),
             rows: vec![],
         };
-        let err = resolve_y_column(&cli, &data, &schema, "date").unwrap_err();
+        let err = resolve_y_column(&query, &data, &schema, "date").unwrap_err();
         let msg = format!("{:#}", err);
         assert!(msg.contains("case-sensitive"), "{msg}");
     }

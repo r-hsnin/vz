@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::cli::Cli;
+use crate::cli::DiffParams;
 use crate::diff::{DiffResult, DiffTimeSeries};
 use crate::render::format_number;
 
@@ -27,12 +27,12 @@ fn escape_cell(s: &str) -> String {
 
 /// Print categorical diff as a Markdown table.
 pub(super) fn print_diff_markdown(
-    cli: &Cli,
+    params: &DiffParams,
     diff: &DiffResult,
     _before_path: &Path,
     _after_path: &Path,
 ) {
-    let entries = apply_sort_and_limit(cli, &diff.entries);
+    let entries = apply_sort_and_limit(params.sort, params.limit, &diff.entries);
 
     let x_col = escape_cell(&diff.x_column);
     println!("| {} | Before | After | Change |", x_col);

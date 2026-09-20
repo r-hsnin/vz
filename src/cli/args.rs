@@ -95,9 +95,45 @@ impl Cli {
             theme: self.theme,
         }
     }
+
+    /// Convert CLI flags into [`DiffParams`]: the `Query` seam plus the
+    /// other resolved diff inputs. Sole funnel for `Cli → diff`.
+    pub fn to_diff_params(&self) -> DiffParams {
+        DiffParams {
+            query: self.to_query(),
+            no_header: self.no_header,
+            format: super::format_override(self),
+            output: self.output,
+            sort: self.effective_sort(),
+            limit: self.top.or(self.tail),
+            width: self.width,
+            height: self.height,
+            title: self.title.clone(),
+            theme: self.theme,
+        }
+    }
 }
 
-/// Parse a column spec that may include a label override.
+/// Resolved, Cli-free inputs for diff mode (two-file comparison).
+///
+/// Built once in the app plane (`Cli::to_diff_params`); downstream
+/// diff/schema/render code takes this instead of `&Cli`. The `query` field
+/// is the Phase 2 `Query` seam (`to_query`); `--where`/`--agg`/`--color`
+/// have no effect in diff mode, so their warnings stay in the
+/// `run_diff_from_cli` adapter and never reach this struct.
+#[derive(Debug, Clone)]
+pub struct DiffParams {
+    pub query: crate::chart::Query,
+    pub no_header: bool,
+    pub format: Option<crate::loader::InputFormat>,
+    pub output: Option<OutputFormat>,
+    pub sort: Option<SortOrder>,
+    pub limit: Option<usize>,
+    pub width: Option<u16>,
+    pub height: Option<u16>,
+    pub title: Option<String>,
+    pub theme: Option<super::ThemeArg>,
+}
 /// "revenue" → ("revenue", None)
 /// "revenue:Revenue (USD)" → ("revenue", Some("Revenue (USD)"))
 pub fn parse_column_spec(spec: &str) -> (&str, Option<&str>) {
@@ -148,6 +184,17 @@ mod tests {
         assert_eq!(params.limit, Some(3));
         assert_eq!(params.sample, None);
         assert!(!params.info);
+    }
+
+    #[test]
+    fn test_to_diff_params_resolves_render_inputs() {
+        let cli =
+            Cli::try_parse_from(["vz", "a.csv", "b.csv", "--top", "2", "-x", "city"]).unwrap();
+        let params = cli.to_diff_params();
+        assert_eq!(params.query.x_col.as_deref(), Some("city"));
+        assert_eq!(params.sort, Some(SortOrder::Desc));
+        assert_eq!(params.limit, Some(2));
+        assert!(!params.no_header);
     }
 
     #[test]

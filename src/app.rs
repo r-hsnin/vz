@@ -146,7 +146,7 @@ fn run_explore_diff(before_path: &Path, after_path: &Path, cli: &Cli) -> Result<
 fn run_oneshot(cli: &Cli) -> Result<()> {
     // Diff mode: two files provided
     if let Some((before, after)) = cli.diff_pair() {
-        return diff::run_diff(cli, &before, &after);
+        return diff::run_diff_from_cli(cli, &before, &after);
     }
 
     let file = resolve_input_file(cli)?;

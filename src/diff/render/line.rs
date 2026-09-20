@@ -6,7 +6,7 @@ use std::path::Path;
 
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
-use crate::cli::Cli;
+use crate::cli::DiffParams;
 use crate::diff::DiffTimeSeries;
 use crate::oneshot::{self, fit_labels_to_width};
 use crate::render::{self, Axis, ChartConfig, ChartData, Series};
@@ -33,7 +33,7 @@ pub(super) fn print_diff_line_summary(ts: &DiffTimeSeries, before_path: &Path, a
 
 /// Render the line chart overlay into a buffer and print to stdout.
 pub(super) fn print_diff_line_chart(
-    cli: &Cli,
+    params: &DiffParams,
     ts: &DiffTimeSeries,
     before_path: &Path,
     after_path: &Path,
@@ -62,8 +62,8 @@ pub(super) fn print_diff_line_chart(
         max: x_max,
     };
 
-    let width = cli.width.unwrap_or_else(oneshot::terminal_width);
-    let height = cli.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
+    let width = params.width.unwrap_or_else(oneshot::terminal_width);
+    let height = params.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
 
     // Fit labels to available width
     let fitted_labels = fit_labels_to_width(&ts.x_labels, width.saturating_sub(12) as usize);

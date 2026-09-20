@@ -4,7 +4,7 @@ use std::path::Path;
 
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
-use crate::cli::{Cli, resolve_theme};
+use crate::cli::{DiffParams, resolve_theme_arg};
 use crate::diff::{DiffResult, DiffTimeSeries};
 use crate::oneshot::{self, fit_labels_to_width};
 use crate::output;
@@ -16,16 +16,21 @@ use super::apply_sort_and_limit;
 /// Render categorical diff as an SVG bar chart wrapped in HTML.
 ///
 /// Bars are colored green (increase) or red (decrease) based on delta direction.
-pub(super) fn print_diff_html(cli: &Cli, diff: &DiffResult, before_path: &Path, after_path: &Path) {
+pub(super) fn print_diff_html(
+    params: &DiffParams,
+    diff: &DiffResult,
+    before_path: &Path,
+    after_path: &Path,
+) {
     let before_name = path_label(before_path);
     let after_name = path_label(after_path);
 
-    let entries = apply_sort_and_limit(cli, &diff.entries);
+    let entries = apply_sort_and_limit(params.sort, params.limit, &diff.entries);
 
-    let theme = resolve_theme(cli);
+    let theme = resolve_theme_arg(params.theme);
     let bg = theme.svg_background();
-    let width = cli.width.unwrap_or_else(oneshot::terminal_width);
-    let height = cli.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
+    let width = params.width.unwrap_or_else(oneshot::terminal_width);
+    let height = params.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
 
     // Color each bar by delta direction: green=increase, red=decrease, gray=unchanged
     let colors: Vec<Color> = entries
@@ -56,7 +61,7 @@ pub(super) fn print_diff_html(cli: &Cli, diff: &DiffResult, before_path: &Path, 
     render::render_chart_data(&ChartData::Bar(bar_data), area, &mut buf);
 
     let svg = output::svg::buffer_to_svg(&buf, bg);
-    let title = cli
+    let title = params
         .title
         .clone()
         .unwrap_or_else(|| format!("Diff: {} vs {}", before_name, after_name));
@@ -67,7 +72,7 @@ pub(super) fn print_diff_html(cli: &Cli, diff: &DiffResult, before_path: &Path, 
 ///
 /// Before series is rendered in gray, after series in cyan.
 pub(super) fn print_diff_line_html(
-    cli: &Cli,
+    params: &DiffParams,
     ts: &DiffTimeSeries,
     before_path: &Path,
     after_path: &Path,
@@ -75,10 +80,10 @@ pub(super) fn print_diff_line_html(
     let before_name = path_label(before_path);
     let after_name = path_label(after_path);
 
-    let theme = resolve_theme(cli);
+    let theme = resolve_theme_arg(params.theme);
     let bg = theme.svg_background();
-    let width = cli.width.unwrap_or_else(oneshot::terminal_width);
-    let height = cli.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
+    let width = params.width.unwrap_or_else(oneshot::terminal_width);
+    let height = params.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
 
     // Build Y axis from all values in both series
     let all_y: Vec<f64> = ts
@@ -106,7 +111,8 @@ pub(super) fn print_diff_line_html(
 
     let config = ChartConfig {
         title: Some(
-            cli.title
+            params
+                .title
                 .clone()
                 .unwrap_or_else(|| format!("{} vs {}", before_name, after_name)),
         ),
@@ -133,7 +139,7 @@ pub(super) fn print_diff_line_html(
     render::render_chart_data(&ChartData::Line(config), area, &mut buf);
 
     let svg = output::svg::buffer_to_svg(&buf, bg);
-    let title = cli
+    let title = params
         .title
         .clone()
         .unwrap_or_else(|| format!("Diff: {} vs {}", before_name, after_name));

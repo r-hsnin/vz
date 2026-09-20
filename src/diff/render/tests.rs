@@ -1,8 +1,7 @@
 use std::path::Path;
 
-use clap::Parser;
-
-use crate::cli::Cli;
+use crate::chart::selector::SortOrder;
+use crate::cli::DiffParams;
 use crate::diff::{DiffEntry, DiffResult, DiffTimeSeries};
 
 use super::apply_sort_and_limit;
@@ -10,6 +9,21 @@ use super::html::{print_diff_html, print_diff_line_html};
 use super::json::print_diff_line_json;
 use super::markdown::{print_diff_line_markdown, print_diff_markdown};
 use super::spark::{print_diff_line_spark, print_diff_spark};
+
+fn diff_params(sort: Option<SortOrder>, limit: Option<usize>) -> DiffParams {
+    DiffParams {
+        query: crate::chart::Query::default(),
+        no_header: false,
+        format: None,
+        output: None,
+        sort,
+        limit,
+        width: None,
+        height: None,
+        title: None,
+        theme: None,
+    }
+}
 
 fn sample_entries() -> Vec<DiffEntry> {
     vec![
@@ -54,8 +68,7 @@ fn test_diff_spark_format() {
 #[test]
 fn test_apply_sort_desc() {
     let entries = sample_entries();
-    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "--sort", "desc"]).unwrap();
-    let sorted = apply_sort_and_limit(&cli, &entries);
+    let sorted = apply_sort_and_limit(Some(SortOrder::Desc), None, &entries);
     assert_eq!(sorted[0].label, "Tokyo"); // delta +200
     assert_eq!(sorted[1].label, "Nagoya"); // delta +150
     assert_eq!(sorted[2].label, "Osaka"); // delta -150
@@ -64,16 +77,14 @@ fn test_apply_sort_desc() {
 #[test]
 fn test_apply_sort_asc() {
     let entries = sample_entries();
-    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "--sort", "asc"]).unwrap();
-    let sorted = apply_sort_and_limit(&cli, &entries);
+    let sorted = apply_sort_and_limit(Some(SortOrder::Asc), None, &entries);
     assert_eq!(sorted[0].label, "Osaka"); // delta -150
 }
 
 #[test]
 fn test_apply_top_limit() {
     let entries = sample_entries();
-    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "--top", "2"]).unwrap();
-    let sorted = apply_sort_and_limit(&cli, &entries);
+    let sorted = apply_sort_and_limit(Some(SortOrder::Desc), Some(2), &entries);
     assert_eq!(sorted.len(), 2);
     assert_eq!(sorted[0].label, "Tokyo"); // highest delta
 }
@@ -171,9 +182,14 @@ fn test_diff_markdown_categorical_basic() {
         after_rows: 3,
         overall_pct: Some(6.06),
     };
-    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "markdown"]).unwrap();
+    let params = diff_params(None, None);
     // Verify it doesn't panic and produces output
-    print_diff_markdown(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+    print_diff_markdown(
+        &params,
+        &diff,
+        Path::new("before.csv"),
+        Path::new("after.csv"),
+    );
 }
 
 #[test]
@@ -186,9 +202,13 @@ fn test_diff_markdown_categorical_with_sort() {
         after_rows: 3,
         overall_pct: Some(6.06),
     };
-    let cli =
-        Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "markdown", "--sort", "desc"]).unwrap();
-    print_diff_markdown(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+    let params = diff_params(Some(SortOrder::Desc), None);
+    print_diff_markdown(
+        &params,
+        &diff,
+        Path::new("before.csv"),
+        Path::new("after.csv"),
+    );
 }
 
 #[test]
@@ -201,9 +221,13 @@ fn test_diff_markdown_categorical_with_top() {
         after_rows: 3,
         overall_pct: Some(6.06),
     };
-    let cli =
-        Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "markdown", "--top", "2"]).unwrap();
-    print_diff_markdown(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+    let params = diff_params(Some(SortOrder::Desc), Some(2));
+    print_diff_markdown(
+        &params,
+        &diff,
+        Path::new("before.csv"),
+        Path::new("after.csv"),
+    );
 }
 
 #[test]
@@ -223,8 +247,13 @@ fn test_diff_markdown_no_overall_pct() {
         after_rows: 3,
         overall_pct: None,
     };
-    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "markdown"]).unwrap();
-    print_diff_markdown(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+    let params = diff_params(None, None);
+    print_diff_markdown(
+        &params,
+        &diff,
+        Path::new("before.csv"),
+        Path::new("after.csv"),
+    );
 }
 
 // --- HTML output tests ---
@@ -239,9 +268,14 @@ fn test_diff_html_categorical_basic() {
         after_rows: 3,
         overall_pct: Some(6.06),
     };
-    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "html"]).unwrap();
+    let params = diff_params(None, None);
     // Verify it doesn't panic (output goes to stdout)
-    print_diff_html(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+    print_diff_html(
+        &params,
+        &diff,
+        Path::new("before.csv"),
+        Path::new("after.csv"),
+    );
 }
 
 #[test]
@@ -254,9 +288,13 @@ fn test_diff_html_categorical_with_sort() {
         after_rows: 3,
         overall_pct: Some(6.06),
     };
-    let cli =
-        Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "html", "--sort", "desc"]).unwrap();
-    print_diff_html(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+    let params = diff_params(Some(SortOrder::Desc), None);
+    print_diff_html(
+        &params,
+        &diff,
+        Path::new("before.csv"),
+        Path::new("after.csv"),
+    );
 }
 
 #[test]
@@ -269,15 +307,25 @@ fn test_diff_html_categorical_with_top() {
         after_rows: 3,
         overall_pct: Some(6.06),
     };
-    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "html", "--top", "2"]).unwrap();
-    print_diff_html(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+    let params = diff_params(Some(SortOrder::Desc), Some(2));
+    print_diff_html(
+        &params,
+        &diff,
+        Path::new("before.csv"),
+        Path::new("after.csv"),
+    );
 }
 
 #[test]
 fn test_diff_html_temporal_basic() {
     let ts = sample_ts();
-    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "html"]).unwrap();
-    print_diff_line_html(&cli, &ts, Path::new("before.csv"), Path::new("after.csv"));
+    let params = diff_params(None, None);
+    print_diff_line_html(
+        &params,
+        &ts,
+        Path::new("before.csv"),
+        Path::new("after.csv"),
+    );
 }
 
 #[test]
@@ -290,6 +338,11 @@ fn test_diff_html_no_overall_pct() {
         after_rows: 3,
         overall_pct: None,
     };
-    let cli = Cli::try_parse_from(["vz", "a.csv", "b.csv", "-o", "html"]).unwrap();
-    print_diff_html(&cli, &diff, Path::new("before.csv"), Path::new("after.csv"));
+    let params = diff_params(None, None);
+    print_diff_html(
+        &params,
+        &diff,
+        Path::new("before.csv"),
+        Path::new("after.csv"),
+    );
 }

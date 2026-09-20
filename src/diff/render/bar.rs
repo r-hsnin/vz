@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::cli::Cli;
+use crate::cli::DiffParams;
 use crate::diff::DiffResult;
 use crate::render::format_number;
 use crate::util::path_label;
@@ -46,8 +46,8 @@ pub(super) fn print_diff_summary(diff: &DiffResult, before_path: &Path, after_pa
 }
 
 /// Print a diff-aware bar chart with ▲/▼ direction markers.
-pub(super) fn print_diff_bar(cli: &Cli, diff: &DiffResult) {
-    let entries = apply_sort_and_limit(cli, &diff.entries);
+pub(super) fn print_diff_bar(params: &DiffParams, diff: &DiffResult) {
+    let entries = apply_sort_and_limit(params.sort, params.limit, &diff.entries);
 
     if entries.is_empty() {
         return;
@@ -60,7 +60,7 @@ pub(super) fn print_diff_bar(cli: &Cli, diff: &DiffResult) {
         .fold(0.0_f64, f64::max);
 
     let label_width = entries.iter().map(|e| e.label.len()).max().unwrap_or(8);
-    let bar_width: usize = cli
+    let bar_width: usize = params
         .width
         .map(|w| w as usize)
         .unwrap_or(DEFAULT_DIFF_BAR_WIDTH)
