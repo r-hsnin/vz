@@ -28,18 +28,22 @@ pub fn print_summary(ctx: &SummaryContext<'_>) {
 /// Build the summary parts vector (pure logic, no IO).
 pub fn build_summary_parts(ctx: &SummaryContext<'_>) -> Vec<String> {
     let mut parts = vec![ctx.chart_type.to_string()];
-    parts.push(format!("x={}", ctx.recommendation.x_column));
 
-    if let Some(ref y) = ctx.recommendation.y_column {
-        let y_idx = crate::chart::data_builder::column_index(ctx.headers, y);
-        let y_part = format_y_part(y, ctx.agg, ctx.agg_stats, ctx.rows, y_idx, ctx.chart_type);
-        parts.push(y_part);
-        // Add trend annotation for line/scatter
-        if ctx.chart_type != ChartType::Bar
-            && let Some(idx) = y_idx
-            && let Some(trend) = trend_annotation(ctx.rows, idx)
-        {
-            parts.push(trend);
+    if ctx.chart_type == ChartType::Histogram {
+        push_histogram_parts(ctx, &mut parts);
+    } else {
+        parts.push(format!("x={}", ctx.recommendation.x_column));
+        if let Some(ref y) = ctx.recommendation.y_column {
+            let y_idx = crate::chart::data_builder::column_index(ctx.headers, y);
+            let y_part = format_y_part(y, ctx.agg, ctx.agg_stats, ctx.rows, y_idx, ctx.chart_type);
+            parts.push(y_part);
+            // Add trend annotation for line/scatter
+            if ctx.chart_type != ChartType::Bar
+                && let Some(idx) = y_idx
+                && let Some(trend) = trend_annotation(ctx.rows, idx)
+            {
+                parts.push(trend);
+            }
         }
     }
 
@@ -82,6 +86,60 @@ pub fn build_summary_parts(ctx: &SummaryContext<'_>) -> Vec<String> {
         parts.push(hint);
     }
     parts
+}
+
+/// Histogram summary: describe the column that is actually binned (canonical
+/// `histogram_column`), never `-y` blindly, and derive range/sparkline/trend
+/// from it. The binned column doubles as the histogram's X axis label.
+fn push_histogram_parts(ctx: &SummaryContext<'_>, parts: &mut Vec<String>) {
+    let Some(x_idx) =
+        crate::chart::data_builder::column_index(ctx.headers, &ctx.recommendation.x_column)
+    else {
+        parts.push(format!("x={}", ctx.recommendation.x_column));
+        return;
+    };
+    let y_idx = ctx
+        .recommendation
+        .y_column
+        .as_deref()
+        .and_then(|y| crate::chart::data_builder::column_index(ctx.headers, y));
+    let idx = crate::chart::data_builder::histogram_column(ctx.rows, x_idx, y_idx.unwrap_or(x_idx));
+    let label = ctx
+        .headers
+        .get(idx)
+        .cloned()
+        .unwrap_or_else(|| ctx.recommendation.x_column.clone());
+    parts.push(format!("x={label}"));
+    if let Some(stats) = histogram_stats_part(ctx.rows, idx) {
+        parts.push(stats);
+    }
+    if let Some(trend) = trend_annotation(ctx.rows, idx) {
+        parts.push(trend);
+    }
+}
+
+/// `min–max spark` for the histogram's binned column, matching the line/scatter
+/// value-part shape (the column name is already the X label, so none is added).
+fn histogram_stats_part(rows: &[Vec<String>], idx: usize) -> Option<String> {
+    let values: Vec<f64> = rows
+        .iter()
+        .filter_map(|r| r.get(idx).and_then(|v| crate::util::parse_number(v)))
+        .filter(|v| v.is_finite())
+        .collect();
+    if values.is_empty() {
+        return None;
+    }
+    let range = crate::util::min_max(&values)
+        .map(|(min, max)| format!("{}–{}", format_number(min), format_number(max)))
+        .unwrap_or_default();
+    if values.len() < 2 {
+        return Some(range);
+    }
+    let sampled = crate::sparkline::sample_values(&values, 8);
+    Some(format!(
+        "{range} {}",
+        crate::sparkline::sparkline_from_values(&sampled)
+    ))
 }
 
 /// Format the Y-axis display part including range and sparkline.

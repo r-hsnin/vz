@@ -199,6 +199,42 @@ fn test_load_histogram_bins_x_when_both_quantitative() {
 }
 
 #[test]
+fn test_load_histogram_x_only_bins_first_quantitative() {
+    // Only X given + categorical X: the block must bin the first quantitative
+    // column (temperature) like oneshot's auto-Y, not the default Y slot (city).
+    let block = ChartBlock {
+        source: "temperature.csv".to_string(),
+        chart_type: Some(ChartType::Histogram),
+        x_col: Some("month".to_string()),
+        y_col: None,
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
+        bins: None,
+        height: None,
+        diff: None,
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
+    assert!(
+        result.is_ok(),
+        "histogram block should load: {:?}",
+        result.err()
+    );
+    match result.unwrap() {
+        crate::render::ChartData::Histogram(data) => {
+            assert_eq!(data.x_label, "temperature");
+            assert!(!data.values.is_empty(), "temperature values must be binned");
+        }
+        _ => panic!("Expected Histogram chart data"),
+    }
+}
+
+#[test]
 fn test_load_chart_data_infers_line_for_temporal() {
     // sales.csv has temporal x + quantitative y → should infer Line
     let block = ChartBlock {

@@ -315,13 +315,19 @@ impl ExploreApp {
         data
     }
 
-    /// Build histogram data.
+    /// Build histogram data. Bins the same column as every other mode
+    /// (canonical `histogram_column`) and labels the chart with that column.
     pub fn build_histogram_data(&self) -> HistogramData {
-        let x_label = self.x_label();
-        let title = format!("Distribution of {}", x_label);
+        let col_idx = data_builder::histogram_column(&self.data, self.selected_x, self.selected_y);
+        let label = self
+            .schema
+            .columns
+            .get(col_idx)
+            .map(|c| c.name.clone())
+            .unwrap_or_else(|| self.x_label());
+        let title = format!("Distribution of {}", label);
 
-        let mut data =
-            data_builder::build_histogram(&self.data, self.selected_x, Some(title), x_label, None);
+        let mut data = data_builder::build_histogram(&self.data, col_idx, Some(title), label, None);
         data.axis_color = Some(self.theme.axis_color);
         data
     }

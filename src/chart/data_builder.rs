@@ -427,6 +427,18 @@ pub fn histogram_column(rows: &[Vec<String>], x_idx: usize, y_idx: usize) -> usi
     if x_has_numbers { x_idx } else { y_idx }
 }
 
+/// Index of the first column whose leading values are numeric, using the same
+/// probe as [`histogram_column`]. Present blocks that name only an X column use
+/// this to choose the bin column, so a histogram over a categorical X bins the
+/// quantitative column oneshot's auto-Y would pick instead of the default Y
+/// slot (which may itself be categorical).
+pub fn first_quantitative_column(headers: &[String], rows: &[Vec<String>]) -> Option<usize> {
+    (0..headers.len()).find(|&i| {
+        let values: Vec<String> = rows.iter().filter_map(|r| r.get(i).cloned()).collect();
+        !values.is_empty() && !is_non_numeric(&values)
+    })
+}
+
 /// Find the index of a column name in headers.
 pub fn column_index(headers: &[String], name: &str) -> Option<usize> {
     headers.iter().position(|h| h == name)

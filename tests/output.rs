@@ -1483,6 +1483,39 @@ fn test_spark_histogram_no_y_uses_canonical_bins() {
 }
 
 #[test]
+fn test_spark_histogram_with_y_bins_canonical_column() {
+    // `-t histogram -x revenue -y profit` must bin revenue (canonical), not
+    // profit, matching the text/JSON renderers.
+    let output = vz_binary()
+        .args([
+            "fixtures/sales.csv",
+            "--spark",
+            "-t",
+            "histogram",
+            "-x",
+            "revenue",
+            "-y",
+            "profit",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.starts_with("revenue"),
+        "spark must be labelled with the binned column: {stdout}"
+    );
+    assert!(
+        stdout.contains("6 rows"),
+        "expected all revenue values binned: {stdout}"
+    );
+    assert!(
+        !stdout.contains("profit"),
+        "must not bin the unused -y column: {stdout}"
+    );
+}
+
+#[test]
 fn test_output_markdown_bar_aggregated_values() {
     // Bar chart markdown should show aggregated sums
     let output = vz_binary()

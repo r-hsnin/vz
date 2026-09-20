@@ -40,18 +40,21 @@ pub fn print_spark(
 
     let chart_type = oneshot::resolve_chart_type(recommendation, params.chart_type_override);
 
-    // Histogram with no Y column: bin the X column values and sparkline the counts
-    if y_idx.is_none() && chart_type == ChartType::Histogram {
+    // Histogram: always bin the canonical column, with or without an explicit
+    // Y, and sparkline the bin counts. Binning Y here would disagree with the
+    // text/JSON/present renderers.
+    if chart_type == ChartType::Histogram {
         if let Some(xi) = x_idx {
-            let hist = data_builder::build_histogram(
-                rows,
-                xi,
-                None,
-                recommendation.x_column.clone(),
-                params.bins,
-            );
+            let yi = y_idx.unwrap_or(xi);
+            let col_idx = data_builder::histogram_column(rows, xi, yi);
+            let label = headers
+                .get(col_idx)
+                .cloned()
+                .unwrap_or_else(|| recommendation.x_column.clone());
+            let hist =
+                data_builder::build_histogram(rows, col_idx, None, label.clone(), params.bins);
             if hist.values.is_empty() {
-                println!("{}", recommendation.x_column);
+                println!("{label}");
                 return;
             }
             let bins = crate::render::compute_bins(&hist.values, hist.bin_count);
@@ -60,8 +63,7 @@ pub fn print_spark(
             let range = util::min_max(&hist.values)
                 .map(|(min, max)| format!("({}–{})", format_number(min), format_number(max)))
                 .unwrap_or_default();
-            let x_name = &recommendation.x_column;
-            println!("{x_name}  {spark}  {range} {} rows", hist.values.len());
+            println!("{label}  {spark}  {range} {} rows", hist.values.len());
             return;
         }
         println!("▄");

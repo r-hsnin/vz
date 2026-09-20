@@ -207,10 +207,14 @@ categorical diff Bar annotation is unified since Phase 3-2 (values = after,
 labels = `label ▲ +20%`, signed-Δ sort/limit via `build_diff_bar_data`;
 color-by-direction stays at the edge — html green/red/gray, explore table
 Dir column). Bar post-aggregation and extra-Y span refit are unified since
-Phase 3-3 (extra-Y series reuse the base config's sampled rows, so
-non-numeric X coordinates — the row index — stay aligned with the base
-series); Line/Scatter/Histogram/Heatmap adapters only resolve their input
-plane and derive titles on top of canonical calls.
+Phase 3-3 (extra-Y series reuse the base config's sampled rows *and* its X
+mapping — the row index when ungrouped, the unique-category index when a
+color column groups the base — so overlay coordinates stay aligned with the
+series they annotate); Line/Scatter/Histogram/Heatmap adapters only resolve
+their input plane and derive titles on top of canonical calls. The histogram
+bin-column choice (`histogram_column`) and the summary/spark/insights
+description of the binned column are shared by every histogram consumer
+(oneshot text/JSON/spark, insights, explore, present).
 
 Known residual divergences (documented, intentional until decided otherwise):
 - explore interactive sort uses |Δ| (`sorted_entries`) while

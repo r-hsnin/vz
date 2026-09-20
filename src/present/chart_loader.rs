@@ -160,9 +160,20 @@ pub fn load_chart_data(
         .chart_type
         .unwrap_or_else(|| infer_chart_type_from_data(headers, rows, block));
 
+    // A histogram block naming only X must bin the first quantitative column,
+    // matching oneshot's auto-Y: the default Y slot (column 1) may be
+    // categorical and would otherwise produce an empty histogram.
+    let y_col = match (block.y_col.as_deref(), chart_type) {
+        (Some(y), _) => Some(y.to_string()),
+        (None, ChartType::Histogram) => {
+            data_builder::first_quantitative_column(headers, rows).map(|i| headers[i].clone())
+        }
+        _ => None,
+    };
+
     let axes = data_builder::ResolvedAxes::from_explicit(
         block.x_col.as_deref(),
-        block.y_col.as_deref(),
+        y_col.as_deref(),
         block.color_col.as_deref(),
         headers,
     )

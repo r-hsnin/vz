@@ -136,6 +136,16 @@ fn test_build_histogram_data() {
 }
 
 #[test]
+fn test_build_histogram_data_bins_quantitative_column() {
+    let mut app = make_test_app();
+    app.selected_x = 1; // city (categorical)
+    app.selected_y = 2; // revenue (quantitative)
+    let hist_data = app.build_histogram_data();
+    assert_eq!(hist_data.x_label, "revenue");
+    assert_eq!(hist_data.values.len(), 4);
+}
+
+#[test]
 fn test_y_values_numeric() {
     let app = make_test_app();
     let values = app.y_values();
