@@ -1,7 +1,7 @@
 //! Chart data builders for oneshot mode: build bar, histogram, heatmap, and line/scatter data.
 
 use crate::chart::data_builder::{self, ResolvedAxes};
-use crate::chart::selector::{AggFunction, SortOrder};
+use crate::chart::selector::AggFunction;
 use crate::chart::selector::{ChartRecommendation, ChartType};
 use crate::render::{BarChartData, ChartConfig, HistogramData};
 
@@ -59,31 +59,8 @@ fn build_chart_config(
     )
 }
 
-/// Sort bar chart data by value. No-op if sort_order is None or SortOrder::None.
-pub(crate) fn sort_bar_data(data: &mut BarChartData, sort_order: Option<SortOrder>) {
-    let reverse = match sort_order {
-        Some(SortOrder::Desc) => true,
-        Some(SortOrder::Asc) => false,
-        _ => return,
-    };
-    let mut indices: Vec<usize> = (0..data.values.len()).collect();
-    indices.sort_by(|a, b| {
-        let cmp = data.values[*a]
-            .partial_cmp(&data.values[*b])
-            .unwrap_or(std::cmp::Ordering::Equal);
-        if reverse { cmp.reverse() } else { cmp }
-    });
-    data.labels = indices.iter().map(|&i| data.labels[i].clone()).collect();
-    data.values = indices.iter().map(|&i| data.values[i]).collect();
-}
-
-/// Truncate bar chart to first N categories. No-op if limit is None.
-pub(crate) fn truncate_bar_data(data: &mut BarChartData, limit: Option<usize>) {
-    if let Some(n) = limit {
-        data.labels.truncate(n);
-        data.values.truncate(n);
-    }
-}
+// Post-aggregation Bar adapters (`sort_bar_data`, `truncate_bar_data`) live in
+// the canonical assembler `crate::chart::data_builder`; use them from there.
 
 /// Build BarChartData: aggregates values by category.
 /// Returns (data, rows_used).
@@ -207,6 +184,7 @@ fn apply_extra_y_columns(
 mod tests {
     use super::*;
     use crate::chart::selector::ChartRecommendation;
+    use crate::chart::selector::SortOrder;
 
     fn sales_headers() -> Vec<String> {
         vec![
@@ -262,107 +240,15 @@ mod tests {
     }
 
     #[test]
-    fn test_sort_bar_data_desc() {
+    fn test_build_bar_data_sort_contract_lives_in_canonical_assembler() {
         let (mut data, _) = build_bar_data(
             &bar_recommendation(),
             &sales_headers(),
             &sales_rows(),
             AggFunction::Sum,
         );
-        sort_bar_data(&mut data, Some(SortOrder::Desc));
+        data_builder::sort_bar_data(&mut data, Some(SortOrder::Desc));
         assert_eq!(data.labels[0], "Tokyo"); // 3000 > 500
-    }
-
-    #[test]
-    fn test_sort_bar_data_asc() {
-        let (mut data, _) = build_bar_data(
-            &bar_recommendation(),
-            &sales_headers(),
-            &sales_rows(),
-            AggFunction::Sum,
-        );
-        sort_bar_data(&mut data, Some(SortOrder::Asc));
-        assert_eq!(data.labels[0], "Osaka"); // 500 < 3000
-    }
-
-    #[test]
-    fn test_truncate_bar_data_limit() {
-        let (mut data, _) = build_bar_data(
-            &bar_recommendation(),
-            &sales_headers(),
-            &sales_rows(),
-            AggFunction::Sum,
-        );
-        truncate_bar_data(&mut data, Some(1));
-        assert_eq!(data.labels.len(), 1);
-        assert_eq!(data.values.len(), 1);
-    }
-
-    #[test]
-    fn test_sort_bar_data_none_preserves_order() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![10.0, 30.0, 20.0],
-            y_label: String::new(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-            axis_color: None,
-        };
-        sort_bar_data(&mut data, None);
-        assert_eq!(data.labels, vec!["A", "B", "C"]);
-    }
-
-    #[test]
-    fn test_sort_bar_data_with_nan() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![f64::NAN, 30.0, 20.0],
-            y_label: String::new(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-            axis_color: None,
-        };
-        sort_bar_data(&mut data, Some(SortOrder::Desc));
-        let non_nan: Vec<(&str, f64)> = data
-            .labels
-            .iter()
-            .zip(data.values.iter())
-            .filter(|(_, v)| !v.is_nan())
-            .map(|(l, v)| (l.as_str(), *v))
-            .collect();
-        assert_eq!(non_nan, vec![("B", 30.0), ("C", 20.0)]);
-    }
-
-    #[test]
-    fn test_truncate_bar_data_none_noop() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![100.0, 50.0, 25.0],
-            y_label: "val".into(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-            axis_color: None,
-        };
-        truncate_bar_data(&mut data, None);
-        assert_eq!(data.labels.len(), 3);
-    }
-
-    #[test]
-    fn test_truncate_bar_data_larger_than_data() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into()],
-            values: vec![100.0, 50.0],
-            y_label: "val".into(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-            axis_color: None,
-        };
-        truncate_bar_data(&mut data, Some(10));
-        assert_eq!(data.labels.len(), 2);
     }
 
     #[test]

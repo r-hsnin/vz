@@ -310,7 +310,7 @@ impl ExploreApp {
             y_label,
             self.agg_function,
         );
-        crate::oneshot::builders::sort_bar_data(&mut data, self.sort_order);
+        data_builder::sort_bar_data(&mut data, self.sort_order);
         data.axis_color = Some(self.theme.axis_color);
         data
     }

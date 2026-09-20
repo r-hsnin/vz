@@ -3,6 +3,7 @@
 //! Used by oneshot, explore, and present modes to avoid duplication.
 
 use crate::chart::selector::AggFunction;
+use crate::chart::selector::SortOrder;
 use crate::render::{Axis, BarChartData, ChartConfig, HistogramData, Series};
 
 /// Maximum number of data points rendered in line/scatter charts.
@@ -47,6 +48,35 @@ pub fn unique_ordered(values: &[String]) -> Vec<String> {
         }
     }
     seen
+}
+
+/// Sort bar chart data by value. No-op if sort_order is None or SortOrder::None.
+/// Canonical post-aggregation adapter shared by every Bar consumer
+/// (oneshot text/svg, output table/markdown/json/spark, explore, present).
+pub fn sort_bar_data(data: &mut BarChartData, sort_order: Option<SortOrder>) {
+    let reverse = match sort_order {
+        Some(SortOrder::Desc) => true,
+        Some(SortOrder::Asc) => false,
+        _ => return,
+    };
+    let mut indices: Vec<usize> = (0..data.values.len()).collect();
+    indices.sort_by(|a, b| {
+        let cmp = data.values[*a]
+            .partial_cmp(&data.values[*b])
+            .unwrap_or(std::cmp::Ordering::Equal);
+        if reverse { cmp.reverse() } else { cmp }
+    });
+    data.labels = indices.iter().map(|&i| data.labels[i].clone()).collect();
+    data.values = indices.iter().map(|&i| data.values[i]).collect();
+}
+
+/// Truncate bar chart to first N categories. No-op if limit is None.
+/// Canonical post-aggregation adapter shared with `sort_bar_data`.
+pub fn truncate_bar_data(data: &mut BarChartData, limit: Option<usize>) {
+    if let Some(n) = limit {
+        data.labels.truncate(n);
+        data.values.truncate(n);
+    }
 }
 
 /// Aggregate values by category label (sum).

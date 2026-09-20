@@ -123,11 +123,13 @@ never reverses**. Concretely:
 ## Decision Records (why the boundaries exist)
 
 1. **Shared `ChartData` with thin mode adapters** (extends decision 6 above).
-  `chart/data_builder.rs` is the canonical assembler
-  (`ResolvedAxes` → `aggregate_bar`/`build_chart_config`/`build_histogram`/
-  `build_heatmap_data`/`build_diff_line_config`/`build_diff_bar_data` →
-  `ChartData`);
-  `oneshot/builders.rs` adapts on top (sort/truncate/label fitting/theme).
+   `chart/data_builder.rs` is the canonical assembler
+   (`ResolvedAxes` → `aggregate_bar`/`build_chart_config`/`build_histogram`/
+   `build_heatmap_data`/`build_diff_line_config`/`build_diff_bar_data` →
+   `ChartData`, plus post-aggregation `sort_bar_data`/`truncate_bar_data`
+   shared by every Bar consumer since Phase 3-3);
+   `oneshot/builders.rs` adapts on top (axis resolution/title derivation,
+   extra-Y overlay, sort/truncate delegation, label fitting, theme).
   Temporal diff Line assembly is unified since Phase 3-1 (oneshot-diff,
   explore-diff, present-diff all build through `build_diff_line_config`);
   categorical diff Bar annotation is unified since Phase 3-2

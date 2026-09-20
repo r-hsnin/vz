@@ -186,9 +186,11 @@ structures before passing them to `render_chart_data()`:
   `aggregate_bar`, `build_histogram`, `build_heatmap_data`,
   `build_diff_line_config` since Phase 3-1, categorical diff annotation
   (`diff_direction_marker`/`format_diff_change`/`build_diff_bar_data`)
-  since Phase 3-2)
-- `oneshot/builders.rs` — sorting, truncation, label fitting, theme application
-  (allowed adapter on top of the canonical layer)
+  since Phase 3-2, post-aggregation Bar adapters
+  (`sort_bar_data`/`truncate_bar_data`) since Phase 3-3)
+- `oneshot/builders.rs` — axis resolution, title derivation, extra-Y overlay,
+  label fitting, theme application (allowed adapter on top of the canonical
+  layer; sort/truncate now delegate to the canonical layer)
 - `explore/` — interactive column selection → canonical assembler calls
   (diff temporal overlay via `build_diff_line_config` since Phase 3-1)
 - `present/chart_loader.rs` — Markdown chart block → canonical assembler calls

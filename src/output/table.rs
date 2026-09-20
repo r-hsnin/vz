@@ -45,8 +45,8 @@ pub fn print_table(
         let y_label = recommendation.y_column.as_deref().unwrap_or("value");
         let (mut bar_data, _) =
             data_builder::aggregate_bar(rows, xi, yi, None, y_label.to_string(), agg);
-        crate::oneshot::builders::sort_bar_data(&mut bar_data, params.sort);
-        crate::oneshot::builders::truncate_bar_data(&mut bar_data, params.limit);
+        data_builder::sort_bar_data(&mut bar_data, params.sort);
+        data_builder::truncate_bar_data(&mut bar_data, params.limit);
         print_two_col_values(
             &recommendation.x_column,
             &agg_header(y_label, agg),

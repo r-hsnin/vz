@@ -10,7 +10,6 @@ use crate::chart::selector::ChartType;
 use crate::chart::selector::{AggFunction, SortOrder};
 use crate::infer::types::Schema;
 use crate::loader::LoadedData;
-use crate::oneshot;
 use crate::render;
 
 use super::build_info_output;
@@ -137,7 +136,7 @@ fn build_bar_json(
 ) -> serde_json::Value {
     let (mut bar_data, _) =
         data_builder::aggregate_bar(rows, x_idx, y_idx, None, String::new(), params.agg);
-    oneshot::builders::sort_bar_data(&mut bar_data, params.sort);
+    data_builder::sort_bar_data(&mut bar_data, params.sort);
     if let Some(n) = params.limit {
         bar_data.labels.truncate(n);
         bar_data.values.truncate(n);

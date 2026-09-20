@@ -80,7 +80,7 @@ pub fn print_spark(
     {
         let (mut bar_data, _) =
             data_builder::aggregate_bar(rows, xi, yi, None, String::new(), params.agg);
-        oneshot::builders::sort_bar_data(&mut bar_data, params.sort);
+        data_builder::sort_bar_data(&mut bar_data, params.sort);
         if let Some(n) = params.limit {
             bar_data.labels.truncate(n);
             bar_data.values.truncate(n);
@@ -93,7 +93,7 @@ pub fn print_spark(
             if let Some(eyi) = data_builder::column_index(headers, extra) {
                 let (mut extra_data, _) =
                     data_builder::aggregate_bar(rows, xi, eyi, None, String::new(), params.agg);
-                oneshot::builders::sort_bar_data(&mut extra_data, params.sort);
+                data_builder::sort_bar_data(&mut extra_data, params.sort);
                 if let Some(n) = params.limit {
                     extra_data.labels.truncate(n);
                     extra_data.values.truncate(n);

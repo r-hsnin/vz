@@ -233,8 +233,8 @@ fn build_chart_data_for_type(
                 .top
                 .map(|_| crate::chart::selector::SortOrder::Desc)
                 .or(block.sort);
-            crate::oneshot::builders::sort_bar_data(&mut data, sort);
-            crate::oneshot::builders::truncate_bar_data(&mut data, block.top);
+            data_builder::sort_bar_data(&mut data, sort);
+            data_builder::truncate_bar_data(&mut data, block.top);
             data.series_colors = theme.series_colors.clone();
             data.axis_color = Some(theme.axis_color);
             Ok(ChartData::Bar(data))

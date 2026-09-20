@@ -1,5 +1,75 @@
 use super::*;
 use crate::chart::selector::AggFunction;
+use crate::chart::selector::SortOrder;
+use crate::render::BarChartData;
+
+fn bar_fixture() -> BarChartData {
+    BarChartData {
+        labels: vec!["A".into(), "B".into(), "C".into()],
+        values: vec![10.0, 30.0, 20.0],
+        y_label: String::new(),
+        title: None,
+        show_labels: false,
+        series_colors: vec![],
+        axis_color: None,
+    }
+}
+
+#[test]
+fn test_sort_bar_data_desc_orders_by_value() {
+    let mut data = bar_fixture();
+    sort_bar_data(&mut data, Some(SortOrder::Desc));
+    assert_eq!(data.labels, vec!["B", "C", "A"]);
+    assert_eq!(data.values, vec![30.0, 20.0, 10.0]);
+}
+
+#[test]
+fn test_sort_bar_data_asc_orders_by_value() {
+    let mut data = bar_fixture();
+    sort_bar_data(&mut data, Some(SortOrder::Asc));
+    assert_eq!(data.labels, vec!["A", "C", "B"]);
+}
+
+#[test]
+fn test_sort_bar_data_none_preserves_order() {
+    let mut data = bar_fixture();
+    sort_bar_data(&mut data, None);
+    assert_eq!(data.labels, vec!["A", "B", "C"]);
+    sort_bar_data(&mut data, Some(SortOrder::None));
+    assert_eq!(data.labels, vec!["A", "B", "C"]);
+}
+
+#[test]
+fn test_sort_bar_data_with_nan_keeps_finite_order() {
+    let mut data = BarChartData {
+        labels: vec!["A".into(), "B".into(), "C".into()],
+        values: vec![f64::NAN, 30.0, 20.0],
+        y_label: String::new(),
+        title: None,
+        show_labels: false,
+        series_colors: vec![],
+        axis_color: None,
+    };
+    sort_bar_data(&mut data, Some(SortOrder::Desc));
+    let non_nan: Vec<(&str, f64)> = data
+        .labels
+        .iter()
+        .zip(data.values.iter())
+        .filter(|(_, v)| !v.is_nan())
+        .map(|(l, v)| (l.as_str(), *v))
+        .collect();
+    assert_eq!(non_nan, vec![("B", 30.0), ("C", 20.0)]);
+}
+
+#[test]
+fn test_truncate_bar_data_limit() {
+    let mut data = bar_fixture();
+    truncate_bar_data(&mut data, Some(2));
+    assert_eq!(data.labels.len(), 2);
+    assert_eq!(data.values.len(), 2);
+    truncate_bar_data(&mut data, None);
+    assert_eq!(data.labels.len(), 2);
+}
 
 #[test]
 fn test_pick_evenly_small() {
