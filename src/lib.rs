@@ -9,7 +9,6 @@ pub mod diff;
 pub mod directory;
 pub mod explore;
 pub mod filter;
-pub mod helpers;
 pub mod infer;
 pub mod info;
 pub mod insights;
