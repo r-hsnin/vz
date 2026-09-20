@@ -15,8 +15,7 @@ pub use schema::{auto_x_column, auto_y_column, is_temporal_column, validate_sche
 use anyhow::Result;
 use std::path::Path;
 
-use crate::cli::Cli;
-use crate::helpers::format_override;
+use crate::cli::{Cli, format_override};
 use crate::loader;
 
 /// Per-category diff entry for bar-style comparison.

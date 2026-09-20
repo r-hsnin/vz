@@ -4,9 +4,8 @@ use std::path::Path;
 
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
-use crate::cli::Cli;
+use crate::cli::{Cli, resolve_theme};
 use crate::diff::{DiffResult, DiffTimeSeries};
-use crate::helpers::resolve_theme;
 use crate::oneshot::{self, fit_labels_to_width};
 use crate::output;
 use crate::render::{self, Axis, BarChartData, ChartConfig, ChartData, Series};

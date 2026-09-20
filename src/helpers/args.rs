@@ -1,9 +1,6 @@
-use anyhow::Result;
-use std::path::PathBuf;
-
 use crate::cli::{self, Cli, parse_multi_y_specs};
 use crate::infer::types::Schema;
-use crate::{chart, oneshot, theme};
+use crate::{chart, oneshot};
 
 pub fn build_render_options<'a>(
     cli: &'a Cli,
@@ -23,7 +20,7 @@ pub fn build_render_options<'a>(
         agg,
         title: cli.title.clone(),
         labels: cli.labels,
-        theme: resolve_theme(cli),
+        theme: crate::cli::resolve_theme(cli),
         bins: cli.bins,
     }
 }
@@ -75,28 +72,6 @@ pub fn effective_agg(
     cli::AggFunction::Sum
 }
 
-/// Resolve the theme from CLI args.
-pub fn resolve_theme(cli: &Cli) -> theme::Theme {
-    match cli.theme {
-        Some(cli::ThemeArg::Light) => theme::Theme::light(),
-        Some(cli::ThemeArg::HighContrast) => theme::Theme::high_contrast(),
-        _ => theme::Theme::dark(),
-    }
-}
-
-pub fn resolve_input_file(cli: &Cli) -> Result<PathBuf> {
-    match cli.primary_file() {
-        Some(f) => Ok(f.to_path_buf()),
-        None => {
-            if !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
-                Ok(PathBuf::from("-"))
-            } else {
-                anyhow::bail!("No input file specified. Usage: vz <file> or pipe data to stdin");
-            }
-        }
-    }
-}
-
 /// Parsed Y-axis options from CLI.
 pub struct YOptions {
     pub hint: Option<String>,
@@ -136,25 +111,6 @@ mod tests {
     use crate::infer::types::DataType;
     use crate::test_helpers::{make_recommendation, make_schema};
     use clap::Parser;
-
-    // --- resolve_input_file ---
-
-    #[test]
-    fn resolve_input_file_returns_path_when_file_specified() {
-        let cli = Cli::try_parse_from(["vz", "sales.csv"]).unwrap();
-        let result = resolve_input_file(&cli).unwrap();
-        assert_eq!(result, PathBuf::from("sales.csv"));
-    }
-
-    #[test]
-    fn resolve_input_file_returns_dash_for_stdin_in_non_terminal() {
-        let cli = Cli::try_parse_from(["vz", "--info"]).unwrap();
-        let result = resolve_input_file(&cli);
-        assert!(result.is_ok() || result.is_err());
-        if let Ok(path) = result {
-            assert_eq!(path, PathBuf::from("-"));
-        }
-    }
 
     // --- effective_agg ---
 
