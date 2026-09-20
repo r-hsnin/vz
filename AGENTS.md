@@ -13,7 +13,7 @@ push 先は `dev`。`origin/main` への直接 push は pre-push hook が阻止�
 
 当面 `origin` へのリリースは行わない。`./scripts/release.sh` は実行しない。日常作業は `dev` への push のみで進める。
 
-解除後の手順は `docs/RUNBOOK.md` を参照。公開範囲は `release-manifest.txt` が単一の真実で、記載の無いファイルは非公開が既定。manifest の変更は公開範囲の変更として扱い、無断で変更しない。
+解除後の手順は `internal/RUNBOOK.md` を参照。公開範囲は `release-manifest.txt` が単一の真実で、記載の無いファイルは非公開が既定。境界の設計と検査は `internal/PUBLICATION.md`。manifest の変更は公開範囲の変更として扱い、無断で変更しない。
 
 ## 作業フロー
 
@@ -62,12 +62,16 @@ lefthook install       # 既存 clone に core.hooksPath が残っていれば -
 
 各文書を内容の単一の真実とし、他文書へは参照を置く。重複を見つけたら所有者へ寄せる。
 
+`docs/` と `skills/` は公開専用。リリース手順・公開範囲・ロードマップ等の内部文書は `internal/` に置く（境界規則は `internal/PUBLICATION.md`）。
+
 | 文書 | 役割（単一の真実） | 読む・更新する条件 |
 |---|---|---|
 | `README.md` | 利用者向けの機能・CLI・チャート選択ルール | CLI や挙動を変えた時 |
 | `docs/ARCHITECTURE.md` | 構造: モジュール・データフロー・変更影響 | 構造を変えた時 |
 | `docs/DESIGN.md` | 設計意図: 理念・推論ルール・スコープ・設計判断 | 設計判断を変えた時 |
 | `docs/GOTCHAS.md` | 非自明な挙動と既知の不具合 | 新たな罠を発見・解消した時 |
-| `docs/RUNBOOK.md` | リリース手順と復旧 | リリース・障害対応時 |
 | `CONTRIBUTING.md` | 開発手順: setup・コマンド・テスト・ベンチ・PR | 開発参加・テスト追加時 |
 | `skills/vz/SKILL.md` | エージェントから vz を使う手順 | スキルの提供内容を変えた時 |
+| `internal/RUNBOOK.md` | リリース手順と復旧 | リリース・障害対応時 |
+| `internal/PUBLICATION.md` | 公開/非公開の境界と検査 | 公開範囲を変えた時 |
+| `internal/ROADMAP.md` | 内部ロードマップ・負債・決定ステータス | 計画や負債を更新した時 |

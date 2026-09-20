@@ -33,11 +33,13 @@ expanded silently.** Current allowlist:
 
 ```
 .github/  .gitignore  benches/  CONTRIBUTING.md  Cargo.lock  Cargo.toml
-LICENSE   README.md   demo/     docs/            fixtures/   skills/  src/  tests/
+LICENSE   README.md   demo/     docs/            fixtures/   rust-toolchain.toml
+skills/   src/        tests/
 ```
 
-Notably **not** published: `AGENTS.md`, `lefthook.yml`, `rust-toolchain.toml`,
-`release-manifest.txt`, `scripts/`, and `target/`.
+Notably **not** published: `AGENTS.md`, `lefthook.yml`, `internal/`, `release-manifest.txt`,
+`scripts/`, and `target/`. The public/private boundary and its enforcement are owned by
+[PUBLICATION.md](PUBLICATION.md).
 
 ## 3. Preconditions
 
