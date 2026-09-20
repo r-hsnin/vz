@@ -159,6 +159,8 @@ never reverses**. Concretely:
    `build_*/parse_*` belongs to `chart`, `apply_filters` belongs to `filter`.
    The module exists only as a migration station; adding new helpers there
    re-creates the coupling L3 must delete.
+   (Dissolution completed in Phase 1: `cli/resolve.rs`, `chart/recommend.rs`,
+   `filter::apply_filters`, `oneshot::RenderOptions::from_cli`.)
 
 ## Reuse Roadmap to L3 (`vz-core` + `vz`)
 

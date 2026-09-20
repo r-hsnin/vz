@@ -190,8 +190,10 @@ cargo bench -- --baseline before
   ([ARCHITECTURE.md](docs/ARCHITECTURE.md#planes-and-dependency-rules)).
   Data/output code takes plain `*Params` structs, never `&Cli`;
   `println!/eprintln!` stays at the app-plane edge.
-- Do not add `pub mod` to `src/lib.rs` (default `pub(crate)`) or new files
-  under `src/helpers/` (it dissolves toward `cli`/`chart`/`filter`).
+- Do not add `pub mod` to `src/lib.rs` (default `pub(crate)`).
+  `src/helpers/` was dissolved in Phase 1 (`resolve_*`→`cli/resolve.rs`,
+  `build_*/parse_*`→`chart/recommend.rs`, `apply_filters`→`filter.rs`) —
+  do not recreate it; put new logic in its owning plane.
 
 ## Pull Request Checklist
 
