@@ -2,7 +2,6 @@
 
 use anyhow::Result;
 
-use crate::cli::Cli;
 use crate::loader;
 
 use super::scanner::FileEntry;
@@ -198,14 +197,17 @@ pub fn print_catalog_json(catalog: &CatalogResult) -> Result<()> {
 }
 
 /// Run catalog mode: scan directory, build catalog, output.
-pub(crate) fn run_catalog(cli: &Cli, entries: &[FileEntry]) -> Result<()> {
-    let catalog = build_catalog(entries, cli.no_header);
+pub(crate) fn run_catalog(
+    params: &crate::cli::DirectoryParams,
+    entries: &[FileEntry],
+) -> Result<()> {
+    let catalog = build_catalog(entries, params.no_header);
 
     if catalog.groups.is_empty() {
         anyhow::bail!("no readable data files found for catalog");
     }
 
-    if cli.output == Some(crate::cli::OutputFormat::Json) {
+    if params.pipeline.output == Some(crate::cli::OutputFormat::Json) {
         print_catalog_json(&catalog)?;
     } else {
         print_catalog_text(&catalog);

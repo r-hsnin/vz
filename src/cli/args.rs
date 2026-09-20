@@ -96,6 +96,20 @@ impl Cli {
         }
     }
 
+    /// Convert CLI flags into [`DirectoryParams`]: the `PipelineParams`
+    /// seam plus the directory scan/combine/catalog inputs. Sole funnel
+    /// for `Cli → directory`.
+    pub fn to_directory_params(&self) -> DirectoryParams {
+        DirectoryParams {
+            pipeline: self.to_pipeline_params(),
+            glob_pattern: self.glob.clone(),
+            recurse: self.recurse,
+            catalog: self.catalog,
+            no_header: self.no_header,
+            no_limit: self.no_limit,
+        }
+    }
+
     /// Convert CLI flags into [`DiffParams`]: the `Query` seam plus the
     /// other resolved diff inputs. Sole funnel for `Cli → diff`.
     pub fn to_diff_params(&self) -> DiffParams {
@@ -112,6 +126,22 @@ impl Cli {
             theme: self.theme,
         }
     }
+}
+
+/// Resolved, Cli-free inputs for directory mode (multi-file combine).
+///
+/// Built once in the app plane (`Cli::to_directory_params`); downstream
+/// directory code takes this instead of `&Cli`. The `pipeline` field is
+/// the Phase 2-4 seam (`to_pipeline_params`); the rest are the directory
+/// resolutions (scan/combine/catalog flags).
+#[derive(Debug, Clone)]
+pub struct DirectoryParams {
+    pub pipeline: PipelineParams,
+    pub glob_pattern: Option<String>,
+    pub recurse: bool,
+    pub catalog: bool,
+    pub no_header: bool,
+    pub no_limit: bool,
 }
 
 /// Resolved, Cli-free inputs for diff mode (two-file comparison).
@@ -184,6 +214,20 @@ mod tests {
         assert_eq!(params.limit, Some(3));
         assert_eq!(params.sample, None);
         assert!(!params.info);
+    }
+
+    #[test]
+    fn test_to_directory_params_resolves_scan_inputs() {
+        let cli =
+            Cli::try_parse_from(["vz", "dir/", "--glob", "sales_*", "--recurse", "--no-limit"])
+                .unwrap();
+        let params = cli.to_directory_params();
+        assert_eq!(params.glob_pattern.as_deref(), Some("sales_*"));
+        assert!(params.recurse);
+        assert!(params.no_limit);
+        assert!(!params.catalog);
+        assert!(!params.no_header);
+        assert_eq!(params.pipeline.query.x_col, None);
     }
 
     #[test]

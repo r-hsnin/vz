@@ -163,7 +163,7 @@ fn run_oneshot(cli: &Cli) -> Result<()> {
 /// Single render pass: load → infer → render. Used by both normal and watch modes.
 fn render_once(cli: &Cli, file: &Path) -> Result<()> {
     if file.is_dir() {
-        return directory::run_directory(cli, file);
+        return directory::run_directory_from_cli(cli, file);
     }
 
     if cli.catalog {
