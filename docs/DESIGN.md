@@ -127,17 +127,23 @@ never reverses**. Concretely:
    (`ResolvedAxes` → `aggregate_bar`/`build_chart_config`/`build_histogram`/
    `build_heatmap_data`/`build_diff_line_config`/`build_diff_bar_data` →
    `ChartData`, plus post-aggregation `sort_bar_data`/`truncate_bar_data`
-   shared by every Bar consumer since Phase 3-3);
-   `oneshot/builders.rs` adapts on top (axis resolution/title derivation,
-   extra-Y overlay, sort/truncate delegation, label fitting, theme).
-  Temporal diff Line assembly is unified since Phase 3-1 (oneshot-diff,
-  explore-diff, present-diff all build through `build_diff_line_config`);
-  categorical diff Bar annotation is unified since Phase 3-2
-  (oneshot-text/markdown/html, explore-chart, present-slide all build through
-  `build_diff_bar_data`; color-by-direction stays at the edge).
-  A mode adapter may only sort, truncate, fit
-  labels, apply theme, or wire slide/interactive state — never re-derive
-  aggregation or axis spans.
+   shared by every Bar consumer and extra-Y span refit
+   `append_series_refit_y`, all since Phase 3-3);
+   `oneshot/builders.rs` adapts on top (axis resolution from a
+   recommendation, title derivation, extra-Y wiring, histogram column choice
+   for `-t histogram`, label fitting, theme).
+   Explore and present call the canonical assembler directly: routing them
+   through `oneshot/builders.rs` would drag oneshot-only concerns (extra-Y,
+   terminal-width fitting) into other modes. An adapter resolves its input
+   plane (recommendation / interactive state / chart block) and may derive
+   titles, but never re-derives aggregation or axis spans.
+   Temporal diff Line assembly is unified since Phase 3-1 (oneshot-diff,
+   explore-diff, present-diff all build through `build_diff_line_config`);
+   categorical diff Bar annotation is unified since Phase 3-2
+   (oneshot-text/markdown/html, explore-chart, present-slide all build through
+   `build_diff_bar_data`; color-by-direction stays at the edge).
+   Residual divergences (|Δ| explore sort, JSON/spark color-group ordering)
+   are listed in ARCHITECTURE.md.
 2. **`Cli` must not leak below the app plane.** Every `&Cli` parameter in
   data/output code forces tests through `Cli::try_parse_from`, blocks reuse
   from other products, and blocks the L3 crate split. Phase 2 removed all

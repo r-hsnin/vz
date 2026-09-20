@@ -187,14 +187,17 @@ structures before passing them to `render_chart_data()`:
   `build_diff_line_config` since Phase 3-1, categorical diff annotation
   (`diff_direction_marker`/`format_diff_change`/`build_diff_bar_data`)
   since Phase 3-2, post-aggregation Bar adapters
-  (`sort_bar_data`/`truncate_bar_data`) since Phase 3-3)
-- `oneshot/builders.rs` — axis resolution, title derivation, extra-Y overlay,
-  label fitting, theme application (allowed adapter on top of the canonical
-  layer; sort/truncate now delegate to the canonical layer)
-- `explore/` — interactive column selection → canonical assembler calls
-  (diff temporal overlay via `build_diff_line_config` since Phase 3-1)
-- `present/chart_loader.rs` — Markdown chart block → canonical assembler calls
-  (diff temporal overlay via `build_diff_line_config` since Phase 3-1)
+  (`sort_bar_data`/`truncate_bar_data`) and extra-Y overlay span refit
+  (`append_series_refit_y`) since Phase 3-3)
+- `oneshot/builders.rs` — axis resolution from the recommendation, title
+  derivation, extra-Y wiring (series via `build_multi_y_series`, span refit
+  via `append_series_refit_y`), histogram column choice for `-t histogram`
+  overrides, label fitting, theme application
+- `explore/` — interactive column selection → canonical assembler calls;
+  deliberately not routed through `oneshot/builders.rs` (oneshot-only
+  concerns such as extra-Y/fitting must not leak into other modes)
+- `present/chart_loader.rs` — Markdown chart block → canonical assembler
+  calls (block title/bins/top/sort come from the block at the edge)
 
 Unification direction (see DESIGN.md decision 1): `chart/data_builder.rs` is
 the canonical assembler; mode adapters may only sort, truncate, fit labels,
@@ -203,8 +206,18 @@ or axis spans. Temporal diff Line assembly is unified (Phase 3-1);
 categorical diff Bar annotation is unified since Phase 3-2 (values = after,
 labels = `label ▲ +20%`, signed-Δ sort/limit via `build_diff_bar_data`;
 color-by-direction stays at the edge — html green/red/gray, explore table
-Dir column. Known residual divergence: explore interactive sort uses |Δ|
-(`sorted_entries`) while oneshot/present/html use signed-Δ.)
+Dir column). Bar post-aggregation and extra-Y span refit are unified since
+Phase 3-3; Line/Scatter/Histogram/Heatmap adapters only resolve their input
+plane and derive titles on top of canonical calls.
+
+Known residual divergences (documented, intentional until decided otherwise):
+- explore interactive sort uses |Δ| (`sorted_entries`) while
+  oneshot/present/html use signed-Δ.
+- Color-group ordering: canonical `ChartData` series follow first-appearance
+  order, while JSON (`build_grouped_series_json`) and spark color output use
+  BTreeMap (alphabetical). JSON line/scatter series also keep raw X strings
+  instead of the canonical numeric index mapping, because the JSON
+  representation is string-based by contract.
 
 Layering note: modes call into `pipeline::render_data` / `pipeline::infer_from_data`
 and `diff` column resolution (`diff::auto_x_column` et al.). `pipeline` itself
