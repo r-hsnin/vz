@@ -107,7 +107,9 @@ never reverses**. Concretely:
   thin `print_*` wrappers. `chart_json`/`spark` already take `*Params`
   structs instead of `&Cli` — that is the pattern to copy. `markdown`/`table`
   take `TableParams` since Phase 2-2, `recommend` takes `Query` since
-  Phase 2-3; `svg` rendering via `Buffer` is known debt, not
+  Phase 2-3, `pipeline` takes `PipelineParams` since Phase 2-4,
+  `filter::apply_filters` returns `FilterOutcome` (data + `info:` notice)
+  since Phase 2-4; `svg` rendering via `Buffer` is known debt, not
   precedent (see below).
 - **App plane** (`main.rs`, `pipeline.rs`, `oneshot/`, `diff/`, `directory/`,
   `explore/`, `present/`, `watch.rs`, `helpers/`, `cli/`) owns `Cli`,
@@ -127,16 +129,20 @@ never reverses**. Concretely:
 2. **`Cli` must not leak below the app plane.** Every `&Cli` parameter in
    data/output code forces tests through `Cli::try_parse_from`, blocks reuse
    from other products, and blocks the L3 crate split. Current violations are
-   debt, not examples to follow: `pipeline::render_data(&Cli)` (the worst —
-   the whole pipeline hangs off CLI), `diff::run_diff(&Cli)`,
+   debt, not examples to follow: `diff::run_diff(&Cli)`,
     `directory::run_directory(&Cli)`
     (done: `diagnostics::error_hint(_, Option<&Path>)` in Phase 2-1,
     `output/table.rs` + `output/markdown.rs` via `TableParams` in Phase 2-2,
     `chart/recommend.rs` via `Query` in / `Warnings` out in Phase 2-3 with
-    the sole `Cli → Query` conversion at `Cli::to_query`).
+    the sole `Cli → Query` conversion at `Cli::to_query`,
+    `pipeline::render_data` via `PipelineParams` in Phase 2-4 with the sole
+    `Cli → PipelineParams` conversion at `Cli::to_pipeline_params` and the
+    `render_data_from_cli` adapter, `filter::apply_filters` via
+    `FilterOutcome` out in Phase 2-4).
     New code must take a
     plain `*Params`/`*Options` struct (precedent: `ChartJsonParams`,
-    `SparkParams`, `TableParams`) or `Option<&Path>` instead.
+    `SparkParams`, `TableParams`, `PipelineParams`, `FilterOutcome`) or
+    `Option<&Path>` instead.
 3. **Ratatui stays inside the render contract.** SVG/HTML/JSON exist so
    agents and reports can consume charts without a terminal; exposing
    `Buffer`/`Rect`/`Color` in their signatures would drag the TUI stack into
