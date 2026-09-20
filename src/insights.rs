@@ -11,8 +11,8 @@
 //! means 100 here exactly as on every other path.
 
 use crate::chart::data_builder;
+use crate::chart::selector::AggFunction;
 use crate::chart::selector::ChartType;
-use crate::cli::AggFunction;
 use crate::render::format_number;
 
 /// Everything the engine needs; mirrors the resolved oneshot query.

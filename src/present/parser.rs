@@ -357,8 +357,8 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
                 "where" => filter.push(value),
                 "sort" => {
                     sort = match value.to_lowercase().as_str() {
-                        "desc" => Some(crate::cli::SortOrder::Desc),
-                        "asc" => Some(crate::cli::SortOrder::Asc),
+                        "desc" => Some(crate::chart::selector::SortOrder::Desc),
+                        "asc" => Some(crate::chart::selector::SortOrder::Asc),
                         _ => {
                             eprintln!(
                                 "warning: unknown sort '{value}' — expected desc or asc. Ignoring."
@@ -369,11 +369,11 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
                 }
                 "agg" => {
                     agg = match value.to_lowercase().as_str() {
-                        "sum" => Some(crate::cli::AggFunction::Sum),
-                        "mean" => Some(crate::cli::AggFunction::Mean),
-                        "count" => Some(crate::cli::AggFunction::Count),
-                        "max" => Some(crate::cli::AggFunction::Max),
-                        "min" => Some(crate::cli::AggFunction::Min),
+                        "sum" => Some(crate::chart::selector::AggFunction::Sum),
+                        "mean" => Some(crate::chart::selector::AggFunction::Mean),
+                        "count" => Some(crate::chart::selector::AggFunction::Count),
+                        "max" => Some(crate::chart::selector::AggFunction::Max),
+                        "min" => Some(crate::chart::selector::AggFunction::Min),
                         _ => {
                             eprintln!(
                                 "warning: unknown agg '{value}' — expected sum, mean, count, max, or min. Ignoring."

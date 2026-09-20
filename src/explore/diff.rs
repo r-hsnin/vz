@@ -2,7 +2,7 @@
 
 use crossterm::event::KeyCode;
 
-use crate::cli::SortOrder;
+use crate::chart::selector::SortOrder;
 use crate::diff::{DiffResult, DiffTimeSeries};
 
 use super::ViewMode;

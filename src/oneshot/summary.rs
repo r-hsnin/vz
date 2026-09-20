@@ -1,7 +1,7 @@
 //! Summary line rendering for oneshot mode.
 
+use crate::chart::selector::AggFunction;
 use crate::chart::selector::{ChartRecommendation, ChartType};
-use crate::cli::AggFunction;
 use crate::render::format_number;
 
 use super::ansi;

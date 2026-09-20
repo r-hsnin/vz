@@ -1,8 +1,10 @@
 use clap::ValueEnum;
 
-/// Sort order for bar chart values.
+use crate::chart::selector::{AggFunction, SortOrder};
+
+/// Sort order for bar chart values (CLI spelling; converts to [`SortOrder`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum SortOrder {
+pub enum SortOrderArg {
     /// Sort by value descending (highest first).
     Desc,
     /// Sort by value ascending (lowest first).
@@ -11,9 +13,20 @@ pub enum SortOrder {
     None,
 }
 
-/// Aggregation function for bar charts.
+impl SortOrderArg {
+    pub fn to_sort_order(self) -> SortOrder {
+        match self {
+            Self::Desc => SortOrder::Desc,
+            Self::Asc => SortOrder::Asc,
+            Self::None => SortOrder::None,
+        }
+    }
+}
+
+/// Aggregation function for bar charts (CLI spelling; converts to
+/// [`AggFunction`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum AggFunction {
+pub enum AggFunctionArg {
     /// Sum of values per category (default).
     Sum,
     /// Arithmetic mean per category.
@@ -24,6 +37,18 @@ pub enum AggFunction {
     Max,
     /// Minimum value per category.
     Min,
+}
+
+impl AggFunctionArg {
+    pub fn to_agg_function(self) -> AggFunction {
+        match self {
+            Self::Sum => AggFunction::Sum,
+            Self::Mean => AggFunction::Mean,
+            Self::Count => AggFunction::Count,
+            Self::Max => AggFunction::Max,
+            Self::Min => AggFunction::Min,
+        }
+    }
 }
 
 /// Input format for data files.

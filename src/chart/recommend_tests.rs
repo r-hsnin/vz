@@ -1,6 +1,7 @@
 use super::*;
+use crate::chart::selector::AggFunction;
 use crate::chart::selector::ChartType;
-use crate::cli::{AggFunction, Cli};
+use crate::cli::Cli;
 use crate::infer::types::DataType;
 use crate::test_helpers::{make_recommendation, make_schema};
 use clap::Parser;

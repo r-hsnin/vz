@@ -76,13 +76,14 @@ fn print_two_col_values(x_label: &str, y_label: &str, labels: &[String], values:
 }
 
 /// Header for an aggregated column: `revenue` for sum, `mean(revenue)` otherwise.
-pub fn agg_header(y_label: &str, agg: cli::AggFunction) -> String {
+pub fn agg_header(y_label: &str, agg: chart::selector::AggFunction) -> String {
+    use crate::chart::selector::AggFunction;
     match agg {
-        cli::AggFunction::Sum => y_label.to_string(),
-        cli::AggFunction::Mean => format!("mean({y_label})"),
-        cli::AggFunction::Count => format!("count({y_label})"),
-        cli::AggFunction::Max => format!("max({y_label})"),
-        cli::AggFunction::Min => format!("min({y_label})"),
+        AggFunction::Sum => y_label.to_string(),
+        AggFunction::Mean => format!("mean({y_label})"),
+        AggFunction::Count => format!("count({y_label})"),
+        AggFunction::Max => format!("max({y_label})"),
+        AggFunction::Min => format!("min({y_label})"),
     }
 }
 
@@ -96,7 +97,7 @@ fn warn_non_bar_limits(chart_type: chart::selector::ChartType, cli: &cli::Cli) {
         );
     } else if matches!(
         cli.sort,
-        Some(cli::SortOrder::Desc) | Some(cli::SortOrder::Asc)
+        Some(cli::SortOrderArg::Desc) | Some(cli::SortOrderArg::Asc)
     ) && !matches!(chart_type, ChartType::Bar)
     {
         eprintln!(

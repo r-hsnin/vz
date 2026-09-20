@@ -2,7 +2,7 @@
 //!
 //! Used by oneshot, explore, and present modes to avoid duplication.
 
-use crate::cli::AggFunction;
+use crate::chart::selector::AggFunction;
 use crate::render::{Axis, BarChartData, ChartConfig, HistogramData, Series};
 
 /// Maximum number of data points rendered in line/scatter charts.

@@ -4,8 +4,8 @@ use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
 use crate::chart::data_builder;
+use crate::chart::selector::AggFunction;
 use crate::chart::selector::ChartType;
-use crate::cli::AggFunction;
 
 use super::ChartBlock;
 
@@ -125,14 +125,14 @@ fn load_diff_chart_data(
         // Apply sort/top from chart block.
         if let Some(sort) = block.sort {
             match sort {
-                crate::cli::SortOrder::Desc => {
+                crate::chart::selector::SortOrder::Desc => {
                     diff.entries.sort_by(|a, b| {
                         b.delta
                             .partial_cmp(&a.delta)
                             .unwrap_or(std::cmp::Ordering::Equal)
                     });
                 }
-                crate::cli::SortOrder::Asc => {
+                crate::chart::selector::SortOrder::Asc => {
                     diff.entries.sort_by(|a, b| {
                         a.delta
                             .partial_cmp(&b.delta)
@@ -300,7 +300,7 @@ fn build_chart_data_for_type(
             );
             let sort = block
                 .top
-                .map(|_| crate::cli::SortOrder::Desc)
+                .map(|_| crate::chart::selector::SortOrder::Desc)
                 .or(block.sort);
             crate::oneshot::builders::sort_bar_data(&mut data, sort);
             crate::oneshot::builders::truncate_bar_data(&mut data, block.top);

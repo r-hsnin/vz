@@ -1,8 +1,8 @@
 //! Chart data builders for oneshot mode: build bar, histogram, heatmap, and line/scatter data.
 
 use crate::chart::data_builder::{self, ResolvedAxes};
+use crate::chart::selector::{AggFunction, SortOrder};
 use crate::chart::selector::{ChartRecommendation, ChartType};
-use crate::cli::{AggFunction, SortOrder};
 use crate::render::{BarChartData, ChartConfig, HistogramData};
 
 use super::RenderOptions;

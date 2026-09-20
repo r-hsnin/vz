@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use crate::chart::selector::ChartType;
-use crate::cli::{AggFunction, SortOrder};
+use crate::chart::selector::{AggFunction, SortOrder};
 use crate::infer::types::DataType;
 
 use super::{ExploreApp, ViewMode};

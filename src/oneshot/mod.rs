@@ -7,9 +7,9 @@ use std::io;
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::chart::data_builder;
+use crate::chart::selector::AggFunction;
+use crate::chart::selector::SortOrder;
 use crate::chart::selector::{ChartRecommendation, ChartType};
-use crate::cli::AggFunction;
-use crate::cli::SortOrder;
 
 pub use ansi::print_buffer;
 
@@ -92,12 +92,13 @@ pub fn render_oneshot(
         None
     };
 
-    let skipped_rows =
-        if chart_type == ChartType::Heatmap || opts.agg == crate::cli::AggFunction::Count {
-            0 // Heatmap Y is categorical; Count uses all rows regardless of parseability
-        } else {
-            count_skipped_y_rows(recommendation, headers, rows)
-        };
+    let skipped_rows = if chart_type == ChartType::Heatmap
+        || opts.agg == crate::chart::selector::AggFunction::Count
+    {
+        0 // Heatmap Y is categorical; Count uses all rows regardless of parseability
+    } else {
+        count_skipped_y_rows(recommendation, headers, rows)
+    };
 
     summary::print_summary(&summary::SummaryContext {
         recommendation,

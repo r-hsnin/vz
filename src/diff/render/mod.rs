@@ -77,14 +77,14 @@ pub(super) fn apply_sort_and_limit(cli: &Cli, entries: &[DiffEntry]) -> Vec<Diff
     let mut sorted = entries.to_vec();
 
     match cli.effective_sort() {
-        Some(cli::SortOrder::Desc) => {
+        Some(crate::chart::selector::SortOrder::Desc) => {
             sorted.sort_by(|a, b| {
                 b.delta
                     .partial_cmp(&a.delta)
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
         }
-        Some(cli::SortOrder::Asc) => {
+        Some(crate::chart::selector::SortOrder::Asc) => {
             sorted.sort_by(|a, b| {
                 a.delta
                     .partial_cmp(&b.delta)

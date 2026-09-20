@@ -1,8 +1,8 @@
 use crossterm::event::KeyCode;
 
 use crate::chart::data_builder;
+use crate::chart::selector::{AggFunction, SortOrder};
 use crate::chart::selector::{ChartRecommendation, ChartType, select_chart};
-use crate::cli::{AggFunction, SortOrder};
 use crate::infer::types::{DataType, Schema};
 use crate::render::{BarChartData, ChartConfig, HistogramData};
 

@@ -4,7 +4,9 @@ mod types;
 
 pub use args::{parse_column_spec, parse_multi_y_specs};
 pub use resolve::{format_override, resolve_input_file, resolve_theme};
-pub use types::{AggFunction, ChartTypeArg, InputFormatArg, OutputFormat, SortOrder, ThemeArg};
+pub use types::{
+    AggFunctionArg, ChartTypeArg, InputFormatArg, OutputFormat, SortOrderArg, ThemeArg,
+};
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -63,7 +65,7 @@ pub struct Cli {
 
     /// Sort bar chart values: desc, asc, or none (default: none).
     #[arg(long = "sort", value_enum)]
-    pub sort: Option<SortOrder>,
+    pub sort: Option<SortOrderArg>,
 
     /// Force input format (auto-detected if not specified).
     #[arg(short = 'f', long = "format", value_enum)]
@@ -83,7 +85,7 @@ pub struct Cli {
 
     /// Aggregation function for bar charts: sum (default), mean, count, max, min.
     #[arg(long = "agg", value_enum)]
-    pub agg: Option<AggFunction>,
+    pub agg: Option<AggFunctionArg>,
 
     /// Custom chart title (overrides the auto-generated title).
     #[arg(long = "title")]

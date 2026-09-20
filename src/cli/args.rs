@@ -1,10 +1,11 @@
-use super::{Cli, SortOrder};
+use super::Cli;
+use crate::chart::selector::SortOrder;
 
 impl Cli {
     /// Compute the effective sort order, considering --top (implies desc) and --tail (implies asc).
     pub fn effective_sort(&self) -> Option<SortOrder> {
-        if self.sort.is_some() {
-            return self.sort;
+        if let Some(s) = self.sort {
+            return Some(s.to_sort_order());
         }
         if self.top.is_some() {
             return Some(SortOrder::Desc);

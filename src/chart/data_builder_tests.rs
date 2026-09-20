@@ -1,5 +1,5 @@
 use super::*;
-use crate::cli::AggFunction;
+use crate::chart::selector::AggFunction;
 
 #[test]
 fn test_pick_evenly_small() {

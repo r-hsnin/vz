@@ -7,7 +7,7 @@ use serde_json::json;
 
 use crate::chart::data_builder;
 use crate::chart::selector::ChartType;
-use crate::cli::{AggFunction, SortOrder};
+use crate::chart::selector::{AggFunction, SortOrder};
 use crate::infer::types::Schema;
 use crate::loader::LoadedData;
 use crate::oneshot;

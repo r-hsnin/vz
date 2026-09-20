@@ -24,6 +24,32 @@ impl std::fmt::Display for ChartType {
     }
 }
 
+/// Sort order for bar chart values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortOrder {
+    /// Sort by value descending (highest first).
+    Desc,
+    /// Sort by value ascending (lowest first).
+    Asc,
+    /// Keep original order.
+    None,
+}
+
+/// Aggregation function for bar charts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AggFunction {
+    /// Sum of values per category (default).
+    Sum,
+    /// Arithmetic mean per category.
+    Mean,
+    /// Count of rows per category.
+    Count,
+    /// Maximum value per category.
+    Max,
+    /// Minimum value per category.
+    Min,
+}
+
 /// Chart recommendation with axis assignments.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChartRecommendation {

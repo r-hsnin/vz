@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use crate::chart::data_builder;
+use crate::chart::selector::{AggFunction, SortOrder};
 use crate::chart::selector::{ChartRecommendation, ChartType};
-use crate::cli::{AggFunction, SortOrder};
 use crate::oneshot;
 use crate::render::format_number;
 use crate::sparkline;

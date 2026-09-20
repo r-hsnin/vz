@@ -7,7 +7,7 @@ use crossterm::event::KeyCode;
 use std::io::IsTerminal;
 
 use crate::chart::selector::ChartType;
-use crate::cli::{AggFunction, SortOrder};
+use crate::chart::selector::{AggFunction, SortOrder};
 use crate::infer::types::Schema;
 
 /// View mode for the Explore TUI.

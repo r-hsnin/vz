@@ -9,8 +9,10 @@
 
 use anyhow::Result;
 
-use crate::chart::selector::{ChartRecommendation, ChartType, fallback_warning, select_chart};
-use crate::cli::{self, ChartTypeArg, Cli, parse_column_spec, parse_multi_y_specs};
+use crate::chart::selector::{
+    AggFunction, ChartRecommendation, ChartType, fallback_warning, select_chart,
+};
+use crate::cli::{ChartTypeArg, Cli, parse_column_spec, parse_multi_y_specs};
 use crate::diagnostics::{format_column_suffix, suggest_column};
 use crate::infer::types::{DataType, Schema};
 
@@ -52,9 +54,9 @@ pub fn effective_agg(
     cli: &Cli,
     recommendation: &ChartRecommendation,
     schema: &Schema,
-) -> cli::AggFunction {
+) -> AggFunction {
     if let Some(agg) = cli.agg {
-        return agg;
+        return agg.to_agg_function();
     }
 
     // When bar chart is forced, Y was auto-inferred (not explicit), and Y is not numeric,
@@ -69,7 +71,7 @@ pub fn effective_agg(
             .map(|c| c.data_type != DataType::Quantitative)
             .unwrap_or(false);
         if y_is_categorical {
-            return cli::AggFunction::Count;
+            return AggFunction::Count;
         }
     }
 
@@ -81,10 +83,10 @@ pub fn effective_agg(
         && x_meta.data_type == DataType::Categorical
         && schema.columns_of_type(DataType::Quantitative).is_empty()
     {
-        return cli::AggFunction::Count;
+        return AggFunction::Count;
     }
 
-    cli::AggFunction::Sum
+    AggFunction::Sum
 }
 
 pub fn build_recommendation(

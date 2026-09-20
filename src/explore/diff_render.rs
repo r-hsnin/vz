@@ -252,9 +252,9 @@ fn build_diff_header(app: &DiffExploreApp) -> Paragraph<'static> {
 
 fn build_diff_status_bar(app: &DiffExploreApp) -> Paragraph<'static> {
     let sort_label = match app.sort_order {
-        None | Some(crate::cli::SortOrder::None) => "off",
-        Some(crate::cli::SortOrder::Desc) => "desc",
-        Some(crate::cli::SortOrder::Asc) => "asc",
+        None | Some(crate::chart::selector::SortOrder::None) => "off",
+        Some(crate::chart::selector::SortOrder::Desc) => "desc",
+        Some(crate::chart::selector::SortOrder::Asc) => "asc",
     };
 
     let bindings: Vec<(&str, &str)> = vec![

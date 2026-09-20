@@ -70,7 +70,7 @@ fn warn_non_bar_limits(chart_type: chart::selector::ChartType, cli: &cli::Cli) {
         );
     } else if matches!(
         cli.sort,
-        Some(cli::SortOrder::Desc) | Some(cli::SortOrder::Asc)
+        Some(cli::SortOrderArg::Desc) | Some(cli::SortOrderArg::Asc)
     ) && !matches!(chart_type, ChartType::Bar)
     {
         eprintln!(
