@@ -108,6 +108,8 @@ never reverses**. Concretely:
   structs instead of `&Cli` — that is the pattern to copy. `markdown`/`table`
   take `TableParams` since Phase 2-2, `recommend` takes `Query` since
   Phase 2-3, `pipeline` takes `PipelineParams` since Phase 2-4,
+  `diff/` takes `DiffParams` since Phase 2-5 (`--where`/`--agg`/`--color`
+  no-effect warnings stay in the `run_diff_from_cli` adapter),
   `filter::apply_filters` returns `FilterOutcome` (data + `info:` notice)
   since Phase 2-4; `svg` rendering via `Buffer` is known debt, not
   precedent (see below).
@@ -129,8 +131,8 @@ never reverses**. Concretely:
 2. **`Cli` must not leak below the app plane.** Every `&Cli` parameter in
    data/output code forces tests through `Cli::try_parse_from`, blocks reuse
    from other products, and blocks the L3 crate split. Current violations are
-   debt, not examples to follow: `diff::run_diff(&Cli)`,
-    `directory::run_directory(&Cli)`
+   debt, not examples to follow:
+     `directory::run_directory(&Cli)`
     (done: `diagnostics::error_hint(_, Option<&Path>)` in Phase 2-1,
     `output/table.rs` + `output/markdown.rs` via `TableParams` in Phase 2-2,
     `chart/recommend.rs` via `Query` in / `Warnings` out in Phase 2-3 with
@@ -138,10 +140,15 @@ never reverses**. Concretely:
     `pipeline::render_data` via `PipelineParams` in Phase 2-4 with the sole
     `Cli → PipelineParams` conversion at `Cli::to_pipeline_params` and the
     `render_data_from_cli` adapter, `filter::apply_filters` via
-    `FilterOutcome` out in Phase 2-4).
+    `FilterOutcome` out in Phase 2-4,
+    `diff::run_diff` via `DiffParams` in Phase 2-5 with the sole
+    `Cli → DiffParams` conversion at `Cli::to_diff_params` and the
+    `run_diff_from_cli` adapter keeping the `--where`/`--agg`/`--color`
+    warnings).
     New code must take a
     plain `*Params`/`*Options` struct (precedent: `ChartJsonParams`,
-    `SparkParams`, `TableParams`, `PipelineParams`, `FilterOutcome`) or
+    `SparkParams`, `TableParams`, `PipelineParams`, `DiffParams`,
+    `FilterOutcome`) or
     `Option<&Path>` instead.
 3. **Ratatui stays inside the render contract.** SVG/HTML/JSON exist so
    agents and reports can consume charts without a terminal; exposing

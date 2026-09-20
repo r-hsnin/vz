@@ -106,8 +106,7 @@ app.rs → pipeline/cli → {oneshot, diff, directory, explore, present, watch}
 Forbidden (compiler-unchecked today — do not add new instances):
 
 - `&Cli` parameters outside `cli/` + binary adapters. Known instances:
-  `diff::run_diff` (`diff/mod.rs`), `directory::run_directory`
-  (`directory/mod.rs`).
+  `directory::run_directory` (`directory/mod.rs`).
   (Done: `diagnostics::error_hint` takes `Option<&Path>` since Phase 2-1;
   `output/table.rs` + `output/markdown.rs` take `TableParams` since Phase 2-2;
   `chart/recommend.rs` takes `Query` + returns `Warnings` since Phase 2-3,
@@ -115,7 +114,11 @@ Forbidden (compiler-unchecked today — do not add new instances):
   `pipeline::render_data` + `dispatch_output`/`print_spark`/`print_chart_json`
   take `PipelineParams` since Phase 2-4 — the only `&Cli` touchpoint left is
   the `render_data_from_cli` adapter — and `filter::apply_filters` returns
-  `FilterOutcome` with the `info:` notice printed by callers.)
+  `FilterOutcome` with the `info:` notice printed by callers;
+  `diff::run_diff` + `diff/schema.rs` resolution + `diff/render/` take
+  `DiffParams` since Phase 2-5 — the only `&Cli` touchpoint left is the
+  `run_diff_from_cli` adapter, which keeps the `--where`/`--agg`/`--color`
+  no-effect warnings in the bin.)
 - `println!/eprintln!` in data/render planes. Known instances:
   `output/markdown.rs` + `output/table.rs` warnings,
   `chart/data_builder.rs:325`.
@@ -123,7 +126,9 @@ Forbidden (compiler-unchecked today — do not add new instances):
   `output/chart_json.rs` (`ChartJsonParams`), `output/spark.rs`
   (`SparkParams`), `output/table.rs` (`TableParams`, shared with
   `output/markdown.rs`), `chart/recommend.rs` (`Query` in / `Warnings`
-  out), `pipeline.rs` (`PipelineParams` in) and `filter.rs`
+  out), `pipeline.rs` (`PipelineParams` in), `diff/` (`DiffParams` in;
+  `--where`/`--agg`/`--color` warnings stay in the `run_diff_from_cli`
+  adapter) and `filter.rs`
   (`FilterOutcome` out: filtered data + `info:` notice, printed at the edge).
 - `render/` geometry invented anywhere else; `ratatui` types in `output/`
   public signatures (only `output/svg.rs` touches `Buffer`, via the shared
@@ -134,10 +139,10 @@ Forbidden (compiler-unchecked today — do not add new instances):
 | Current `src/` path | Target crate | Notes |
 |---|---|---|
 | `loader/`, `infer/`, `filter.rs`, `util.rs`, `sparkline.rs` | `vz-core` | Move as-is; drop `Cli` uses on the way |
-| `chart/` (selector + data_builder + recommend) | `vz-core` | Canonical `ChartData` assembler lives here; `Query`/`Warnings` seam done at Phase 2-3, `PipelineParams` seam at Phase 2-4 |
+| `chart/` (selector + data_builder + recommend) | `vz-core` | Canonical `ChartData` assembler lives here; `Query`/`Warnings` seam done at Phase 2-3, `PipelineParams` seam at Phase 2-4, `DiffParams` seam at Phase 2-5 |
 | `render/` | `vz-core` | Keep ratatui inside; hide from public signatures |
 | `output/` | `vz-core` | Convert to `String`/value returns; print wrappers stay in bin |
-| `diff/compute.rs`, `diff/schema.rs` (+ pure types) | `vz-core` | `run_diff` CLI behavior stays in bin |
+| `diff/compute.rs`, `diff/schema.rs` (+ pure types) | `vz-core` | `run_diff_from_cli` CLI behavior stays in bin |
 | `diff/render/` | `vz` (bin) | TUI/CLI-coupled rendering |
 | `present/parser.rs` | `vz-core` | Markdown → `Presentation` only |
 | `present/` rest, `explore/`, `oneshot/`, `directory/` | `vz` (bin) | Mode dispatch + loops |
@@ -184,7 +189,9 @@ and `diff` column resolution (`diff::auto_x_column` et al.). `pipeline` itself
 never depends on `diff` / `directory` / `present` / `explore`, so the module
 graph stays acyclic. `pipeline` is the app-plane orchestrator (the only `&Cli`
 touchpoint is the `render_data_from_cli` adapter; everything downstream takes
-`PipelineParams`);
+`PipelineParams`); `diff::run_diff` is the diff-plane orchestrator (the only
+`&Cli` touchpoint is the `run_diff_from_cli` adapter; everything downstream
+takes `DiffParams`);
 the `Cli`-free functions it calls (`infer_from_data`, `diff::schema`
 resolution) are the shared services that will move to `vz-core` at L3.
 
