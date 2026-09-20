@@ -225,7 +225,7 @@ vz q1.csv q2.csv -o json
 ```
 
 Both files must have matching schemas (same column names, case-insensitive).
-Categorical X columns produce a bar chart with ▲/▼ annotations showing per-category change and percentage delta.
+Categorical X columns produce a bar chart with ▲/▼ annotations showing per-category change and percentage delta. A zero or missing before value has no percentage delta and is annotated `▲ new` / `▼ new` in every output format.
 Temporal X columns produce a line chart overlay with before (gray) and after (cyan) series.
 `--where`/`--agg`/`--color` have no effect in diff mode (a warning is printed).
 Non-numeric cells are skipped, never counted as `0`.
@@ -311,7 +311,7 @@ Supported chart block parameters:
 | `where` | Filter rows (repeatable): e.g. `where: revenue>1000` |
 | `sort` | Sort bar chart: `desc`, `asc` |
 | `agg` | Aggregation: `sum`, `mean`, `count`, `max`, `min` |
-| `top` | Show only top N categories |
+| `top` | Show only top N categories (implies `desc` when `sort` is unset) |
 | `bins` | Number of histogram bins |
 | `height` | Chart height in rows |
 | `diff` | "After" file for diff comparison (`source` becomes "before") |

@@ -24,6 +24,7 @@ Release procedures live in [RUNBOOK.md](RUNBOOK.md).
 - **SVG data marks carry every series.** Line/scatter overlays emit one `<circle class="vz-point" data-series="…">` per vertex of every series (not just the first), positioned on the union axis span; HTML tooltips prefix the series name (`series — label: value`). Bar marks use the full min→max span so negative values sit below positives. Breaking change: snapshots with `-c` overlays now show more marks at shifted coordinates. Known approximation: tooltip labels come from the shared `x_labels` by per-series index, so overlaid series with missing x values can show the wrong label while the dot position stays correct.
 - **NaN/inf are skipped in aggregations, diffs, and every chart path** (line/scatter/histogram/spark/JSON series), and ignored in the type-inference vote like nulls. `--agg max/min` never emits `±inf`; text-only diffs report no entries instead of `0→0`. JSON `data[]` renders them as `null`, while `chart_data` series omit those points.
 - **Diff mode ignores `--where`/`--agg`/`--color`.** A `no effect in diff mode` warning is printed; filter before comparing instead.
+- **New diff entries show `▲ new` / `▼ new`, not a percentage.** When a category or point has no value on the before side, the percentage delta is undefined, so charts and tables use the `new` marker instead of an absolute delta like `▲ +800`.
 - **Explore/Present require an interactive terminal.** In CI or pipes, use one-shot mode.
 
 ## Build Failures
