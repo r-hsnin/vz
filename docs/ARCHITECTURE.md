@@ -106,7 +106,7 @@ app.rs → pipeline/cli → {oneshot, diff, directory, explore, present, watch}
 Forbidden (compiler-unchecked today — do not add new instances):
 
 - `&Cli` parameters outside `cli/` + binary adapters. Known instances:
-  `directory::run_directory` (`directory/mod.rs`).
+  (none — Phase 2 complete).
   (Done: `diagnostics::error_hint` takes `Option<&Path>` since Phase 2-1;
   `output/table.rs` + `output/markdown.rs` take `TableParams` since Phase 2-2;
   `chart/recommend.rs` takes `Query` + returns `Warnings` since Phase 2-3,
@@ -118,7 +118,10 @@ Forbidden (compiler-unchecked today — do not add new instances):
   `diff::run_diff` + `diff/schema.rs` resolution + `diff/render/` take
   `DiffParams` since Phase 2-5 — the only `&Cli` touchpoint left is the
   `run_diff_from_cli` adapter, which keeps the `--where`/`--agg`/`--color`
-  no-effect warnings in the bin.)
+  no-effect warnings in the bin;
+  `directory::run_directory` + `directory::run_catalog` take
+  `DirectoryParams` since Phase 2-6 — the only `&Cli` touchpoint left is
+  the `run_directory_from_cli` adapter.)
 - `println!/eprintln!` in data/render planes. Known instances:
   `output/markdown.rs` + `output/table.rs` warnings,
   `chart/data_builder.rs:325`.
@@ -129,7 +132,9 @@ Forbidden (compiler-unchecked today — do not add new instances):
   out), `pipeline.rs` (`PipelineParams` in), `diff/` (`DiffParams` in;
   `--where`/`--agg`/`--color` warnings stay in the `run_diff_from_cli`
   adapter) and `filter.rs`
-  (`FilterOutcome` out: filtered data + `info:` notice, printed at the edge).
+  (`FilterOutcome` out: filtered data + `info:` notice, printed at the edge),
+  `directory::run_directory`/`run_catalog` (`DirectoryParams` in; sole
+  `&Cli` touchpoint is the `run_directory_from_cli` adapter).
 - `render/` geometry invented anywhere else; `ratatui` types in `output/`
   public signatures (only `output/svg.rs` touches `Buffer`, via the shared
   cell-geometry contract).
@@ -139,7 +144,7 @@ Forbidden (compiler-unchecked today — do not add new instances):
 | Current `src/` path | Target crate | Notes |
 |---|---|---|
 | `loader/`, `infer/`, `filter.rs`, `util.rs`, `sparkline.rs` | `vz-core` | Move as-is; drop `Cli` uses on the way |
-| `chart/` (selector + data_builder + recommend) | `vz-core` | Canonical `ChartData` assembler lives here; `Query`/`Warnings` seam done at Phase 2-3, `PipelineParams` seam at Phase 2-4, `DiffParams` seam at Phase 2-5 |
+| `chart/` (selector + data_builder + recommend) | `vz-core` | Canonical `ChartData` assembler lives here; `Query`/`Warnings` seam done at Phase 2-3, `PipelineParams` seam at Phase 2-4, `DiffParams` seam at Phase 2-5, `DirectoryParams` seam at Phase 2-6 |
 | `render/` | `vz-core` | Keep ratatui inside; hide from public signatures |
 | `output/` | `vz-core` | Convert to `String`/value returns; print wrappers stay in bin |
 | `diff/compute.rs`, `diff/schema.rs` (+ pure types) | `vz-core` | `run_diff_from_cli` CLI behavior stays in bin |
@@ -191,7 +196,9 @@ graph stays acyclic. `pipeline` is the app-plane orchestrator (the only `&Cli`
 touchpoint is the `render_data_from_cli` adapter; everything downstream takes
 `PipelineParams`); `diff::run_diff` is the diff-plane orchestrator (the only
 `&Cli` touchpoint is the `run_diff_from_cli` adapter; everything downstream
-takes `DiffParams`);
+takes `DiffParams`); `directory::run_directory` is the directory-plane
+orchestrator (the only `&Cli` touchpoint is the `run_directory_from_cli`
+adapter; everything downstream takes `DirectoryParams`);
 the `Cli`-free functions it calls (`infer_from_data`, `diff::schema`
 resolution) are the shared services that will move to `vz-core` at L3.
 

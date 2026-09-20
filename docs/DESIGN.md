@@ -110,6 +110,8 @@ never reverses**. Concretely:
   Phase 2-3, `pipeline` takes `PipelineParams` since Phase 2-4,
   `diff/` takes `DiffParams` since Phase 2-5 (`--where`/`--agg`/`--color`
   no-effect warnings stay in the `run_diff_from_cli` adapter),
+  `directory/` takes `DirectoryParams` since Phase 2-6 (scan/combine plus
+  `PipelineParams`),
   `filter::apply_filters` returns `FilterOutcome` (data + `info:` notice)
   since Phase 2-4; `svg` rendering via `Buffer` is known debt, not
   precedent (see below).
@@ -129,11 +131,11 @@ never reverses**. Concretely:
    labels, apply theme, or wire slide/interactive state — never re-derive
    aggregation.
 2. **`Cli` must not leak below the app plane.** Every `&Cli` parameter in
-   data/output code forces tests through `Cli::try_parse_from`, blocks reuse
-   from other products, and blocks the L3 crate split. Current violations are
-   debt, not examples to follow:
-     `directory::run_directory(&Cli)`
-    (done: `diagnostics::error_hint(_, Option<&Path>)` in Phase 2-1,
+  data/output code forces tests through `Cli::try_parse_from`, blocks reuse
+  from other products, and blocks the L3 crate split. Phase 2 removed all
+  instances from data/output code (only `cli/` + binary adapters keep
+  `&Cli`):
+  (done: `diagnostics::error_hint(_, Option<&Path>)` in Phase 2-1,
     `output/table.rs` + `output/markdown.rs` via `TableParams` in Phase 2-2,
     `chart/recommend.rs` via `Query` in / `Warnings` out in Phase 2-3 with
     the sole `Cli → Query` conversion at `Cli::to_query`,
@@ -144,11 +146,14 @@ never reverses**. Concretely:
     `diff::run_diff` via `DiffParams` in Phase 2-5 with the sole
     `Cli → DiffParams` conversion at `Cli::to_diff_params` and the
     `run_diff_from_cli` adapter keeping the `--where`/`--agg`/`--color`
-    warnings).
+    warnings,
+    `directory::run_directory` via `DirectoryParams` in Phase 2-6 with the
+    sole `Cli → DirectoryParams` conversion at `Cli::to_directory_params`
+    and the `run_directory_from_cli` adapter).
     New code must take a
     plain `*Params`/`*Options` struct (precedent: `ChartJsonParams`,
     `SparkParams`, `TableParams`, `PipelineParams`, `DiffParams`,
-    `FilterOutcome`) or
+    `DirectoryParams`, `FilterOutcome`) or
     `Option<&Path>` instead.
 3. **Ratatui stays inside the render contract.** SVG/HTML/JSON exist so
    agents and reports can consume charts without a terminal; exposing
