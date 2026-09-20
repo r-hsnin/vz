@@ -112,6 +112,34 @@ fn test_chart_block_bins_invalid_ignored() {
 }
 
 #[test]
+fn test_chart_block_bins_zero_ignored() {
+    // Out-of-range bins must not become an empty histogram with no warning.
+    let lines = vec!["source: data.csv".into(), "bins: 0".into()];
+    let chart = parse_chart_block(&lines);
+    assert_eq!(chart.bins, None);
+}
+
+#[test]
+fn test_chart_block_bins_above_max_ignored() {
+    let lines = vec![
+        "source: data.csv".into(),
+        format!("bins: {}", crate::render::MAX_BINS + 1),
+    ];
+    let chart = parse_chart_block(&lines);
+    assert_eq!(chart.bins, None);
+}
+
+#[test]
+fn test_chart_block_bins_at_max_accepted() {
+    let lines = vec![
+        "source: data.csv".into(),
+        format!("bins: {}", crate::render::MAX_BINS),
+    ];
+    let chart = parse_chart_block(&lines);
+    assert_eq!(chart.bins, Some(crate::render::MAX_BINS));
+}
+
+#[test]
 fn test_chart_block_height_parsed() {
     let lines = vec![
         "source: data.csv".into(),

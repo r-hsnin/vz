@@ -313,7 +313,9 @@ fn parse_table_row(line: &str) -> Vec<String> {
 ///
 /// Unknown `type`/`sort`/`agg` values and unparsable `top`/`bins`/`height`
 /// are ignored (auto-infer applies) but emit a stderr warning so typos like
-/// `type: barr` don't mis-chart silently. Unknown keys are ignored silently.
+/// `type: barr` don't mis-chart silently. `bins` outside `1..=render::MAX_BINS`
+/// is likewise warned and ignored instead of silently rendering an empty or
+/// clamped histogram. Unknown keys are ignored silently.
 pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
     let mut source = String::new();
     let mut chart_type = None;
@@ -395,7 +397,14 @@ pub(crate) fn parse_chart_block(lines: &[String]) -> ChartBlock {
                 }
                 "bins" => {
                     bins = match value.parse::<usize>() {
-                        Ok(n) => Some(n),
+                        Ok(n) if (1..=crate::render::MAX_BINS).contains(&n) => Some(n),
+                        Ok(n) => {
+                            eprintln!(
+                                "warning: bins {n} out of range (1-{}) — ignoring.",
+                                crate::render::MAX_BINS
+                            );
+                            None
+                        }
                         Err(_) => {
                             eprintln!(
                                 "warning: invalid bins '{value}' — expected a positive integer. Ignoring."
