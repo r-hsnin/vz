@@ -8,7 +8,7 @@ use crate::render::{BarChartData, ChartConfig, HistogramData};
 use super::RenderOptions;
 
 /// Build ChartConfig for Line/Scatter charts, including extra Y columns.
-pub fn build_line_scatter_config(
+pub(crate) fn build_line_scatter_config(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -60,7 +60,7 @@ fn build_chart_config(
 }
 
 /// Sort bar chart data by value. No-op if sort_order is None or SortOrder::None.
-pub fn sort_bar_data(data: &mut BarChartData, sort_order: Option<SortOrder>) {
+pub(crate) fn sort_bar_data(data: &mut BarChartData, sort_order: Option<SortOrder>) {
     let reverse = match sort_order {
         Some(SortOrder::Desc) => true,
         Some(SortOrder::Asc) => false,
@@ -78,7 +78,7 @@ pub fn sort_bar_data(data: &mut BarChartData, sort_order: Option<SortOrder>) {
 }
 
 /// Truncate bar chart to first N categories. No-op if limit is None.
-pub fn truncate_bar_data(data: &mut BarChartData, limit: Option<usize>) {
+pub(crate) fn truncate_bar_data(data: &mut BarChartData, limit: Option<usize>) {
     if let Some(n) = limit {
         data.labels.truncate(n);
         data.values.truncate(n);
@@ -87,7 +87,7 @@ pub fn truncate_bar_data(data: &mut BarChartData, limit: Option<usize>) {
 
 /// Build BarChartData: aggregates values by category.
 /// Returns (data, rows_used).
-pub fn build_bar_data(
+pub(crate) fn build_bar_data(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -105,7 +105,8 @@ pub fn build_bar_data(
 }
 
 /// Build HistogramData for Histogram charts.
-pub fn build_histogram_data(
+#[cfg(test)]
+pub(crate) fn build_histogram_data(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -114,7 +115,7 @@ pub fn build_histogram_data(
 }
 
 /// Build histogram data with an explicit bin count override.
-pub fn build_histogram_data_with_bins(
+pub(crate) fn build_histogram_data_with_bins(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -147,7 +148,7 @@ pub fn build_histogram_data_with_bins(
 }
 
 /// Build heatmap data for two categorical columns.
-pub fn build_heatmap(
+pub(crate) fn build_heatmap(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],

@@ -9,13 +9,13 @@ use super::ViewMode;
 
 /// Diff data variant: categorical or temporal.
 #[derive(Debug, Clone)]
-pub enum DiffData {
+pub(crate) enum DiffData {
     Categorical(DiffResult),
     Temporal(DiffTimeSeries),
 }
 
 /// Application state for Diff Explore mode.
-pub struct DiffExploreApp {
+pub(crate) struct DiffExploreApp {
     pub diff_data: DiffData,
     pub before_name: String,
     pub after_name: String,

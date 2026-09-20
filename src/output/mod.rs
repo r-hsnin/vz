@@ -1,12 +1,12 @@
 //! Machine-readable output formats for AI agent integration.
 
-pub mod chart_json;
-pub mod html;
-pub mod markdown;
-pub mod spark;
-pub mod stats_text;
-pub mod svg;
-pub mod table;
+pub(crate) mod chart_json;
+pub(crate) mod html;
+pub(crate) mod markdown;
+pub(crate) mod spark;
+pub(crate) mod stats_text;
+pub(crate) mod svg;
+pub(crate) mod table;
 
 use serde::Serialize;
 
@@ -16,7 +16,7 @@ use crate::loader::LoadedData;
 
 /// Top-level JSON output for `--info --output json`.
 #[derive(Debug, Serialize)]
-pub struct InfoOutput {
+pub(crate) struct InfoOutput {
     pub version: u32,
     pub file: String,
     pub rows: usize,
@@ -31,7 +31,7 @@ pub struct InfoOutput {
 
 /// Column metadata in JSON output.
 #[derive(Debug, Serialize)]
-pub struct ColumnOutput {
+pub(crate) struct ColumnOutput {
     pub name: String,
     #[serde(rename = "type")]
     pub data_type: String,
@@ -42,7 +42,7 @@ pub struct ColumnOutput {
 /// Per-column statistics (variant depends on data type).
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
-pub enum ColumnStats {
+pub(crate) enum ColumnStats {
     Quantitative { min: f64, max: f64, mean: f64 },
     Categorical { unique: usize, values: Vec<String> },
     Temporal { min: String, max: String },
@@ -51,7 +51,7 @@ pub enum ColumnStats {
 
 /// Chart recommendation in JSON output.
 #[derive(Debug, Serialize)]
-pub struct RecommendationOutput {
+pub(crate) struct RecommendationOutput {
     pub chart_type: String,
     pub x: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -63,7 +63,7 @@ pub struct RecommendationOutput {
 /// The resolved query that produced `chart_data`: every knob that changes
 /// the numbers, so agents can reproduce or audit the result.
 #[derive(Debug, Serialize)]
-pub struct QueryOutput {
+pub(crate) struct QueryOutput {
     /// Chart type actually rendered (`-t` override applied).
     pub chart_type: String,
     pub x: String,
@@ -88,7 +88,7 @@ pub struct QueryOutput {
 }
 
 /// Build JSON info output from schema and data.
-pub fn build_info_output(
+pub(crate) fn build_info_output(
     file: &str,
     data: &LoadedData,
     schema: &Schema,
@@ -169,7 +169,7 @@ fn build_data_sample(headers: &[String], rows: &[Vec<String>]) -> Vec<serde_json
 }
 
 /// Compute statistics for a single column based on its inferred type.
-pub fn compute_column_stats(
+pub(crate) fn compute_column_stats(
     col_idx: usize,
     data_type: &DataType,
     data: &LoadedData,

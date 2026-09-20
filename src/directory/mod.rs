@@ -5,7 +5,7 @@
 
 #[cfg(test)]
 mod auto_sample_tests;
-pub mod catalog;
+mod catalog;
 #[cfg(test)]
 mod catalog_tests;
 pub mod combiner;

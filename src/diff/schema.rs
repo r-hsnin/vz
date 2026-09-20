@@ -86,7 +86,7 @@ pub fn is_temporal_column(schema: &crate::infer::types::Schema, col: &str) -> bo
 }
 
 /// Resolve which column to use as X axis for diff comparison.
-pub(super) fn resolve_x_column(
+pub(crate) fn resolve_x_column(
     cli: &Cli,
     data: &LoadedData,
     schema: &crate::infer::types::Schema,
@@ -113,7 +113,7 @@ pub(super) fn resolve_x_column(
 }
 
 /// Resolve which column to use as Y axis for diff comparison.
-pub(super) fn resolve_y_column(
+pub(crate) fn resolve_y_column(
     cli: &Cli,
     data: &LoadedData,
     schema: &crate::infer::types::Schema,

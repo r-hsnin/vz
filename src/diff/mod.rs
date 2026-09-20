@@ -4,7 +4,7 @@
 //! and renders diff-aware visualizations.
 
 mod compute;
-pub mod render;
+mod render;
 mod schema;
 #[cfg(test)]
 mod tests;
@@ -58,7 +58,7 @@ pub struct DiffTimeSeries {
 }
 
 /// Run diff mode: load both files, validate schemas, compute and render diff.
-pub fn run_diff(cli: &Cli, before_path: &Path, after_path: &Path) -> Result<()> {
+pub(crate) fn run_diff(cli: &Cli, before_path: &Path, after_path: &Path) -> Result<()> {
     if !cli.filter.is_empty() {
         eprintln!("warning: --where has no effect in diff mode");
     }

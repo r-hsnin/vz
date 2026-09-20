@@ -1,5 +1,5 @@
-pub mod ansi;
-pub mod builders;
+pub(crate) mod ansi;
+pub(crate) mod builders;
 mod summary;
 
 use std::io;
@@ -7,11 +7,10 @@ use std::io;
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::chart::data_builder;
-use crate::chart::selector::AggFunction;
 use crate::chart::selector::SortOrder;
-use crate::chart::selector::{ChartRecommendation, ChartType};
+use crate::chart::selector::{AggFunction, ChartRecommendation, ChartType};
 
-pub use ansi::print_buffer;
+pub(crate) use ansi::print_buffer;
 
 /// Default chart height in terminal rows.
 pub(crate) const DEFAULT_HEIGHT: u16 = 24;
@@ -72,7 +71,7 @@ impl<'a> RenderOptions<'a> {
     }
 }
 
-pub fn render_oneshot(
+pub(crate) fn render_oneshot(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -202,7 +201,7 @@ fn compute_bar_agg_stats(
 }
 
 /// Render the appropriate chart type into a buffer.
-pub fn render_chart_to_buffer(
+pub(crate) fn render_chart_to_buffer(
     chart_type: ChartType,
     recommendation: &ChartRecommendation,
     headers: &[String],
@@ -222,7 +221,7 @@ pub fn render_chart_to_buffer(
 /// Build the `ChartData` for a chart without rendering it.
 /// Shared by `render_chart_to_buffer` (text path) and the SVG exporter
 /// (which needs the data twice: once for the grid, once for vector marks).
-pub fn build_chart_data_for_svg(
+pub(crate) fn build_chart_data_for_svg(
     chart_type: ChartType,
     recommendation: &ChartRecommendation,
     headers: &[String],
@@ -306,7 +305,7 @@ fn build_histogram_chart(
 
 /// Get terminal width, falling back to 80 columns.
 /// When stdout is piped (not a TTY), always returns 80 for deterministic output.
-pub fn terminal_width() -> u16 {
+pub(crate) fn terminal_width() -> u16 {
     if !std::io::IsTerminal::is_terminal(&std::io::stdout()) {
         return DEFAULT_TERMINAL_WIDTH;
     }
@@ -368,7 +367,7 @@ pub(crate) fn fit_labels_to_width(labels: &[String], available_width: usize) -> 
     data_builder::pick_evenly(labels, labels_that_fit)
 }
 /// Resolve the chart type: use override if given, otherwise use the recommended type.
-pub fn resolve_chart_type(
+pub(crate) fn resolve_chart_type(
     recommendation: &ChartRecommendation,
     override_type: Option<crate::cli::ChartTypeArg>,
 ) -> ChartType {

@@ -10,7 +10,7 @@ use super::state::initial_axes;
 use super::{ExploreApp, ViewMode};
 
 impl ExploreApp {
-    pub fn new(schema: Schema, data: Vec<Vec<String>>, theme: crate::theme::Theme) -> Self {
+    pub(crate) fn new(schema: Schema, data: Vec<Vec<String>>, theme: crate::theme::Theme) -> Self {
         let (x_idx, y_idx) = initial_axes(&schema);
         Self {
             schema,
@@ -241,6 +241,7 @@ impl ExploreApp {
     }
 
     /// Extract Y column values as f64.
+    #[cfg(test)]
     pub fn y_values(&self) -> Vec<f64> {
         self.data
             .iter()

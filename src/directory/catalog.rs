@@ -198,7 +198,7 @@ pub fn print_catalog_json(catalog: &CatalogResult) -> Result<()> {
 }
 
 /// Run catalog mode: scan directory, build catalog, output.
-pub fn run_catalog(cli: &Cli, entries: &[FileEntry]) -> Result<()> {
+pub(crate) fn run_catalog(cli: &Cli, entries: &[FileEntry]) -> Result<()> {
     let catalog = build_catalog(entries, cli.no_header);
 
     if catalog.groups.is_empty() {

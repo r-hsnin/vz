@@ -16,7 +16,7 @@ const FONT_SIZE: f64 = 14.0;
 /// histogram bin emits one `<circle class="vz-point" …>` with its label and
 /// value; the text-grid layer below stays byte-identical for snapshots.
 #[derive(Debug, Clone, PartialEq)]
-pub struct DataPoint {
+pub(crate) struct DataPoint {
     /// Category / x label (e.g. city name, date string).
     pub label: String,
     /// Aggregated / plotted value.
@@ -38,7 +38,7 @@ pub struct DataPoint {
 /// - cell (0,0) is at pixel (0,0); each cell is CELL_W × CELL_H.
 /// - bars grow upward from a baseline one row above the bottom edge.
 /// - line/scatter/histogram points spread across the same plot rect.
-pub fn data_marks_svg(
+pub(crate) fn data_marks_svg(
     chart_data: &crate::render::ChartData,
     width_cells: u16,
     height_cells: u16,
@@ -232,7 +232,7 @@ fn layout_points(
 
 /// Convert a ratatui Buffer to an SVG string.
 /// `bg_color` sets the background (default: dark theme #1e1e1e).
-pub fn buffer_to_svg(buf: &Buffer, bg_color: &str) -> String {
+pub(crate) fn buffer_to_svg(buf: &Buffer, bg_color: &str) -> String {
     let area = buf.area;
     let width = area.width as f64 * CELL_WIDTH;
     let height = area.height as f64 * CELL_HEIGHT;
@@ -384,7 +384,7 @@ fn color_to_hex(color: Color) -> String {
 /// `data-label`/`data-value` + `<title>` for tooltips and scraping.
 /// (Breaking change: SVG output now contains a second layer — downstream
 /// parsers that assumed "only text rows" must ignore the `vz-data` group.)
-pub fn render_chart_svg(
+pub(crate) fn render_chart_svg(
     recommendation: &crate::chart::selector::ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -394,8 +394,9 @@ pub fn render_chart_svg(
 }
 
 /// Same as [`render_chart_svg`] but with the data-marks overlay disabled.
-/// Used by snapshot tests to pin the text-grid layer byte-for-byte.
-pub fn render_chart_svg_text_only(
+/// Dead code kept for snapshot pinning experiments; not wired to any caller.
+#[allow(dead_code)]
+pub(crate) fn render_chart_svg_text_only(
     recommendation: &crate::chart::selector::ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -440,7 +441,7 @@ fn render_chart_svg_with_marks(
 }
 
 /// Render the chart to SVG and print to stdout.
-pub fn print_svg(
+pub(crate) fn print_svg(
     recommendation: &crate::chart::selector::ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],

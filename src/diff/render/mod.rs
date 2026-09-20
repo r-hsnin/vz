@@ -17,7 +17,7 @@ use crate::cli::{self, Cli};
 use crate::diff::{DiffEntry, DiffResult, DiffTimeSeries};
 
 /// Render the diff result based on CLI output format.
-pub fn render_diff(
+pub(crate) fn render_diff(
     cli: &Cli,
     diff: &DiffResult,
     before_path: &Path,
@@ -45,7 +45,7 @@ pub fn render_diff(
 }
 
 /// Render temporal diff as a 2-series line chart overlay.
-pub fn render_diff_line(
+pub(crate) fn render_diff_line(
     cli: &Cli,
     ts: &DiffTimeSeries,
     before_path: &Path,
