@@ -1,10 +1,13 @@
 use super::*;
-use crate::chart::selector::AggFunction;
 use crate::chart::selector::ChartType;
 use crate::cli::Cli;
 use crate::infer::types::DataType;
 use crate::test_helpers::{make_recommendation, make_schema};
 use clap::Parser;
+
+fn query_of(cli: &Cli) -> Query {
+    cli.to_query()
+}
 
 // --- effective_agg ---
 
@@ -16,7 +19,10 @@ fn effective_agg_explicit_overrides_all() {
         ("revenue", DataType::Quantitative),
     ]);
     let rec = make_recommendation(ChartType::Bar, "city", Some("revenue"), None);
-    assert_eq!(effective_agg(&cli, &rec, &schema), AggFunction::Mean);
+    assert_eq!(
+        effective_agg(&query_of(&cli), &rec, &schema),
+        AggFunction::Mean
+    );
 }
 
 #[test]
@@ -27,7 +33,10 @@ fn effective_agg_defaults_to_sum() {
         ("revenue", DataType::Quantitative),
     ]);
     let rec = make_recommendation(ChartType::Bar, "city", Some("revenue"), None);
-    assert_eq!(effective_agg(&cli, &rec, &schema), AggFunction::Sum);
+    assert_eq!(
+        effective_agg(&query_of(&cli), &rec, &schema),
+        AggFunction::Sum
+    );
 }
 
 #[test]
@@ -38,7 +47,44 @@ fn effective_agg_bar_forced_categorical_y_becomes_count() {
         ("status", DataType::Categorical),
     ]);
     let rec = make_recommendation(ChartType::Bar, "department", Some("status"), None);
-    assert_eq!(effective_agg(&cli, &rec, &schema), AggFunction::Count);
+    assert_eq!(
+        effective_agg(&query_of(&cli), &rec, &schema),
+        AggFunction::Count
+    );
+}
+
+#[test]
+fn build_recommendation_bar_color_warning_returned_not_printed() {
+    let cli = Cli::try_parse_from(["vz", "data.csv", "-c", "city"]).unwrap();
+    let schema = make_schema(&[
+        ("city", DataType::Categorical),
+        ("revenue", DataType::Quantitative),
+    ]);
+    let query = query_of(&cli);
+    let y_opts = parse_y_options(query.y_col.as_deref());
+    let (rec, warnings) = build_recommendation(&query, &schema, &y_opts).unwrap();
+    assert_eq!(rec.chart_type, ChartType::Bar);
+    assert!(
+        warnings
+            .0
+            .iter()
+            .any(|w| w.contains("no effect on bar chart")),
+        "expected bar color warning, got: {:?}",
+        warnings.0
+    );
+}
+
+#[test]
+fn build_recommendation_no_fallback_warning_for_first_class_pair() {
+    let cli = Cli::try_parse_from(["vz", "data.csv", "-x", "month", "-y", "revenue"]).unwrap();
+    let schema = make_schema(&[
+        ("month", DataType::Temporal),
+        ("revenue", DataType::Quantitative),
+    ]);
+    let query = query_of(&cli);
+    let y_opts = parse_y_options(query.y_col.as_deref());
+    let (_, warnings) = build_recommendation(&query, &schema, &y_opts).unwrap();
+    assert!(warnings.is_empty(), "got: {:?}", warnings.0);
 }
 
 // --- parse_y_options ---
@@ -46,7 +92,7 @@ fn effective_agg_bar_forced_categorical_y_becomes_count() {
 #[test]
 fn parse_y_options_single_column_no_label() {
     let cli = Cli::try_parse_from(["vz", "data.csv", "-y", "revenue"]).unwrap();
-    let opts = parse_y_options(&cli);
+    let opts = parse_y_options(cli.y_col.as_deref());
     assert_eq!(opts.hint, Some("revenue".to_string()));
     assert_eq!(opts.label_override, None);
     assert!(opts.extra_columns.is_empty());
@@ -55,7 +101,7 @@ fn parse_y_options_single_column_no_label() {
 #[test]
 fn parse_y_options_multi_y_with_labels() {
     let cli = Cli::try_parse_from(["vz", "data.csv", "-y", "revenue:Rev,profit:Profit"]).unwrap();
-    let opts = parse_y_options(&cli);
+    let opts = parse_y_options(cli.y_col.as_deref());
     assert_eq!(opts.hint, Some("revenue".to_string()));
     assert_eq!(opts.label_override, Some("Rev".to_string()));
     assert_eq!(
@@ -67,7 +113,7 @@ fn parse_y_options_multi_y_with_labels() {
 #[test]
 fn parse_y_options_no_y_specified() {
     let cli = Cli::try_parse_from(["vz", "data.csv"]).unwrap();
-    let opts = parse_y_options(&cli);
+    let opts = parse_y_options(cli.y_col.as_deref());
     assert_eq!(opts.hint, None);
     assert_eq!(opts.label_override, None);
     assert!(opts.extra_columns.is_empty());
@@ -82,7 +128,7 @@ fn build_render_options_default_values() {
         ("month", DataType::Temporal),
         ("revenue", DataType::Quantitative),
     ]);
-    let y_opts = parse_y_options(&cli);
+    let y_opts = parse_y_options(cli.y_col.as_deref());
     let rec = make_recommendation(ChartType::Bar, "month", Some("revenue"), None);
     let opts = crate::oneshot::RenderOptions::from_cli(&cli, &y_opts, &rec, &schema);
     assert_eq!(opts.width, None);
@@ -124,7 +170,7 @@ fn build_render_options_with_all_overrides() {
         ("revenue", DataType::Quantitative),
         ("profit", DataType::Quantitative),
     ]);
-    let y_opts = parse_y_options(&cli);
+    let y_opts = parse_y_options(cli.y_col.as_deref());
     let rec = make_recommendation(ChartType::Bar, "city", Some("revenue"), None);
     let opts = crate::oneshot::RenderOptions::from_cli(&cli, &y_opts, &rec, &schema);
     assert_eq!(opts.width, Some(80));
@@ -210,8 +256,9 @@ fn build_recommendation_basic_temporal_quant() {
         ("month", DataType::Temporal),
         ("revenue", DataType::Quantitative),
     ]);
-    let y_opts = parse_y_options(&cli);
-    let rec = build_recommendation(&cli, &schema, &y_opts).unwrap();
+    let query = query_of(&cli);
+    let y_opts = parse_y_options(query.y_col.as_deref());
+    let (rec, _) = build_recommendation(&query, &schema, &y_opts).unwrap();
     assert_eq!(rec.x_column, "month");
     assert_eq!(rec.y_column, Some("revenue".to_string()));
 }
@@ -227,8 +274,9 @@ fn build_recommendation_color_col_overrides() {
         ("revenue", DataType::Quantitative),
         ("region", DataType::Categorical),
     ]);
-    let y_opts = parse_y_options(&cli);
-    let rec = build_recommendation(&cli, &schema, &y_opts).unwrap();
+    let query = query_of(&cli);
+    let y_opts = parse_y_options(query.y_col.as_deref());
+    let (rec, _) = build_recommendation(&query, &schema, &y_opts).unwrap();
     assert_eq!(rec.color_column, Some("region".to_string()));
 }
 
@@ -240,8 +288,9 @@ fn build_recommendation_extra_y_clears_color() {
         ("revenue", DataType::Quantitative),
         ("profit", DataType::Quantitative),
     ]);
-    let y_opts = parse_y_options(&cli);
-    let rec = build_recommendation(&cli, &schema, &y_opts).unwrap();
+    let query = query_of(&cli);
+    let y_opts = parse_y_options(query.y_col.as_deref());
+    let (rec, _) = build_recommendation(&query, &schema, &y_opts).unwrap();
     assert_eq!(rec.color_column, None);
 }
 
@@ -252,8 +301,9 @@ fn build_recommendation_unknown_extra_y_errors_with_hint() {
         ("month", DataType::Temporal),
         ("revenue", DataType::Quantitative),
     ]);
-    let y_opts = parse_y_options(&cli);
-    let err = build_recommendation(&cli, &schema, &y_opts)
+    let query = query_of(&cli);
+    let y_opts = parse_y_options(query.y_col.as_deref());
+    let err = build_recommendation(&query, &schema, &y_opts)
         .expect_err("typo'd extra-y must not be silently dropped");
     let msg = format!("{err:#}");
     assert!(

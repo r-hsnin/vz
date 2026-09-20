@@ -33,6 +33,18 @@ impl Cli {
     pub fn primary_file(&self) -> Option<&std::path::Path> {
         self.file.first().map(|p| p.as_path())
     }
+
+    /// Convert CLI flags into the Cli-free [`Query`](crate::chart::Query).
+    /// Single conversion point for the recommendation seam (app plane only).
+    pub fn to_query(&self) -> crate::chart::Query {
+        crate::chart::Query {
+            x_col: self.x_col.clone(),
+            y_col: self.y_col.clone(),
+            chart_type: self.chart_type,
+            color_col: self.color_col.clone(),
+            agg: self.agg.map(|a| a.to_agg_function()),
+        }
+    }
 }
 
 /// Parse a column spec that may include a label override.

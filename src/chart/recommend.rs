@@ -1,20 +1,52 @@
-//! Recommendation assembly: CLI hints + schema → `ChartRecommendation`.
+//! Recommendation assembly: query hints + schema → `ChartRecommendation`.
 //!
 //! Single home for the former `helpers::{build_recommendation,
 //! adjust_bar_recommendation, effective_agg, parse_y_options, YOptions}`.
-//! Plan note: the `&Cli`-bound parts (`build_recommendation`,
-//! `effective_agg`) and the `eprintln!` warnings are app-plane adapters kept
-//! here until the Phase 2 `Query` seam separates them from the pure core
-//! (`select_chart`, `adjust_bar_recommendation`, `validate_extra_y_columns`).
+//! Plan note: the app-plane adapters (`build_recommendation`,
+//! `effective_agg`) take the Cli-free [`Query`] and return [`Warnings`]
+//! instead of printing; only the `Cli → Query` conversion lives in the app
+//! plan (`cli::args::query_from_cli`). The pure core is (`select_chart`,
+//! `adjust_bar_recommendation`, `validate_extra_y_columns`).
 
 use anyhow::Result;
 
 use crate::chart::selector::{
     AggFunction, ChartRecommendation, ChartType, fallback_warning, select_chart,
 };
-use crate::cli::{ChartTypeArg, Cli, parse_column_spec, parse_multi_y_specs};
+use crate::cli::{ChartTypeArg, parse_column_spec, parse_multi_y_specs};
 use crate::diagnostics::{format_column_suffix, suggest_column};
 use crate::infer::types::{DataType, Schema};
+
+/// Cli-free inputs for recommendation assembly (the Phase 2 `Query` seam).
+///
+/// Built once in the app plane (`Cli::to_query`); every
+/// downstream consumer takes this instead of `&Cli`.
+#[derive(Debug, Clone, Default)]
+pub struct Query {
+    pub x_col: Option<String>,
+    pub y_col: Option<String>,
+    pub chart_type: Option<ChartTypeArg>,
+    pub color_col: Option<String>,
+    pub agg: Option<AggFunction>,
+}
+
+/// Notifications that stay visible but no longer print from core.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Warnings(pub Vec<String>);
+
+impl Warnings {
+    pub fn push(&mut self, w: String) {
+        self.0.push(w);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
 
 /// Parsed Y-axis options from CLI.
 pub struct YOptions {
@@ -24,12 +56,9 @@ pub struct YOptions {
 }
 
 /// Parse Y-axis options: primary Y hint, label override, and extra Y columns.
-pub fn parse_y_options(cli: &Cli) -> YOptions {
-    let y_specs: Vec<(&str, Option<&str>)> = cli
-        .y_col
-        .as_deref()
-        .map(|s| parse_multi_y_specs(s))
-        .unwrap_or_default();
+pub fn parse_y_options(y_col: Option<&str>) -> YOptions {
+    let y_specs: Vec<(&str, Option<&str>)> =
+        y_col.map(|s| parse_multi_y_specs(s)).unwrap_or_default();
     let hint = y_specs.first().map(|(col, _)| col.to_string());
     let label_override = y_specs
         .first()
@@ -51,19 +80,19 @@ pub fn parse_y_options(cli: &Cli) -> YOptions {
 /// Auto-switches to Count when bar chart is forced on a categorical Y column
 /// that was auto-inferred (not explicitly specified by the user).
 pub fn effective_agg(
-    cli: &Cli,
+    query: &Query,
     recommendation: &ChartRecommendation,
     schema: &Schema,
 ) -> AggFunction {
-    if let Some(agg) = cli.agg {
-        return agg.to_agg_function();
+    if let Some(agg) = query.agg {
+        return agg;
     }
 
     // When bar chart is forced, Y was auto-inferred (not explicit), and Y is not numeric,
     // default to Count. This handles the case where both columns are categorical
     // (e.g., departments.csv with department + status).
     // Self-aggregation (`-x city` alone → x=y=city) also counts rows per category.
-    if cli.chart_type == Some(ChartTypeArg::Bar) && cli.y_col.is_none() {
+    if query.chart_type == Some(ChartTypeArg::Bar) && query.y_col.is_none() {
         let y_is_categorical = recommendation
             .y_column
             .as_ref()
@@ -77,8 +106,8 @@ pub fn effective_agg(
 
     // Categorical X with no quantitative Y (incl. `-x city` alone):
     // count rows per category (matches the README "count auto-applied" claim).
-    if cli.y_col.is_none()
-        && let Some(x_name) = cli.x_col.as_deref().map(|s| parse_column_spec(s).0)
+    if query.y_col.is_none()
+        && let Some(x_name) = query.x_col.as_deref().map(|s| parse_column_spec(s).0)
         && let Some(x_meta) = schema.find_column(x_name)
         && x_meta.data_type == DataType::Categorical
         && schema.columns_of_type(DataType::Quantitative).is_empty()
@@ -90,50 +119,57 @@ pub fn effective_agg(
 }
 
 pub fn build_recommendation(
-    cli: &Cli,
+    query: &Query,
     schema: &Schema,
     y_opts: &YOptions,
-) -> Result<ChartRecommendation> {
-    let x_hint = cli.x_col.as_deref().map(|s| parse_column_spec(s).0);
+) -> Result<(ChartRecommendation, Warnings)> {
+    let x_hint = query.x_col.as_deref().map(|s| parse_column_spec(s).0);
     let mut recommendation = select_chart(schema, x_hint, y_opts.hint.as_deref())?;
     validate_extra_y_columns(schema, y_opts)?;
 
-    if cli.chart_type == Some(ChartTypeArg::Bar) && cli.x_col.is_none() {
+    if query.chart_type == Some(ChartTypeArg::Bar) && query.x_col.is_none() {
         adjust_bar_recommendation(&mut recommendation, schema);
     }
 
+    let mut warnings = Warnings::default();
     if let Some(warning) = fallback_warning(
         schema,
         &recommendation.x_column,
         recommendation.y_column.as_deref(),
         recommendation.chart_type,
     ) {
-        eprintln!("{warning}");
+        warnings.push(warning);
     }
 
-    if let Some(ref color) = cli.color_col {
+    if let Some(ref color) = query.color_col {
         recommendation.color_column = Some(color.clone());
     }
 
-    if !y_opts.extra_columns.is_empty() && cli.color_col.is_none() {
+    if !y_opts.extra_columns.is_empty() && query.color_col.is_none() {
         recommendation.color_column = None;
     }
 
-    warn_bar_color_ignored(&recommendation);
+    if let Some(warning) = bar_color_ignored_warning(&recommendation) {
+        warnings.push(warning);
+    }
 
-    Ok(recommendation)
+    Ok((recommendation, warnings))
 }
 
-/// Warn when `-c` names a column that no renderer consumes: grouped bars are
+/// Warning when `-c` names a column that no renderer consumes: grouped bars are
 /// not implemented, so the color column only reaches the summary legend —
 /// bar heights stay aggregated over all rows. Without this, `color=prod […]`
 /// reads as if the chart were split by `prod` when it is not.
-fn warn_bar_color_ignored(recommendation: &ChartRecommendation) {
+/// Returns the message instead of printing (callers print at the edge).
+fn bar_color_ignored_warning(recommendation: &ChartRecommendation) -> Option<String> {
     if recommendation.chart_type == ChartType::Bar && recommendation.color_column.is_some() {
-        eprintln!(
+        Some(
             "warning: -c/--color has no effect on bar chart data (grouped bars are not supported); \
              showing aggregated values over all rows"
-        );
+                .to_string(),
+        )
+    } else {
+        None
     }
 }
 

@@ -53,7 +53,7 @@ impl<'a> RenderOptions<'a> {
         recommendation: &ChartRecommendation,
         schema: &crate::infer::types::Schema,
     ) -> Self {
-        let agg = crate::chart::recommend::effective_agg(cli, recommendation, schema);
+        let agg = crate::chart::recommend::effective_agg(&cli.to_query(), recommendation, schema);
         Self {
             chart_type_override: cli.chart_type,
             y_label_override: y_opts.label_override.as_deref(),

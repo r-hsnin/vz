@@ -73,8 +73,12 @@ pub fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
         return Ok(());
     }
 
-    let mut y_opts = recommend::parse_y_options(cli);
-    let recommendation = recommend::build_recommendation(cli, &schema, &y_opts)?;
+    let query = cli.to_query();
+    let mut y_opts = recommend::parse_y_options(query.y_col.as_deref());
+    let (recommendation, warnings) = recommend::build_recommendation(&query, &schema, &y_opts)?;
+    for w in warnings.0 {
+        eprintln!("{w}");
+    }
     if cli.all_y {
         expand_all_y(&recommendation, &schema, &mut y_opts);
     }
@@ -152,9 +156,10 @@ fn dispatch_output(
 ) -> Result<()> {
     match cli.output {
         Some(cli::OutputFormat::Table) => {
+            let query = cli.to_query();
             let params = output::table::TableParams {
                 chart_type_override: cli.chart_type,
-                agg: recommend::effective_agg(cli, recommendation, schema),
+                agg: recommend::effective_agg(&query, recommendation, schema),
                 sort: cli.effective_sort(),
                 limit: cli.top.or(cli.tail),
                 sort_flag: cli.sort.map(|s| s.to_sort_order()),
@@ -173,9 +178,10 @@ fn dispatch_output(
             output::html::print_html(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Markdown) => {
+            let query = cli.to_query();
             let params = output::table::TableParams {
                 chart_type_override: cli.chart_type,
-                agg: recommend::effective_agg(cli, recommendation, schema),
+                agg: recommend::effective_agg(&query, recommendation, schema),
                 sort: cli.effective_sort(),
                 limit: cli.top.or(cli.tail),
                 sort_flag: cli.sort.map(|s| s.to_sort_order()),
@@ -201,7 +207,7 @@ fn print_spark(
 ) {
     let params = output::spark::SparkParams {
         chart_type_override: cli.chart_type,
-        agg: recommend::effective_agg(cli, recommendation, schema),
+        agg: recommend::effective_agg(&cli.to_query(), recommendation, schema),
         sort: cli.effective_sort(),
         limit: cli.top.or(cli.tail),
         color_col: cli.color_col.clone(),
@@ -249,7 +255,7 @@ fn print_chart_json(
             .map(|ct| ct.to_chart_type())
             .unwrap_or(recommendation.chart_type),
         sort: cli.effective_sort(),
-        agg: recommend::effective_agg(cli, recommendation, schema),
+        agg: recommend::effective_agg(&cli.to_query(), recommendation, schema),
         limit: cli.top.or(cli.tail),
         extra_y_columns: y_opts.extra_columns.clone(),
         color_column: cli.color_col.clone(),
