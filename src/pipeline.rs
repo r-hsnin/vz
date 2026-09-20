@@ -3,12 +3,9 @@
 use anyhow::Result;
 use std::path::Path;
 
-use crate::chart::ChartRecommendation;
+use crate::chart::{ChartRecommendation, recommend};
 use crate::cli::{self, Cli};
 use crate::filter::apply_filters;
-use crate::helpers::{
-    YOptions, build_recommendation, build_render_options, effective_agg, parse_y_options,
-};
 use crate::infer;
 use crate::infer::types::Schema;
 use crate::loader::{self, LoadedData};
@@ -76,8 +73,8 @@ pub fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
         return Ok(());
     }
 
-    let mut y_opts = parse_y_options(cli);
-    let recommendation = build_recommendation(cli, &schema, &y_opts)?;
+    let mut y_opts = recommend::parse_y_options(cli);
+    let recommendation = recommend::build_recommendation(cli, &schema, &y_opts)?;
     if cli.all_y {
         expand_all_y(&recommendation, &schema, &mut y_opts);
     }
@@ -150,7 +147,7 @@ fn dispatch_output(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
-    y_opts: &YOptions,
+    y_opts: &recommend::YOptions,
     schema: &Schema,
 ) -> Result<()> {
     match cli.output {
@@ -161,18 +158,18 @@ fn dispatch_output(
             print_spark(recommendation, headers, rows, cli, schema, y_opts);
         }
         Some(cli::OutputFormat::Svg) => {
-            let opts = build_render_options(cli, y_opts, recommendation, schema);
+            let opts = oneshot::RenderOptions::from_cli(cli, y_opts, recommendation, schema);
             output::svg::print_svg(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Html) => {
-            let opts = build_render_options(cli, y_opts, recommendation, schema);
+            let opts = oneshot::RenderOptions::from_cli(cli, y_opts, recommendation, schema);
             output::html::print_html(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Markdown) => {
             output::markdown::print_markdown(recommendation, headers, rows, cli, schema)?;
         }
         _ => {
-            let opts = build_render_options(cli, y_opts, recommendation, schema);
+            let opts = oneshot::RenderOptions::from_cli(cli, y_opts, recommendation, schema);
             oneshot::render_oneshot(recommendation, headers, rows, &opts)?;
         }
     }
@@ -186,11 +183,11 @@ fn print_spark(
     rows: &[Vec<String>],
     cli: &Cli,
     schema: &Schema,
-    y_opts: &YOptions,
+    y_opts: &recommend::YOptions,
 ) {
     let params = output::spark::SparkParams {
         chart_type_override: cli.chart_type,
-        agg: effective_agg(cli, recommendation, schema),
+        agg: recommend::effective_agg(cli, recommendation, schema),
         sort: cli.effective_sort(),
         limit: cli.top.or(cli.tail),
         color_col: cli.color_col.clone(),
@@ -205,7 +202,11 @@ fn print_spark(
 }
 
 /// Expand `--all-y`: add all remaining quantitative columns to extra_y.
-fn expand_all_y(recommendation: &ChartRecommendation, schema: &Schema, y_opts: &mut YOptions) {
+fn expand_all_y(
+    recommendation: &ChartRecommendation,
+    schema: &Schema,
+    y_opts: &mut recommend::YOptions,
+) {
     let x_col = &recommendation.x_column;
     let primary_y = recommendation.y_column.as_deref().unwrap_or("");
     let extra: Vec<(String, Option<String>)> = schema
@@ -226,7 +227,7 @@ fn print_chart_json(
     schema: &Schema,
     recommendation: &ChartRecommendation,
     cli: &Cli,
-    y_opts: &YOptions,
+    y_opts: &recommend::YOptions,
 ) -> anyhow::Result<()> {
     let params = output::chart_json::ChartJsonParams {
         chart_type: cli
@@ -234,7 +235,7 @@ fn print_chart_json(
             .map(|ct| ct.to_chart_type())
             .unwrap_or(recommendation.chart_type),
         sort: cli.effective_sort(),
-        agg: effective_agg(cli, recommendation, schema),
+        agg: recommend::effective_agg(cli, recommendation, schema),
         limit: cli.top.or(cli.tail),
         extra_y_columns: y_opts.extra_columns.clone(),
         color_column: cli.color_col.clone(),

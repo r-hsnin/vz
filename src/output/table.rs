@@ -4,8 +4,8 @@ use anyhow::Result;
 
 use crate::chart;
 use crate::chart::data_builder;
+use crate::chart::recommend::effective_agg;
 use crate::cli;
-use crate::helpers::effective_agg;
 use crate::infer::types::Schema;
 use crate::oneshot;
 use crate::render::format_number;

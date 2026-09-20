@@ -46,6 +46,32 @@ pub struct RenderOptions<'a> {
     pub bins: Option<usize>,
 }
 
+impl<'a> RenderOptions<'a> {
+    /// Build render options from CLI hints (app-plane adapter).
+    pub fn from_cli(
+        cli: &'a crate::cli::Cli,
+        y_opts: &'a crate::chart::recommend::YOptions,
+        recommendation: &ChartRecommendation,
+        schema: &crate::infer::types::Schema,
+    ) -> Self {
+        let agg = crate::chart::recommend::effective_agg(cli, recommendation, schema);
+        Self {
+            chart_type_override: cli.chart_type,
+            y_label_override: y_opts.label_override.as_deref(),
+            width: cli.width,
+            height: cli.height,
+            sort_order: cli.effective_sort(),
+            extra_y_columns: y_opts.extra_columns.clone(),
+            limit: cli.top.or(cli.tail),
+            agg,
+            title: cli.title.clone(),
+            labels: cli.labels,
+            theme: crate::cli::resolve_theme(cli),
+            bins: cli.bins,
+        }
+    }
+}
+
 pub fn render_oneshot(
     recommendation: &ChartRecommendation,
     headers: &[String],
