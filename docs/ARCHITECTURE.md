@@ -109,9 +109,10 @@ Forbidden (compiler-unchecked today — do not add new instances):
   `pipeline::render_data` / `dispatch_output` helpers (`pipeline.rs`),
   `diff::run_diff` (`diff/mod.rs`), `directory::run_directory`
   (`directory/mod.rs`), `output/markdown.rs` + `output/table.rs`,
-  `diagnostics::error_hint`, `chart/recommend.rs` (`build_recommendation`,
+  `chart/recommend.rs` (`build_recommendation`,
   `effective_agg`, `parse_y_options` — app-plane adapters parked in `chart/`
   until the Phase 2 `Query` seam; see `recommend.rs` header).
+  (`diagnostics::error_hint` done: takes `Option<&Path>` since Phase 2-1.)
 - `println!/eprintln!` in data/render planes. Known instances:
   `output/markdown.rs` + `output/table.rs` warnings,
   `chart/recommend.rs` recommendation notices, `chart/data_builder.rs:325`,

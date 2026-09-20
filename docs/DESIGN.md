@@ -128,8 +128,9 @@ never reverses**. Concretely:
    from other products, and blocks the L3 crate split. Current violations are
    debt, not examples to follow: `pipeline::render_data(&Cli)` (the worst —
    the whole pipeline hangs off CLI), `diff::run_diff(&Cli)`,
-   `directory::run_directory(&Cli)`, `output/markdown.rs` + `output/table.rs`
-   taking `&Cli`, `diagnostics::error_hint(_, &Cli)`. New code must take a
+    `directory::run_directory(&Cli)`, `output/markdown.rs` + `output/table.rs`
+    taking `&Cli` (`diagnostics::error_hint(_, Option<&Path>)` done in
+    Phase 2-1). New code must take a
    plain `*Params`/`*Options` struct (precedent: `ChartJsonParams`,
    `SparkParams`) or `Option<&Path>` instead.
 3. **Ratatui stays inside the render contract.** SVG/HTML/JSON exist so
