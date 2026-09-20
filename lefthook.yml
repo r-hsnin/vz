@@ -6,6 +6,8 @@ pre-commit:
       run: cargo fmt --check
     - name: clippy
       run: cargo clippy --all-targets -- -D warnings
+    - name: public-surface
+      run: bash scripts/check-public-surface.sh
 
 pre-push:
   jobs:

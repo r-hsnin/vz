@@ -104,6 +104,11 @@ if [[ -n "$CARGO_VERSION" && "$CARGO_VERSION" != "$TAG_VERSION" ]]; then
   fi
 fi
 
+# --- 公開面の検査 (禁止トークン / 公開集合内リンク / manifest drift) ---
+echo "=== Checking public surface ==="
+bash "$REPO_ROOT/scripts/check-public-surface.sh" --root "$REPO_ROOT" --tag "$VERSION"
+echo ""
+
 # --- manifest 読み込み ---
 allowed_patterns=()
 while IFS= read -r line; do
