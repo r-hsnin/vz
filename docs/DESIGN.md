@@ -116,7 +116,7 @@ never reverses**. Concretely:
   since Phase 2-4; `svg` rendering via `Buffer` is known debt, not
   precedent (see below).
 - **App plane** (`main.rs`, `pipeline.rs`, `oneshot/`, `diff/`, `directory/`,
-  `explore/`, `present/`, `watch.rs`, `helpers/`, `cli/`) owns `Cli`,
+  `explore/`, `present/`, `watch.rs`, `cli/`) owns `Cli`,
   stdout/stderr, and TUI loops. Only this plane converts `Cli` into plain
   parameter structs.
 

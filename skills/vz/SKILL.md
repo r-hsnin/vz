@@ -84,6 +84,7 @@ JSON output includes:
 Other output formats:
 - `--spark` — single-line sparkline (embed in dashboards, logs)
 - `--svg` — vector image (embed in docs, reports)
+- `--html` — self-contained interactive HTML page (hover tooltips)
 - `--markdown` — Markdown table (paste into README, issues)
 - `--output table` — formatted text table
 

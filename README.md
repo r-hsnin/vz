@@ -68,8 +68,8 @@ cat data.csv | vz -
 kubectl top pods | vz - -f space
 
 # Fixed-width / space-aligned input (auto-detected from content)
-kubectl top pods | vz - -f space
-df -h | vz - -f space -x Mounted -y Use%
+kubectl top pods | vz -
+df -h | vz - -f space -x "Mounted on" -y "Use%"
 
 # TSV files (auto-detected by extension or content)
 vz data.tsv

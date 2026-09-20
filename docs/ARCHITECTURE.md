@@ -124,7 +124,7 @@ Forbidden (compiler-unchecked today — do not add new instances):
   the `run_directory_from_cli` adapter.)
 - `println!/eprintln!` in data/render planes. Known instances:
   `output/markdown.rs` + `output/table.rs` warnings,
-  `chart/data_builder.rs:325`.
+  `chart/data_builder.rs` (`maybe_sample` sampling notice).
   Precedent to copy:
   `output/chart_json.rs` (`ChartJsonParams`), `output/spark.rs`
   (`SparkParams`), `output/table.rs` (`TableParams`, shared with
@@ -176,7 +176,7 @@ app.rs ─── cli/        (parse args)
    └──────── render/    (data structs → ratatui Buffer)
              │
              ├── oneshot/  (builders.rs → ChartData → render_chart_data → Buffer → ANSI)
-             ├── explore/  (inline construction → ChartData → ChartWidget → TUI)
+             ├── explore/  (canonical assembler calls → ChartData → ChartWidget → TUI)
              └── present/  (chart_loader.rs → ChartData → render_chart_data → slide)
 ```
 
@@ -243,7 +243,8 @@ resolution) are the shared services that will move to `vz-core` at L3.
   explore diff applies `--where`.
 - `infer/` change → affects chart selection + all modes.
 - `chart/selector.rs` change → affects all modes.
-- `chart/data_builder.rs` change → affects oneshot, explore, present.
+- `chart/data_builder.rs` change → affects oneshot, explore, present, diff
+  rendering, and every Bar-consuming output (`table`/`markdown`/`json`/`spark`).
 - `render/` change → affects only the corresponding chart type.
 - `oneshot/`, `explore/`, `present/` → affects only that mode.
 

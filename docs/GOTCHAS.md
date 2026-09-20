@@ -39,7 +39,7 @@ Release procedures live in [RUNBOOK.md](RUNBOOK.md).
 
 - **Git hooks not running:** if `core.hooksPath` points to a custom path (legacy `scripts/hooks` setup), Git ignores lefthook's hooks. Run `lefthook install --reset-hooks-path` once.
 - **pre-push jobs don't receive git args automatically:** pass them explicitly via `{1}` in `run:` (see `lefthook.yml`). Hooks reading the ref list from stdin also need `use_stdin: true`; without it lefthook can hang.
-- **Pinned toolchain:** `rust-toolchain.toml` forces 1.97.0 for all cargo/rustc commands in this repo. Check MSRV with `cargo +1.88.0 check --locked`; `rustup update` does not move the pinned channel.
+- **MSRV check:** use the explicit toolchain — `cargo +1.88.0 check --locked` (what CI's msrv job runs). If a `rust-toolchain.toml` is present it pins a newer channel for local commands, so a bare `cargo check` does not validate MSRV.
 
 ## Runtime Issues
 
