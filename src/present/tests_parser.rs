@@ -447,3 +447,37 @@ fn test_load_diff_chart_data_schema_mismatch() {
         err_msg
     );
 }
+
+#[test]
+fn test_bar_sort_takes_precedence_over_top() {
+    let block = ChartBlock {
+        source: "sales.csv".to_string(),
+        chart_type: Some(ChartType::Bar),
+        x_col: Some("city".to_string()),
+        y_col: Some("revenue".to_string()),
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: Some(crate::chart::selector::SortOrder::Asc),
+        agg: None,
+        top: Some(2),
+        bins: None,
+        height: None,
+        diff: None,
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
+    match result {
+        Ok(crate::render::ChartData::Bar(bar)) => {
+            assert_eq!(
+                bar.values,
+                vec![800.0, 3300.0],
+                "Explicit sort (asc) must win over top-implied desc: {:?}",
+                bar.labels
+            );
+        }
+        Ok(other) => panic!("Expected Bar chart data, got: {other:?}"),
+        Err(err) => panic!("load failed: {err:?}"),
+    }
+}

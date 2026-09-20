@@ -230,9 +230,8 @@ fn build_chart_data_for_type(
                 agg_fn,
             );
             let sort = block
-                .top
-                .map(|_| crate::chart::selector::SortOrder::Desc)
-                .or(block.sort);
+                .sort
+                .or(block.top.map(|_| crate::chart::selector::SortOrder::Desc));
             data_builder::sort_bar_data(&mut data, sort);
             data_builder::truncate_bar_data(&mut data, block.top);
             data.series_colors = theme.series_colors.clone();
