@@ -18,6 +18,7 @@ README.md
 demo/
 docs/
 fixtures/
+rust-toolchain.toml
 skills/
 src/
 tests/
