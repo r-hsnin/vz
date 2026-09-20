@@ -75,6 +75,31 @@ fn build_recommendation_bar_color_warning_returned_not_printed() {
 }
 
 #[test]
+fn build_recommendation_bar_autodetected_color_no_warning() {
+    // No explicit `-c`: an unused categorical column becomes the color, but the
+    // "-c has no effect" warning must not fire because the user never asked.
+    let cli = Cli::try_parse_from(["vz", "data.csv", "-x", "city", "-y", "revenue"]).unwrap();
+    let schema = make_schema(&[
+        ("city", DataType::Categorical),
+        ("prod", DataType::Categorical),
+        ("revenue", DataType::Quantitative),
+    ]);
+    let query = query_of(&cli);
+    let y_opts = parse_y_options(query.y_col.as_deref());
+    let (rec, warnings) = build_recommendation(&query, &schema, &y_opts).unwrap();
+    assert_eq!(rec.chart_type, ChartType::Bar);
+    assert_eq!(rec.color_column, Some("prod".to_string()));
+    assert!(
+        !warnings
+            .0
+            .iter()
+            .any(|w| w.contains("no effect on bar chart")),
+        "auto-detected color must not warn, got: {:?}",
+        warnings.0
+    );
+}
+
+#[test]
 fn build_recommendation_no_fallback_warning_for_first_class_pair() {
     let cli = Cli::try_parse_from(["vz", "data.csv", "-x", "month", "-y", "revenue"]).unwrap();
     let schema = make_schema(&[

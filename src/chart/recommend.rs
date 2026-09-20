@@ -150,7 +150,12 @@ pub fn build_recommendation(
         recommendation.color_column = None;
     }
 
-    if let Some(warning) = bar_color_ignored_warning(&recommendation) {
+    // Only warn for an explicit `-c`: an auto-detected color column also
+    // reaches the legend, but "-c has no effect" would be confusing when the
+    // user never passed `-c`.
+    if query.color_col.is_some()
+        && let Some(warning) = bar_color_ignored_warning(&recommendation)
+    {
         warnings.push(warning);
     }
 
@@ -162,6 +167,8 @@ pub fn build_recommendation(
 /// bar heights stay aggregated over all rows. Without this, `color=prod […]`
 /// reads as if the chart were split by `prod` when it is not.
 /// Returns the message instead of printing (callers print at the edge).
+/// Only invoked when `-c` was passed explicitly; an auto-detected color column
+/// is not worth warning about.
 fn bar_color_ignored_warning(recommendation: &ChartRecommendation) -> Option<String> {
     if recommendation.chart_type == ChartType::Bar && recommendation.color_column.is_some() {
         Some(

@@ -992,3 +992,36 @@ fn test_reversed_bar_axes_hint_renders_canonical_chart() {
         "normalized chart must not skip rows, got: {stderr}"
     );
 }
+
+#[test]
+fn test_bar_autodetected_color_does_not_warn() {
+    // A color column inferred from an unused categorical column must reach the
+    // legend quietly; the "-c has no effect" warning is only for explicit `-c`.
+    let file = common::temp_csv_with_suffix(
+        ".csv",
+        &[
+            "city,prod,revenue",
+            "Tokyo,A,100",
+            "Tokyo,B,200",
+            "Osaka,A,150",
+        ],
+    );
+    let output = vz_binary()
+        .args([
+            file.path().to_str().unwrap(),
+            "-x",
+            "city",
+            "-y",
+            "revenue",
+            "-t",
+            "bar",
+        ])
+        .output()
+        .expect("Failed to run vz");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "vz failed: {stderr}");
+    assert!(
+        !stderr.contains("no effect on bar chart"),
+        "auto-detected color must not warn about -c, got: {stderr}"
+    );
+}
