@@ -170,7 +170,10 @@ fn load_delimited(content: &str, delimiter: u8, no_header: bool) -> Result<Loade
 
 /// Check if all header values parse as numbers (indicating they're probably data, not headers).
 fn headers_are_numeric(headers: &[String]) -> bool {
-    !headers.is_empty() && headers.iter().all(|h| h.parse::<f64>().is_ok())
+    !headers.is_empty()
+        && headers
+            .iter()
+            .all(|h| crate::util::parse_number(h).is_some())
 }
 
 /// Load delimited data treating ALL rows as data (no header row).
@@ -214,12 +217,15 @@ fn load_json_array(content: &str) -> Result<LoadedData> {
 
 /// Load NDJSON (newline-delimited JSON) — one JSON object per line.
 fn load_ndjson(content: &str) -> Result<LoadedData> {
-    let objects: Vec<serde_json::Value> = content
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(serde_json::from_str)
-        .collect::<std::result::Result<Vec<_>, _>>()
-        .context("Failed to parse NDJSON")?;
+    let mut objects = Vec::new();
+    for (idx, line) in content.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let value: serde_json::Value = serde_json::from_str(line)
+            .with_context(|| format!("Failed to parse NDJSON at line {}", idx + 1))?;
+        objects.push(value);
+    }
     objects_to_tabular(objects)
 }
 

@@ -1,5 +1,5 @@
-pub mod ansi;
-pub mod builders;
+pub(crate) mod ansi;
+pub(crate) mod builders;
 mod summary;
 
 use std::io;
@@ -7,17 +7,19 @@ use std::io;
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::chart::data_builder;
-use crate::chart::selector::{ChartRecommendation, ChartType};
-use crate::cli::AggFunction;
-use crate::cli::SortOrder;
+use crate::chart::selector::SortOrder;
+use crate::chart::selector::{AggFunction, ChartRecommendation, ChartType};
 
-pub use ansi::print_buffer;
+pub(crate) use ansi::print_buffer;
 
 /// Default chart height in terminal rows.
-const DEFAULT_HEIGHT: u16 = 24;
+pub(crate) const DEFAULT_HEIGHT: u16 = 24;
 
 /// Minimum width for chart rendering.
 const MIN_WIDTH: u16 = 40;
+
+/// Default terminal width when width cannot be determined.
+pub(crate) const DEFAULT_TERMINAL_WIDTH: u16 = 80;
 
 /// Render a chart to stdout as a one-shot output (no TUI interaction).
 /// Options for oneshot rendering.
@@ -43,7 +45,60 @@ pub struct RenderOptions<'a> {
     pub bins: Option<usize>,
 }
 
-pub fn render_oneshot(
+impl<'a> RenderOptions<'a> {
+    /// Build render options from the resolved pipeline params (app-plane adapter).
+    pub fn from_params(
+        params: &'a crate::cli::PipelineParams,
+        y_opts: &'a crate::chart::recommend::YOptions,
+        recommendation: &ChartRecommendation,
+        schema: &crate::infer::types::Schema,
+    ) -> Self {
+        let agg = crate::chart::recommend::effective_agg(&params.query, recommendation, schema);
+        Self {
+            chart_type_override: params.query.chart_type,
+            y_label_override: y_opts.label_override.as_deref(),
+            width: params.width,
+            height: params.height,
+            sort_order: params.sort,
+            extra_y_columns: y_opts.extra_columns.clone(),
+            limit: params.limit,
+            agg,
+            title: params.title.clone(),
+            labels: params.labels,
+            theme: crate::cli::resolve_theme_arg(params.theme),
+            bins: params.bins,
+        }
+    }
+
+    /// Build render options from CLI hints (app-plane adapter; test seam).
+    #[cfg(test)]
+    pub fn from_cli(
+        cli: &'a crate::cli::Cli,
+        y_opts: &'a crate::chart::recommend::YOptions,
+        recommendation: &ChartRecommendation,
+        schema: &crate::infer::types::Schema,
+    ) -> Self {
+        let params = cli.to_pipeline_params();
+        let theme = crate::cli::resolve_theme(cli);
+        let agg = crate::chart::recommend::effective_agg(&params.query, recommendation, schema);
+        Self {
+            chart_type_override: params.query.chart_type,
+            y_label_override: y_opts.label_override.as_deref(),
+            width: params.width,
+            height: params.height,
+            sort_order: params.sort,
+            extra_y_columns: y_opts.extra_columns.clone(),
+            limit: params.limit,
+            agg,
+            title: params.title.clone(),
+            labels: params.labels,
+            theme,
+            bins: params.bins,
+        }
+    }
+}
+
+pub(crate) fn render_oneshot(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -63,12 +118,13 @@ pub fn render_oneshot(
         None
     };
 
-    let skipped_rows =
-        if chart_type == ChartType::Heatmap || opts.agg == crate::cli::AggFunction::Count {
-            0 // Heatmap Y is categorical; Count uses all rows regardless of parseability
-        } else {
-            count_skipped_y_rows(recommendation, headers, rows)
-        };
+    let skipped_rows = if chart_type == ChartType::Heatmap
+        || opts.agg == crate::chart::selector::AggFunction::Count
+    {
+        0 // Heatmap Y is categorical; Count uses all rows regardless of parseability
+    } else {
+        count_skipped_y_rows(recommendation, headers, rows)
+    };
 
     summary::print_summary(&summary::SummaryContext {
         recommendation,
@@ -80,6 +136,17 @@ pub fn render_oneshot(
         agg_stats,
         skipped_rows,
         series_colors: &opts.theme.series_colors,
+    });
+
+    crate::insights::print_insights(&crate::insights::InsightRequest {
+        chart_type,
+        x_column: &recommendation.x_column,
+        y_column: recommendation.y_column.as_deref(),
+        color_column: recommendation.color_column.as_deref(),
+        headers,
+        rows,
+        agg: opts.agg,
+        bins: opts.bins,
     });
 
     warn_incompatible_flags(chart_type, opts);
@@ -161,7 +228,7 @@ fn compute_bar_agg_stats(
 }
 
 /// Render the appropriate chart type into a buffer.
-pub fn render_chart_to_buffer(
+pub(crate) fn render_chart_to_buffer(
     chart_type: ChartType,
     recommendation: &ChartRecommendation,
     headers: &[String],
@@ -170,7 +237,26 @@ pub fn render_chart_to_buffer(
     area: Rect,
     buf: &mut Buffer,
 ) {
-    use crate::render::{ChartData, render_chart_data};
+    use crate::render::render_chart_data;
+
+    let chart_data =
+        build_chart_data_for_svg(chart_type, recommendation, headers, rows, opts, area);
+
+    render_chart_data(&chart_data, area, buf);
+}
+
+/// Build the `ChartData` for a chart without rendering it.
+/// Shared by `render_chart_to_buffer` (text path) and the SVG exporter
+/// (which needs the data twice: once for the grid, once for vector marks).
+pub(crate) fn build_chart_data_for_svg(
+    chart_type: ChartType,
+    recommendation: &ChartRecommendation,
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &RenderOptions<'_>,
+    area: Rect,
+) -> crate::render::ChartData {
+    use crate::render::ChartData;
 
     let mut chart_data = match chart_type {
         ChartType::Line | ChartType::Scatter => {
@@ -188,7 +274,7 @@ pub fn render_chart_to_buffer(
         chart_data.set_title(title.clone());
     }
 
-    render_chart_data(&chart_data, area, buf);
+    chart_data
 }
 
 fn build_line_scatter_chart(
@@ -223,8 +309,8 @@ fn build_bar_chart(
     data.show_labels = opts.labels;
     data.series_colors = opts.theme.series_colors.clone();
     data.axis_color = Some(opts.theme.axis_color);
-    builders::sort_bar_data(&mut data, opts.sort_order);
-    builders::truncate_bar_data(&mut data, opts.limit);
+    data_builder::sort_bar_data(&mut data, opts.sort_order);
+    data_builder::truncate_bar_data(&mut data, opts.limit);
     warn_skipped_rows(rows.len(), rows_used, recommendation, ChartType::Bar);
     ChartData::Bar(data)
 }
@@ -246,13 +332,13 @@ fn build_histogram_chart(
 
 /// Get terminal width, falling back to 80 columns.
 /// When stdout is piped (not a TTY), always returns 80 for deterministic output.
-pub fn terminal_width() -> u16 {
+pub(crate) fn terminal_width() -> u16 {
     if !std::io::IsTerminal::is_terminal(&std::io::stdout()) {
-        return 80;
+        return DEFAULT_TERMINAL_WIDTH;
     }
     crossterm::terminal::size()
         .map(|(w, _)| w.max(MIN_WIDTH))
-        .unwrap_or(80)
+        .unwrap_or(DEFAULT_TERMINAL_WIDTH)
 }
 
 /// Choose chart height adaptively based on data density.
@@ -294,20 +380,21 @@ pub(crate) fn fit_labels_to_width(labels: &[String], available_width: usize) -> 
     if labels.is_empty() {
         return vec![];
     }
-    // Small datasets: always show all labels (avoids confusing elision)
-    if labels.len() <= 10 {
-        return labels.to_vec();
-    }
+    // Reserve one label width plus the axis frame so the last label is
+    // never clipped into the border (e.g. `-W 30` showed `024-01-30`
+    // instead of `2024-01-30`). The y-axis gutter and frame consume roughly
+    // one label width on a narrow chart; on wide charts this costs at most
+    // one tick.
     let max_label_width = labels.iter().map(|l| l.len()).max().unwrap_or(1);
-    let labels_that_fit = (available_width / (max_label_width + 2)).max(2);
+    let usable = available_width.saturating_sub(2 * (max_label_width + 2));
+    let labels_that_fit = (usable / (max_label_width + 2)).max(1);
     if labels.len() <= labels_that_fit {
         return labels.to_vec();
     }
     data_builder::pick_evenly(labels, labels_that_fit)
 }
-
 /// Resolve the chart type: use override if given, otherwise use the recommended type.
-pub fn resolve_chart_type(
+pub(crate) fn resolve_chart_type(
     recommendation: &ChartRecommendation,
     override_type: Option<crate::cli::ChartTypeArg>,
 ) -> ChartType {
@@ -360,7 +447,7 @@ fn count_skipped_y_rows(
     rows.iter()
         .filter(|row| {
             row.get(idx)
-                .map(|v| v.trim().parse::<f64>().is_err())
+                .map(|v| crate::util::parse_number(v.trim()).is_none())
                 .unwrap_or(true)
         })
         .count()
@@ -368,34 +455,9 @@ fn count_skipped_y_rows(
 
 // Re-export builder functions for use in tests
 #[cfg(test)]
-use crate::render::ChartConfig;
-#[cfg(test)]
-use builders::{build_bar_data, build_histogram_data, build_histogram_data_with_bins};
-
-/// Build ChartConfig for line/scatter charts (used by tests).
-#[cfg(test)]
-fn build_chart_config(
-    recommendation: &ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-) -> ChartConfig {
-    let axes = data_builder::ResolvedAxes::from_recommendation(
-        &recommendation.x_column,
-        recommendation.y_column.as_deref(),
-        recommendation.color_column.as_deref(),
-        headers,
-    );
-    let title = format!("{} vs {}", axes.y_label, axes.x_label);
-    data_builder::build_chart_config(
-        rows,
-        axes.x_idx,
-        axes.y_idx,
-        axes.color_idx,
-        axes.x_label,
-        axes.y_label,
-        Some(title),
-    )
-}
+use builders::{
+    build_bar_data, build_chart_config, build_histogram_data, build_histogram_data_with_bins,
+};
 
 #[cfg(test)]
 #[path = "tests.rs"]

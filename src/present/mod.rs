@@ -11,14 +11,14 @@ use crate::chart::selector::ChartType;
 
 /// A single slide in a presentation.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Slide {
+pub(crate) struct Slide {
     pub title: Option<String>,
     pub content: Vec<SlideElement>,
 }
 
 /// Elements that can appear on a slide.
 #[derive(Debug, Clone, PartialEq)]
-pub enum SlideElement {
+pub(crate) enum SlideElement {
     /// Plain text paragraph.
     Text(String),
     /// Bullet point list.
@@ -45,7 +45,7 @@ pub enum SlideElement {
 
 /// Configuration for a chart embedded in a slide.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ChartBlock {
+pub(crate) struct ChartBlock {
     pub source: String,
     pub chart_type: Option<ChartType>,
     pub x_col: Option<String>,
@@ -55,9 +55,9 @@ pub struct ChartBlock {
     /// Optional filter expressions (same syntax as `--where`).
     pub filter: Vec<String>,
     /// Sort order for bar charts.
-    pub sort: Option<crate::cli::SortOrder>,
+    pub sort: Option<crate::chart::selector::SortOrder>,
     /// Aggregation function for bar charts.
-    pub agg: Option<crate::cli::AggFunction>,
+    pub agg: Option<crate::chart::selector::AggFunction>,
     /// Limit bar chart to top N categories.
     pub top: Option<usize>,
     /// Number of bins for histogram charts.
@@ -70,12 +70,12 @@ pub struct ChartBlock {
 
 /// A parsed presentation.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Presentation {
+pub(crate) struct Presentation {
     pub slides: Vec<Slide>,
 }
 
 /// Application state for Present mode.
-pub struct PresentApp {
+pub(crate) struct PresentApp {
     pub presentation: Presentation,
     pub current_slide: usize,
     pub should_quit: bool,
@@ -188,10 +188,10 @@ impl PresentApp {
 /// Parse a markdown file into a Presentation.
 mod parser;
 
-pub use parser::parse_presentation;
+pub(crate) use parser::parse_presentation;
 
 /// Parse inline markdown formatting (**bold** and *italic*) into styled spans.
-pub fn parse_inline_spans(text: &str) -> Vec<Span<'static>> {
+pub(crate) fn parse_inline_spans(text: &str) -> Vec<Span<'static>> {
     let mut spans = Vec::new();
     let mut remaining = text;
 
@@ -253,7 +253,7 @@ pub fn parse_inline_spans(text: &str) -> Vec<Span<'static>> {
 }
 
 /// Run the Present mode TUI.
-pub fn run_present(path: &Path, theme: crate::theme::Theme) -> Result<()> {
+pub(crate) fn run_present(path: &Path, theme: crate::theme::Theme) -> Result<()> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read presentation file: {}", path.display()))?;
     let presentation = parse_presentation(&content);

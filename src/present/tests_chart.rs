@@ -120,6 +120,121 @@ fn test_load_chart_data_infers_type_when_not_specified() {
 }
 
 #[test]
+fn test_load_histogram_bins_y_when_x_is_non_numeric() {
+    // A histogram over a categorical x must bin the quantitative y
+    // (canonical `histogram_column` contract), matching oneshot text output.
+    let block = ChartBlock {
+        source: "temperature.csv".to_string(),
+        chart_type: Some(ChartType::Histogram),
+        x_col: Some("month".to_string()),
+        y_col: Some("temperature".to_string()),
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
+        bins: None,
+        height: None,
+        diff: None,
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
+    assert!(
+        result.is_ok(),
+        "histogram block should load: {:?}",
+        result.err()
+    );
+    match result.unwrap() {
+        crate::render::ChartData::Histogram(data) => {
+            assert_eq!(data.x_label, "temperature");
+            assert!(!data.values.is_empty(), "temperature values must be binned");
+        }
+        _ => panic!("Expected Histogram chart data"),
+    }
+}
+
+#[test]
+fn test_load_histogram_bins_x_when_both_quantitative() {
+    // Both x and y quantitative: canonical `histogram_column` bins x, matching
+    // oneshot text/JSON.
+    let block = ChartBlock {
+        source: "sales.csv".to_string(),
+        chart_type: Some(ChartType::Histogram),
+        x_col: Some("revenue".to_string()),
+        y_col: Some("profit".to_string()),
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
+        bins: None,
+        height: None,
+        diff: None,
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
+    assert!(
+        result.is_ok(),
+        "histogram block should load: {:?}",
+        result.err()
+    );
+    match result.unwrap() {
+        crate::render::ChartData::Histogram(data) => {
+            assert_eq!(data.x_label, "revenue");
+            let min = data.values.iter().cloned().fold(f64::INFINITY, f64::min);
+            let max = data
+                .values
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
+            assert_eq!(min, 800.0);
+            assert_eq!(max, 2000.0);
+        }
+        _ => panic!("Expected Histogram chart data"),
+    }
+}
+
+#[test]
+fn test_load_histogram_x_only_bins_first_quantitative() {
+    // Only X given + categorical X: the block must bin the first quantitative
+    // column (temperature) like oneshot's auto-Y, not the default Y slot (city).
+    let block = ChartBlock {
+        source: "temperature.csv".to_string(),
+        chart_type: Some(ChartType::Histogram),
+        x_col: Some("month".to_string()),
+        y_col: None,
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
+        bins: None,
+        height: None,
+        diff: None,
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let result = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark());
+    assert!(
+        result.is_ok(),
+        "histogram block should load: {:?}",
+        result.err()
+    );
+    match result.unwrap() {
+        crate::render::ChartData::Histogram(data) => {
+            assert_eq!(data.x_label, "temperature");
+            assert!(!data.values.is_empty(), "temperature values must be binned");
+        }
+        _ => panic!("Expected Histogram chart data"),
+    }
+}
+
+#[test]
 fn test_load_chart_data_infers_line_for_temporal() {
     // sales.csv has temporal x + quantitative y → should infer Line
     let block = ChartBlock {
@@ -302,4 +417,30 @@ fn test_parse_inline_spans_empty_bold_markers() {
     );
     let reconstructed: String = spans.iter().map(|s| s.content.as_ref()).collect();
     assert_eq!(reconstructed, "before  after");
+}
+
+#[test]
+fn test_load_chart_data_unknown_x_column_errors() {
+    let block = ChartBlock {
+        source: "sales.csv".to_string(),
+        chart_type: Some(ChartType::Line),
+        x_col: Some("dat".to_string()),
+        y_col: Some("revenue".to_string()),
+        color_col: None,
+        title: None,
+        filter: vec![],
+        sort: None,
+        agg: None,
+        top: None,
+        bins: None,
+        height: None,
+        diff: None,
+    };
+
+    let base_dir = std::path::Path::new("fixtures");
+    let err = super::load_chart_data(&block, base_dir, &crate::theme::Theme::dark())
+        .expect_err("typo'd x must fail instead of mis-charting column 0");
+    let msg = format!("{err:?}");
+    assert!(msg.contains("dat"), "error must name the bad column: {msg}");
+    assert!(msg.contains("date"), "error must suggest the fix: {msg}");
 }

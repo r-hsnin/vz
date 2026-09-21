@@ -1,8 +1,10 @@
 //! Benchmarks for the vz data pipeline: loading, inference, and full pipeline.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
+use vz::infer_from_data;
 use vz::loader::{self, InputFormat};
-use vz::pipeline;
 
 /// Generate a 1000-row CSV string: date,city,revenue
 fn generate_csv_1000() -> String {
@@ -79,7 +81,7 @@ fn bench_infer(c: &mut Criterion) {
     let csv_data = generate_csv_1000();
     let data = loader::load_from_content(&csv_data, InputFormat::Csv, false).unwrap();
     c.bench_function("infer_1000", |b| {
-        b.iter(|| pipeline::infer_from_data(black_box(&data)))
+        b.iter(|| infer_from_data(black_box(&data)))
     });
 }
 
@@ -89,7 +91,7 @@ fn bench_pipeline(c: &mut Criterion) {
         b.iter(|| {
             let data =
                 loader::load_from_content(black_box(&csv_data), InputFormat::Csv, false).unwrap();
-            let _schema = pipeline::infer_from_data(&data);
+            let _schema = infer_from_data(&data);
         })
     });
 }
@@ -110,7 +112,7 @@ fn bench_infer_large(c: &mut Criterion) {
     let data = loader::load_from_content(&csv_data, InputFormat::Csv, false).unwrap();
 
     c.bench_function("infer_10000_rows", |b| {
-        b.iter(|| pipeline::infer_from_data(black_box(&data)))
+        b.iter(|| infer_from_data(black_box(&data)))
     });
 }
 
@@ -124,14 +126,14 @@ fn bench_full_load_infer(c: &mut Criterion) {
         b.iter(|| {
             let data =
                 loader::load_from_content(black_box(&csv_data), InputFormat::Csv, false).unwrap();
-            pipeline::infer_from_data(&data)
+            infer_from_data(&data)
         })
     });
     group.bench_function("json_load_infer_1000", |b| {
         b.iter(|| {
             let data =
                 loader::load_from_content(black_box(&json_data), InputFormat::Json, false).unwrap();
-            pipeline::infer_from_data(&data)
+            infer_from_data(&data)
         })
     });
     group.finish();

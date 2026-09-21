@@ -1,0 +1,153 @@
+---
+source: tests/snapshot_test.rs
+expression: output
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vz chart</title>
+<style>
+body {
+  margin: 0;
+  background: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.chart-container {
+  position: relative;
+}
+.tooltip {
+  position: absolute;
+  display: none;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+}
+svg {
+  max-width: 100%;
+  height: auto;
+}
+</style>
+</head>
+<body>
+<div class="chart-container">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 384" width="640" height="384">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text { font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 14px; white-space: pre; }</style>
+<text y="13"><tspan x="0" fill="#cccccc">┌───────────────────────────────</tspan><tspan x="256" fill="#cccccc" font-weight="bold">revenue vs date</tspan><tspan x="376" fill="#cccccc">────────────────────────────────┐</tspan></text>
+<text y="29"><tspan x="0" fill="#cccccc">│2k       </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">revenue                                             </tspan><tspan x="504" fill="#569cd6">⡠⠔⠁</tspan><tspan x="528" fill="#cccccc">     ┌──────┐│</tspan></text>
+<text y="45"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                                 </tspan><tspan x="480" fill="#569cd6">⢀⠔⠊</tspan><tspan x="504" fill="#cccccc">       </tspan><tspan x="560" fill="#569cd6">█ Tokyo </tspan><tspan x="624" fill="#cccccc">││</tspan></text>
+<text y="61"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                               </tspan><tspan x="464" fill="#569cd6">⡠⠒⠁</tspan><tspan x="488" fill="#cccccc">         </tspan><tspan x="560" fill="#f44747">█ Osaka⣀</tspan><tspan x="624" fill="#cccccc">││</tspan></text>
+<text y="77"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                            </tspan><tspan x="440" fill="#569cd6">⢀⠔⠉</tspan><tspan x="464" fill="#cccccc">    </tspan><tspan x="496" fill="#f44747">⢀⣀⣀⣀⠤⠤⠤⠤</tspan><tspan x="560" fill="#6a9955">█ Nagoya</tspan><tspan x="624" fill="#cccccc">││</tspan></text>
+<text y="93"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                     </tspan><tspan x="384" fill="#f44747">⣀⣀⣀⣀⠤⠤⠤⠔⠒⠒⠒⠉⠉⠉⠁</tspan><tspan x="504" fill="#cccccc">        └──────┘│</tspan></text>
+<text y="109"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                       </tspan><tspan x="272" fill="#f44747">⣀⣀⣀⡠⠤⠤⠤⠒⠒⠒⠊⠉⠉⠉</tspan><tspan x="384" fill="#cccccc">  </tspan><tspan x="400" fill="#569cd6">⣀⠔⠁</tspan><tspan x="424" fill="#cccccc">                          │</tspan></text>
+<text y="125"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">             </tspan><tspan x="192" fill="#f44747">⠠⠤⠔⠒⠒⠒⠉⠉⠉⠉</tspan><tspan x="272" fill="#cccccc">             </tspan><tspan x="376" fill="#569cd6">⢀⠤⠊</tspan><tspan x="400" fill="#cccccc">                             │</tspan></text>
+<text y="141"><tspan x="0" fill="#cccccc">│1.5k     </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                  </tspan><tspan x="360" fill="#569cd6">⡠⠔⠁</tspan><tspan x="384" fill="#cccccc">                               │</tspan></text>
+<text y="157"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                               </tspan><tspan x="336" fill="#569cd6">⢀⠔⠊</tspan><tspan x="360" fill="#cccccc">                                  │</tspan></text>
+<text y="173"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                             </tspan><tspan x="320" fill="#569cd6">⡠⠒⠁</tspan><tspan x="344" fill="#cccccc">                                    │</tspan></text>
+<text y="189"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                       </tspan><tspan x="272" fill="#569cd6">⢀⣀⣀⠤⠔⠉</tspan><tspan x="320" fill="#cccccc">                                       │</tspan></text>
+<text y="205"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">              </tspan><tspan x="200" fill="#569cd6">⣀⣀⠤⠤⠔⠒⠒⠉⠉⠁</tspan><tspan x="280" fill="#cccccc">                                            │</tspan></text>
+<text y="221"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">    </tspan><tspan x="120" fill="#569cd6">⣀⣀⡠⠤⠤⠒⠒⠊⠉⠉</tspan><tspan x="200" fill="#cccccc">                                                      │</tspan></text>
+<text y="237"><tspan x="0" fill="#cccccc">│1k       </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#569cd6">⠒⠊⠉⠉</tspan><tspan x="120" fill="#cccccc">                                                                │</tspan></text>
+<text y="253"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                                                    │</tspan></text>
+<text y="269"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                        </tspan><tspan x="408" fill="#6a9955">•</tspan><tspan x="416" fill="#cccccc">                           │</tspan></text>
+<text y="285"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                                                    │</tspan></text>
+<text y="301"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                                                    │</tspan></text>
+<text y="317"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                                                    │</tspan></text>
+<text y="333"><tspan x="0" fill="#cccccc">│500      </tspan><tspan x="80" fill="#cccccc">│</tspan><tspan x="88" fill="#cccccc">                                                                date│</tspan></text>
+<text y="349"><tspan x="0" fill="#cccccc">│         </tspan><tspan x="80" fill="#cccccc">└────────────────────────────────────────────────────────────────────</tspan><tspan x="632" fill="#cccccc">│</tspan></text>
+<text y="365"><tspan x="0" fill="#cccccc">│2024-01-01                            2024-04-01                    2024-06-01│</tspan></text>
+<text y="381"><tspan x="0" fill="#cccccc">└──────────────────────────────────────────────────────────────────────────────┘</tspan></text>
+<g class="vz-data" fill="#ffffff" fill-opacity="0.0">
+<circle class="vz-point" cx="48.0" cy="304.0" r="7" data-label="2024-01-01" data-value="1000" data-series="Tokyo"><title>2024-01-01: 1k</title></circle>
+<circle class="vz-point" cx="281.6" cy="248.0" r="7" data-label="2024-04-01" data-value="1200" data-series="Tokyo"><title>2024-04-01: 1.2k</title></circle>
+<circle class="vz-point" cx="515.2" cy="24.0" r="7" data-label="2024-06-01" data-value="2000" data-series="Tokyo"><title>2024-06-01: 2k</title></circle>
+<circle class="vz-point" cx="164.8" cy="164.0" r="7" data-label="2024-01-01" data-value="1500" data-series="Osaka"><title>2024-01-01: 1.5k</title></circle>
+<circle class="vz-point" cx="632.0" cy="80.0" r="7" data-label="2024-04-01" data-value="1800" data-series="Osaka"><title>2024-04-01: 1.8k</title></circle>
+<circle class="vz-point" cx="398.4" cy="360.0" r="7" data-label="2024-01-01" data-value="800" data-series="Nagoya"><title>2024-01-01: 800</title></circle>
+</g>
+</svg>
+
+<div class="tooltip" id="tooltip"></div>
+</div>
+<script>
+(function() {
+  var tooltip = document.getElementById('tooltip');
+  var container = document.querySelector('.chart-container');
+  var svg = container.querySelector('svg');
+  if (!svg) return;
+
+  // Prefer real data marks first (<circle class="vz-point"> with
+  // data-label/data-value + <title>); fall back to tspan/rect
+  // heuristics only when no marks exist.
+  if (svg.querySelector('circle.vz-point')) {
+    svg.querySelectorAll('circle.vz-point').forEach(function(el) {
+      el.style.cursor = 'pointer';
+      el.style.pointerEvents = 'all';
+      function labelFor(target) {
+        var title = target.querySelector('title');
+        if (title && title.textContent.trim().length > 0) {
+          var series = target.getAttribute('data-series');
+          var t = title.textContent.trim();
+          return series ? series + ' — ' + t : t;
+        }
+        var label = target.getAttribute('data-label') || '';
+        var value = target.getAttribute('data-value') || '';
+        var s = (label + (value ? ': ' + value : '')).trim();
+        return s || 'data point';
+      }
+      el.addEventListener('mouseenter', function(e) {
+        showTooltip(e, labelFor(el));
+      });
+      el.addEventListener('mousemove', function(e) {
+        showTooltip(e, labelFor(el));
+      });
+      el.addEventListener('mouseleave', hideTooltip);
+    });
+  } else {
+  // Attach hover listeners to tspan elements that contain visible text
+  var tspans = svg.querySelectorAll('tspan');
+  tspans.forEach(function(el) {
+    var text = el.textContent.trim();
+    if (text.length > 0 && text.length < 40) {
+      el.style.cursor = 'pointer';
+      el.addEventListener('mouseenter', function(e) {
+        showTooltip(e, text);
+      });
+      el.addEventListener('mousemove', function(e) {
+        showTooltip(e, text);
+      });
+      el.addEventListener('mouseleave', hideTooltip);
+    }
+  });
+
+  // Also handle rect elements with non-background fills (chart bars)
+  var rects = svg.querySelectorAll('rect');
+  rects.forEach(function(el) {
+    var fill = el.getAttribute('fill');
+    if (fill && fill !== '#ffffff' && el.getAttribute('width') !== '100%') {
+      el.style.cursor = 'pointer';
+      el.addEventListener('mouseenter', function(e) {
+        showTooltip(e, 'bar');
+      });
+      el.addEventListener('mousemove', function(e) {
+        showTooltip(e, 'bar');
+      });
+      el.addEventListener('mouseleave', hideTooltip);
+    }
+  });
+  }
+})();
+</script>
+</body>
+</html>

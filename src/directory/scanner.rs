@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 
 use super::date_extract::extract_file_date;
+use crate::util::path_label;
 
 /// Options controlling file discovery in a directory.
 pub struct ScanOptions {
@@ -106,10 +107,10 @@ fn collect_files(
         }
 
         // Apply glob pattern if specified (matches against filename only)
-        if let Some(ref pattern) = opts.glob_pattern {
-            if !glob_matches(pattern, &filename) {
-                continue;
-            }
+        if let Some(ref pattern) = opts.glob_pattern
+            && !glob_matches(pattern, &filename)
+        {
+            continue;
         }
 
         // Compute stem: relative path from root (without extension) for recursive,
@@ -119,10 +120,7 @@ fn collect_files(
             let rel_no_ext = rel.with_extension("");
             rel_no_ext.to_string_lossy().replace('\\', "/")
         } else {
-            path.file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unknown")
-                .to_string()
+            path_label(&path).to_string()
         };
 
         // Extract date from the leaf filename (not from path components)

@@ -1,5 +1,100 @@
 use super::*;
-use crate::cli::AggFunction;
+use crate::chart::selector::AggFunction;
+use crate::chart::selector::SortOrder;
+use crate::render::BarChartData;
+
+fn bar_fixture() -> BarChartData {
+    BarChartData {
+        labels: vec!["A".into(), "B".into(), "C".into()],
+        values: vec![10.0, 30.0, 20.0],
+        y_label: String::new(),
+        title: None,
+        show_labels: false,
+        series_colors: vec![],
+        axis_color: None,
+    }
+}
+
+fn to_tuples(entries: &[crate::diff::DiffEntry]) -> Vec<(String, f64, Option<f64>, f64)> {
+    entries
+        .iter()
+        .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
+        .collect()
+}
+
+#[test]
+fn test_sort_bar_data_desc_orders_by_value() {
+    let mut data = bar_fixture();
+    sort_bar_data(&mut data, Some(SortOrder::Desc));
+    assert_eq!(data.labels, vec!["B", "C", "A"]);
+    assert_eq!(data.values, vec![30.0, 20.0, 10.0]);
+}
+
+#[test]
+fn test_sort_bar_data_asc_orders_by_value() {
+    let mut data = bar_fixture();
+    sort_bar_data(&mut data, Some(SortOrder::Asc));
+    assert_eq!(data.labels, vec!["A", "C", "B"]);
+}
+
+#[test]
+fn test_sort_bar_data_none_preserves_order() {
+    let mut data = bar_fixture();
+    sort_bar_data(&mut data, None);
+    assert_eq!(data.labels, vec!["A", "B", "C"]);
+    sort_bar_data(&mut data, Some(SortOrder::None));
+    assert_eq!(data.labels, vec!["A", "B", "C"]);
+}
+
+#[test]
+fn test_sort_bar_data_with_nan_keeps_finite_order() {
+    let mut data = BarChartData {
+        labels: vec!["A".into(), "B".into(), "C".into()],
+        values: vec![f64::NAN, 30.0, 20.0],
+        y_label: String::new(),
+        title: None,
+        show_labels: false,
+        series_colors: vec![],
+        axis_color: None,
+    };
+    sort_bar_data(&mut data, Some(SortOrder::Desc));
+    let non_nan: Vec<(&str, f64)> = data
+        .labels
+        .iter()
+        .zip(data.values.iter())
+        .filter(|(_, v)| !v.is_nan())
+        .map(|(l, v)| (l.as_str(), *v))
+        .collect();
+    assert_eq!(non_nan, vec![("B", 30.0), ("C", 20.0)]);
+}
+
+#[test]
+fn test_truncate_bar_data_limit() {
+    let mut data = bar_fixture();
+    truncate_bar_data(&mut data, Some(2));
+    assert_eq!(data.labels.len(), 2);
+    assert_eq!(data.values.len(), 2);
+    truncate_bar_data(&mut data, None);
+    assert_eq!(data.labels.len(), 2);
+}
+
+#[test]
+fn test_truncate_bar_data_larger_than_data() {
+    let mut data = bar_fixture();
+    truncate_bar_data(&mut data, Some(10));
+    assert_eq!(data.labels.len(), 3);
+    assert_eq!(data.values.len(), 3);
+}
+
+#[test]
+fn test_truncate_bar_data_zero_empties() {
+    // `--top 0`/`--tail 0` are rejected at the CLI, but present chart blocks
+    // reach here directly — pin the canonical contract as empty, not no-op.
+    let mut data = bar_fixture();
+    truncate_bar_data(&mut data, Some(0));
+    assert!(data.labels.is_empty());
+    assert!(data.values.is_empty());
+}
 
 #[test]
 fn test_pick_evenly_small() {
@@ -69,6 +164,31 @@ fn test_aggregate_bar_with_non_parseable() {
     assert_eq!(data.labels, vec!["Tokyo"]);
     assert_eq!(data.values, vec![1500.0]);
     assert_eq!(used, 2);
+}
+
+#[test]
+fn test_aggregate_bar_parses_formatted_numbers() {
+    // Shared numeric parser: "1,000", "$100", "45%", "10k" all aggregate.
+    let rows = vec![
+        vec!["A".into(), "1,000".into()],
+        vec!["A".into(), "$500".into()],
+        vec!["B".into(), "50%".into()],
+        vec!["B".into(), "10k".into()],
+    ];
+    let (data, used) = aggregate_bar(&rows, 0, 1, None, "y".into(), AggFunction::Sum);
+    assert_eq!(used, 4, "all formatted values must aggregate, none skipped");
+    let a = data.labels.iter().position(|l| l == "A").unwrap();
+    let b = data.labels.iter().position(|l| l == "B").unwrap();
+    assert!(
+        (data.values[a] - 1500.0).abs() < 1e-9,
+        "got {}",
+        data.values[a]
+    );
+    assert!(
+        (data.values[b] - 10000.5).abs() < 1e-9,
+        "got {}",
+        data.values[b]
+    );
 }
 
 #[test]
@@ -142,6 +262,86 @@ fn test_build_grouped_series() {
 }
 
 #[test]
+fn test_histogram_column_probe_any_numeric_in_leading_rows() {
+    // Probe semantics are `any` over the leading rows: a single numeric X in
+    // the window selects X even when earlier rows are non-numeric.
+    let rows = vec![
+        vec!["N/A".to_string(), "1000".to_string()],
+        vec!["10".to_string(), "2000".to_string()],
+        vec!["20".to_string(), "3000".to_string()],
+    ];
+    assert_eq!(histogram_column(&rows, 0, 1), 0);
+}
+
+#[test]
+fn test_histogram_column_probe_window_is_five_rows() {
+    // A numeric X first appearing on row 6 is outside the 5-row probe window,
+    // so the column falls back to Y.
+    let mut rows: Vec<Vec<String>> = (0..5)
+        .map(|_| vec!["N/A".to_string(), "1".to_string()])
+        .collect();
+    rows.push(vec!["99".to_string(), "2".to_string()]);
+    assert_eq!(histogram_column(&rows, 0, 1), 1);
+}
+
+#[test]
+fn test_histogram_column_short_rows_do_not_panic() {
+    // Rows shorter than the probed index are skipped, not panicked on.
+    let rows = vec![vec![], vec!["5".to_string(), "7".to_string()]];
+    assert_eq!(histogram_column(&rows, 0, 1), 0);
+}
+
+#[test]
+fn test_truncate_bar_data_exact_len_keeps_all() {
+    let mut data = bar_fixture();
+    truncate_bar_data(&mut data, Some(3));
+    assert_eq!(data.labels, vec!["A", "B", "C"]);
+    assert_eq!(data.values, vec![10.0, 30.0, 20.0]);
+}
+
+#[test]
+fn test_build_multi_y_series_category_index_when_grouped() {
+    // Duplicate non-numeric X across groups: the grouped base series maps X to
+    // the unique-category index, so an extra-Y overlay must use the same index
+    // rather than the raw row index (the extra-Y + color bug).
+    let rows = vec![
+        vec!["2024-01".into(), "100".into(), "10".into()],
+        vec!["2024-01".into(), "200".into(), "20".into()],
+        vec!["2024-02".into(), "150".into(), "15".into()],
+    ];
+    let extra = build_multi_y_series(&rows, 0, &[(2, "profit".into())], true, true);
+    assert_eq!(extra.len(), 1);
+    assert_eq!(
+        extra[0].data,
+        vec![(0.0, 10.0), (0.0, 20.0), (1.0, 15.0)],
+        "grouped overlay must share the base's unique-category X index"
+    );
+}
+
+#[test]
+fn test_build_multi_y_series_row_index_when_ungrouped() {
+    // Without a color column the base uses raw row indices, so the overlay must
+    // too (duplicate X labels stay distinct points).
+    let rows = vec![
+        vec!["2024-01".into(), "100".into(), "10".into()],
+        vec!["2024-01".into(), "200".into(), "20".into()],
+        vec!["2024-02".into(), "150".into(), "15".into()],
+    ];
+    let extra = build_multi_y_series(&rows, 0, &[(2, "profit".into())], true, false);
+    assert_eq!(extra[0].data, vec![(0.0, 10.0), (1.0, 20.0), (2.0, 15.0)]);
+}
+
+#[test]
+fn test_build_multi_y_series_numeric_x_uses_parsed_values() {
+    let rows = vec![
+        vec!["1".into(), "100".into(), "10".into()],
+        vec!["2".into(), "200".into(), "20".into()],
+    ];
+    let extra = build_multi_y_series(&rows, 0, &[(2, "profit".into())], false, false);
+    assert_eq!(extra[0].data, vec![(1.0, 10.0), (2.0, 20.0)]);
+}
+
+#[test]
 fn test_build_chart_config_single_series() {
     let rows = vec![
         vec!["2024-01".into(), "100".into()],
@@ -165,10 +365,77 @@ fn test_build_chart_config_multi_series() {
 }
 
 #[test]
+fn test_append_series_refit_y_includes_extra_series_in_span() {
+    let rows = vec![
+        vec!["2024-01".into(), "10".into()],
+        vec!["2024-02".into(), "20".into()],
+    ];
+    let mut config = build_chart_config(&rows, 0, 1, None, "date".into(), "value".into(), None);
+    let base_x_min = config.x_axis.min;
+    let base_x_max = config.x_axis.max;
+
+    append_series_refit_y(
+        &mut config,
+        vec![Series {
+            name: "profit".into(),
+            data: vec![(0.0, 500.0)],
+        }],
+    );
+
+    assert_eq!(config.series.len(), 2);
+    assert!(config.y_axis.max >= 500.0);
+    // X span is intentionally untouched: extra-Y series share the base X coords.
+    assert_eq!(config.x_axis.min, base_x_min);
+    assert_eq!(config.x_axis.max, base_x_max);
+    assert_eq!(config.y_axis.label, "value");
+}
+
+#[test]
+fn test_append_series_refit_y_empty_is_noop() {
+    let rows = vec![
+        vec!["2024-01".into(), "10".into()],
+        vec!["2024-02".into(), "20".into()],
+    ];
+    let mut config = build_chart_config(&rows, 0, 1, None, "date".into(), "value".into(), None);
+    let base_y_min = config.y_axis.min;
+    let base_y_max = config.y_axis.max;
+
+    append_series_refit_y(&mut config, vec![]);
+
+    assert_eq!(config.series.len(), 1);
+    assert_eq!(config.y_axis.min, base_y_min);
+    assert_eq!(config.y_axis.max, base_y_max);
+}
+
+#[test]
 fn test_column_index() {
     let headers: Vec<String> = vec!["a".into(), "b".into(), "c".into()];
     assert_eq!(column_index(&headers, "b"), Some(1));
     assert_eq!(column_index(&headers, "z"), None);
+}
+
+#[test]
+fn test_histogram_column_prefers_numeric_x() {
+    let rows = vec![
+        vec!["5".to_string(), "1000".to_string()],
+        vec!["7".to_string(), "2000".to_string()],
+    ];
+    assert_eq!(histogram_column(&rows, 0, 1), 0);
+}
+
+#[test]
+fn test_histogram_column_falls_back_to_y_when_x_non_numeric() {
+    let rows = vec![
+        vec!["Jan".to_string(), "5".to_string()],
+        vec!["Feb".to_string(), "7".to_string()],
+    ];
+    assert_eq!(histogram_column(&rows, 0, 1), 1);
+}
+
+#[test]
+fn test_histogram_column_empty_rows_fall_back_to_y() {
+    let rows: Vec<Vec<String>> = vec![];
+    assert_eq!(histogram_column(&rows, 0, 1), 1);
 }
 
 #[test]
@@ -256,7 +523,8 @@ fn test_build_heatmap_data_single_cell() {
 #[test]
 fn test_resolved_axes_from_explicit() {
     let headers = vec!["city".into(), "revenue".into(), "region".into()];
-    let axes = ResolvedAxes::from_explicit(Some("city"), Some("revenue"), Some("region"), &headers);
+    let axes = ResolvedAxes::from_explicit(Some("city"), Some("revenue"), Some("region"), &headers)
+        .expect("known columns must resolve");
     assert_eq!(axes.x_idx, 0);
     assert_eq!(axes.y_idx, 1);
     assert_eq!(axes.color_idx, Some(2));
@@ -267,7 +535,8 @@ fn test_resolved_axes_from_explicit() {
 #[test]
 fn test_resolved_axes_from_explicit_defaults() {
     let headers = vec!["date".into(), "value".into()];
-    let axes = ResolvedAxes::from_explicit(None, None, None, &headers);
+    let axes =
+        ResolvedAxes::from_explicit(None, None, None, &headers).expect("empty refs must resolve");
     assert_eq!(axes.x_idx, 0);
     assert_eq!(axes.y_idx, 1);
     assert_eq!(axes.color_idx, None);
@@ -287,9 +556,39 @@ fn test_resolved_axes_from_recommendation() {
 #[test]
 fn test_resolved_axes_single_column() {
     let headers = vec!["values".into()];
-    let axes = ResolvedAxes::from_explicit(None, None, None, &headers);
+    let axes =
+        ResolvedAxes::from_explicit(None, None, None, &headers).expect("empty refs must resolve");
     assert_eq!(axes.x_idx, 0);
     assert_eq!(axes.y_idx, 0); // min(1, len-1) = min(1, 0) = 0
+}
+
+#[test]
+fn test_resolved_axes_unknown_x_errors_with_hint() {
+    let headers = vec!["city".to_string(), "revenue".to_string()];
+    let err = ResolvedAxes::from_explicit(Some("ctiy"), None, None, &headers)
+        .expect_err("typo'd x must not fall back silently");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("ctiy"),
+        "error must name the bad column: {msg}"
+    );
+    assert!(msg.contains("city"), "error must hint the fix: {msg}");
+}
+
+#[test]
+fn test_resolved_axes_unknown_y_errors() {
+    let headers = vec!["city".to_string(), "revenue".to_string()];
+    let err = ResolvedAxes::from_explicit(None, Some("profit"), None, &headers)
+        .expect_err("unknown y must not fall back silently");
+    assert!(err.to_string().contains("profit"));
+}
+
+#[test]
+fn test_resolved_axes_unknown_color_errors() {
+    let headers = vec!["city".to_string(), "revenue".to_string()];
+    let err = ResolvedAxes::from_explicit(None, None, Some("citi"), &headers)
+        .expect_err("typo'd color must not be silently dropped");
+    assert!(err.to_string().contains("citi"));
 }
 
 #[test]
@@ -319,4 +618,190 @@ fn test_collect_groups_count() {
     assert_eq!(used, 3);
     assert_eq!(groups[0].0, "X");
     assert_eq!(groups[0].1.len(), 2); // two entries for X
+}
+
+#[test]
+fn test_collect_groups_skips_non_finite() {
+    let rows = vec![
+        vec!["A".to_string(), "NaN".to_string()],
+        vec!["B".to_string(), "50".to_string()],
+        vec!["C".to_string(), "inf".to_string()],
+    ];
+    let (groups, used) = collect_groups(&rows, 0, 1, AggFunction::Max);
+    assert_eq!(used, 1);
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].0, "B");
+    let v = apply_agg(&groups[0].1, AggFunction::Max);
+    assert!(v.is_finite() && (v - 50.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn test_build_single_series_skips_non_finite() {
+    let rows = vec![
+        vec!["2024-01".to_string(), "10".to_string()],
+        vec!["2024-02".to_string(), "NaN".to_string()],
+        vec!["2024-03".to_string(), "inf".to_string()],
+        vec!["2024-04".to_string(), "40".to_string()],
+    ];
+    let series = build_single_series(&rows, 0, 1, true, "v".to_string());
+    assert_eq!(series.data.len(), 2);
+    assert!(series.data.iter().all(|(_, y)| y.is_finite()));
+}
+
+#[test]
+fn test_build_grouped_series_skips_non_finite() {
+    let rows = vec![
+        vec!["2024-01".to_string(), "10".to_string(), "A".to_string()],
+        vec!["2024-02".to_string(), "NaN".to_string(), "A".to_string()],
+        vec!["2024-03".to_string(), "-inf".to_string(), "B".to_string()],
+        vec!["2024-04".to_string(), "40".to_string(), "B".to_string()],
+    ];
+    let series = build_grouped_series(&rows, 0, 1, 2, true);
+    let total: usize = series.iter().map(|s| s.data.len()).sum();
+    assert_eq!(total, 2);
+    assert!(
+        series
+            .iter()
+            .flat_map(|s| s.data.iter())
+            .all(|(x, y)| x.is_finite() && y.is_finite())
+    );
+}
+
+#[test]
+fn test_build_diff_line_config_two_series_before_after() {
+    let before = vec![(0.0, 100.0), (1.0, 120.0)];
+    let after = vec![(0.0, 110.0), (1.0, 130.0)];
+    let labels = vec!["2024-01".to_string(), "2024-02".to_string()];
+    let config = build_diff_line_config(
+        &before,
+        &after,
+        &labels,
+        "date",
+        "revenue",
+        Some("before vs after".into()),
+    );
+    assert_eq!(config.series.len(), 2);
+    assert_eq!(config.series[0].name, "before");
+    assert_eq!(config.series[1].name, "after");
+    assert_eq!(config.x_labels, Some(labels));
+    assert_eq!(config.x_axis.label, "date");
+    assert_eq!(config.y_axis.label, "revenue");
+    assert_eq!(config.title.as_deref(), Some("before vs after"));
+    assert_eq!(config.x_axis.min, 0.0);
+    assert_eq!(config.x_axis.max, 1.0);
+}
+
+#[test]
+fn test_diff_direction_marker_delta_sign() {
+    assert_eq!(diff_direction_marker(200.0), "▲");
+    assert_eq!(diff_direction_marker(-150.0), "▼");
+    assert_eq!(diff_direction_marker(0.0), "─");
+}
+
+#[test]
+fn test_format_diff_change_pct_and_new() {
+    assert_eq!(format_diff_change(Some(20.0), 200.0), "▲ +20%");
+    assert_eq!(format_diff_change(Some(-10.0), -150.0), "▼ -10%");
+    assert_eq!(format_diff_change(Some(0.0), 0.0), "─ 0%");
+    assert_eq!(format_diff_change(None, 800.0), "▲ new");
+    assert_eq!(format_diff_change(None, -800.0), "▼ new");
+    assert_eq!(format_diff_change(None, 0.0), "─");
+}
+
+#[test]
+fn test_build_diff_bar_data_categorical_annotation() {
+    let entries = vec![
+        crate::diff::DiffEntry {
+            label: "Tokyo".to_string(),
+            before: 1000.0,
+            after: 1200.0,
+            delta: 200.0,
+            pct_change: Some(20.0),
+        },
+        crate::diff::DiffEntry {
+            label: "Osaka".to_string(),
+            before: 1500.0,
+            after: 1350.0,
+            delta: -150.0,
+            pct_change: Some(-10.0),
+        },
+        crate::diff::DiffEntry {
+            label: "Fukuoka".to_string(),
+            before: 600.0,
+            after: 600.0,
+            delta: 0.0,
+            pct_change: Some(0.0),
+        },
+        crate::diff::DiffEntry {
+            label: "New".to_string(),
+            before: 0.0,
+            after: 800.0,
+            delta: 800.0,
+            pct_change: None,
+        },
+    ];
+    let data = build_diff_bar_data(
+        &to_tuples(&entries),
+        None,
+        None,
+        "revenue".to_string(),
+        None,
+    );
+    assert_eq!(data.values, vec![1200.0, 1350.0, 600.0, 800.0]);
+    assert_eq!(
+        data.labels,
+        vec!["Tokyo ▲ +20%", "Osaka ▼ -10%", "Fukuoka ─ 0%", "New ▲ new",]
+    );
+    assert_eq!(data.y_label, "revenue");
+}
+
+#[test]
+fn test_build_diff_bar_data_sort_desc_signed_delta() {
+    let entries = vec![
+        crate::diff::DiffEntry {
+            label: "Nagoya".to_string(),
+            before: 800.0,
+            after: 950.0,
+            delta: 150.0,
+            pct_change: Some(18.75),
+        },
+        crate::diff::DiffEntry {
+            label: "Tokyo".to_string(),
+            before: 1000.0,
+            after: 1200.0,
+            delta: 200.0,
+            pct_change: Some(20.0),
+        },
+        crate::diff::DiffEntry {
+            label: "Osaka".to_string(),
+            before: 1500.0,
+            after: 1350.0,
+            delta: -150.0,
+            pct_change: Some(-10.0),
+        },
+    ];
+    // signed-Δ desc (oneshot/present/html contract): +200, +150, -150.
+    let data = build_diff_bar_data(
+        &to_tuples(&entries),
+        Some(crate::chart::selector::SortOrder::Desc),
+        Some(2),
+        "revenue".to_string(),
+        None,
+    );
+    assert_eq!(data.values, vec![1200.0, 950.0]);
+    assert_eq!(data.labels[0], "Tokyo ▲ +20%");
+    assert_eq!(data.labels[1], "Nagoya ▲ +19%");
+}
+
+#[test]
+fn test_build_histogram_skips_non_finite() {
+    let rows = vec![
+        vec!["10".to_string()],
+        vec!["NaN".to_string()],
+        vec!["inf".to_string()],
+        vec!["20".to_string()],
+    ];
+    let hist = build_histogram(&rows, 0, None, "v".to_string(), None);
+    assert_eq!(hist.values.len(), 2);
+    assert!(hist.values.iter().all(|v| v.is_finite()));
 }

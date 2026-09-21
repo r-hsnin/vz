@@ -2,12 +2,16 @@
 //!
 //! Used by oneshot, explore, and present modes to avoid duplication.
 
-use crate::cli::AggFunction;
+use crate::chart::selector::AggFunction;
+use crate::chart::selector::SortOrder;
 use crate::render::{Axis, BarChartData, ChartConfig, HistogramData, Series};
 
 /// Maximum number of data points rendered in line/scatter charts.
 /// Beyond this threshold, rows are systematically sampled.
 pub const MAX_CHART_POINTS: usize = 5000;
+
+/// Default number of bins for histogram charts.
+pub(crate) const DEFAULT_BINS: usize = 10;
 
 /// Pick `count` evenly spaced items from a slice of strings.
 /// Returns all items if the slice is empty or `count >= items.len()`.
@@ -25,9 +29,14 @@ pub fn pick_evenly(items: &[String], count: usize) -> Vec<String> {
 }
 
 /// Detect if X column values are non-numeric (temporal/categorical strings).
-/// Samples up to 5 values to determine.
+/// Samples up to 5 values to determine. Uses the shared numeric parser so
+/// "$100"/"45%"/"1,000" count as numeric, matching inference.
 pub fn is_non_numeric(values: &[String]) -> bool {
-    !values.is_empty() && values.iter().take(5).all(|s| s.parse::<f64>().is_err())
+    !values.is_empty()
+        && values
+            .iter()
+            .take(5)
+            .all(|s| crate::util::parse_number(s).is_none())
 }
 
 /// Compute unique X values in order of first appearance.
@@ -39,6 +48,35 @@ pub fn unique_ordered(values: &[String]) -> Vec<String> {
         }
     }
     seen
+}
+
+/// Sort bar chart data by value. No-op if sort_order is None or SortOrder::None.
+/// Canonical post-aggregation adapter shared by every Bar consumer
+/// (oneshot text/svg, output table/markdown/json/spark, explore, present).
+pub fn sort_bar_data(data: &mut BarChartData, sort_order: Option<SortOrder>) {
+    let reverse = match sort_order {
+        Some(SortOrder::Desc) => true,
+        Some(SortOrder::Asc) => false,
+        _ => return,
+    };
+    let mut indices: Vec<usize> = (0..data.values.len()).collect();
+    indices.sort_by(|a, b| {
+        let cmp = data.values[*a]
+            .partial_cmp(&data.values[*b])
+            .unwrap_or(std::cmp::Ordering::Equal);
+        if reverse { cmp.reverse() } else { cmp }
+    });
+    data.labels = indices.iter().map(|&i| data.labels[i].clone()).collect();
+    data.values = indices.iter().map(|&i| data.values[i]).collect();
+}
+
+/// Truncate bar chart to first N categories. No-op if limit is None.
+/// Canonical post-aggregation adapter shared with `sort_bar_data`.
+pub fn truncate_bar_data(data: &mut BarChartData, limit: Option<usize>) {
+    if let Some(n) = limit {
+        data.labels.truncate(n);
+        data.values.truncate(n);
+    }
 }
 
 /// Aggregate values by category label (sum).
@@ -92,9 +130,10 @@ fn collect_groups(
         let value = if agg == AggFunction::Count {
             1.0
         } else {
-            match row.get(y_idx).and_then(|v| v.parse::<f64>().ok()) {
-                Some(v) => v,
-                None => continue,
+            match row.get(y_idx).and_then(|v| crate::util::parse_number(v)) {
+                // Skip non-finite (NaN/inf): never leak ±inf sentinels into max/min.
+                Some(v) if v.is_finite() => v,
+                _ => continue,
             }
         };
 
@@ -126,6 +165,48 @@ fn apply_agg(values: &[f64], agg: AggFunction) -> f64 {
     }
 }
 
+/// Canonical X coordinate for one row.
+///
+/// * numeric X: the parsed value (row index when missing/non-finite)
+/// * non-numeric X with a non-empty `categorical_x`: the index into that
+///   unique-category list (rows sharing an X label share a coordinate)
+/// * non-numeric X otherwise: the row index
+///
+/// Single, grouped, and extra-Y series all resolve X through here so an
+/// overlay can never land on a different X scale than the series it annotates.
+fn x_coordinate(
+    row: &[String],
+    row_index: usize,
+    x_idx: usize,
+    x_is_non_numeric: bool,
+    categorical_x: &[String],
+) -> f64 {
+    if x_is_non_numeric {
+        if categorical_x.is_empty() {
+            return row_index as f64;
+        }
+        let x_val = row.get(x_idx).map(String::as_str).unwrap_or("");
+        categorical_x
+            .iter()
+            .position(|v| v == x_val)
+            .unwrap_or(row_index) as f64
+    } else {
+        row.get(x_idx)
+            .and_then(|v| crate::util::parse_number(v))
+            .filter(|v| v.is_finite())
+            .unwrap_or(row_index as f64)
+    }
+}
+
+/// Unique X values in first-appearance order, or empty for numeric X.
+fn categorical_x_for(rows: &[Vec<String>], x_idx: usize, x_is_non_numeric: bool) -> Vec<String> {
+    if !x_is_non_numeric {
+        return Vec::new();
+    }
+    let raw: Vec<String> = rows.iter().filter_map(|r| r.get(x_idx).cloned()).collect();
+    unique_ordered(&raw)
+}
+
 /// Build grouped series by a color column.
 /// Returns a Vec of named Series, each containing (x, y) data points.
 pub fn build_grouped_series(
@@ -135,28 +216,17 @@ pub fn build_grouped_series(
     color_idx: usize,
     x_is_non_numeric: bool,
 ) -> Vec<Series> {
-    let unique_x: Vec<String> = if x_is_non_numeric {
-        let raw: Vec<String> = rows.iter().filter_map(|r| r.get(x_idx).cloned()).collect();
-        unique_ordered(&raw)
-    } else {
-        Vec::new()
-    };
+    let unique_x = categorical_x_for(rows, x_idx, x_is_non_numeric);
 
     let mut groups: Vec<(String, Vec<(f64, f64)>)> = Vec::new();
 
     for (i, row) in rows.iter().enumerate() {
         let group_name = row.get(color_idx).cloned().unwrap_or_default();
-        let x = if x_is_non_numeric {
-            let x_val = row.get(x_idx).cloned().unwrap_or_default();
-            unique_x.iter().position(|v| *v == x_val).unwrap_or(i) as f64
-        } else {
-            row.get(x_idx)
-                .and_then(|v| v.parse::<f64>().ok())
-                .unwrap_or(i as f64)
-        };
-        let y = match row.get(y_idx).and_then(|v| v.parse::<f64>().ok()) {
-            Some(v) => v,
-            None => continue,
+        let x = x_coordinate(row, i, x_idx, x_is_non_numeric, &unique_x);
+        // Skip non-finite (NaN/inf): never leak them into axes or series.
+        let y = match row.get(y_idx).and_then(|v| crate::util::parse_number(v)) {
+            Some(v) if v.is_finite() => v,
+            _ => continue,
         };
 
         if let Some(entry) = groups.iter_mut().find(|(name, _)| name == &group_name) {
@@ -185,14 +255,12 @@ pub fn build_single_series(
         .iter()
         .enumerate()
         .filter_map(|(i, row)| {
-            let x = if x_is_non_numeric {
-                i as f64
-            } else {
-                row.get(x_idx)
-                    .and_then(|v| v.parse::<f64>().ok())
-                    .unwrap_or(i as f64)
-            };
-            let y = row.get(y_idx).and_then(|v| v.parse::<f64>().ok())?;
+            let x = x_coordinate(row, i, x_idx, x_is_non_numeric, &[]);
+            // Skip non-finite (NaN/inf): never leak them into axes or series.
+            let y = row
+                .get(y_idx)
+                .and_then(|v| crate::util::parse_number(v))
+                .filter(|v| v.is_finite())?;
             Some((x, y))
         })
         .collect();
@@ -325,18 +393,50 @@ pub fn build_histogram(
     x_label: String,
     bin_count: Option<usize>,
 ) -> HistogramData {
+    // Skip non-finite (NaN/inf): never leak them into bins or ranges.
     let values: Vec<f64> = rows
         .iter()
-        .filter_map(|r| r.get(col_idx).and_then(|v| v.parse().ok()))
+        .filter_map(|r| r.get(col_idx).and_then(|v| crate::util::parse_number(v)))
+        .filter(|v: &f64| v.is_finite())
         .collect();
 
     HistogramData {
         title,
         values,
-        bin_count: bin_count.unwrap_or(10),
+        bin_count: bin_count.unwrap_or(DEFAULT_BINS),
         x_label,
         axis_color: None,
     }
+}
+
+/// Leading rows probed to decide whether a column is quantitative when
+/// picking the histogram bin column.
+const HISTOGRAM_PROBE_ROWS: usize = 5;
+
+/// Pick the column to bin for a histogram: X when it holds numeric values in
+/// the leading sample (the usual `-t histogram -x temperature` case),
+/// otherwise Y so an explicit `-x city -y revenue` still bins revenue.
+/// Canonical because every mode (oneshot text, JSON, present, insights) must
+/// bin the same column or their outputs silently disagree.
+pub fn histogram_column(rows: &[Vec<String>], x_idx: usize, y_idx: usize) -> usize {
+    let x_has_numbers = rows
+        .iter()
+        .take(HISTOGRAM_PROBE_ROWS)
+        .filter_map(|r| r.get(x_idx))
+        .any(|v| crate::util::parse_number(v).is_some());
+    if x_has_numbers { x_idx } else { y_idx }
+}
+
+/// Index of the first column whose leading values are numeric, using the same
+/// probe as [`histogram_column`]. Present blocks that name only an X column use
+/// this to choose the bin column, so a histogram over a categorical X bins the
+/// quantitative column oneshot's auto-Y would pick instead of the default Y
+/// slot (which may itself be categorical).
+pub fn first_quantitative_column(headers: &[String], rows: &[Vec<String>]) -> Option<usize> {
+    (0..headers.len()).find(|&i| {
+        let values: Vec<String> = rows.iter().filter_map(|r| r.get(i).cloned()).collect();
+        !values.is_empty() && !is_non_numeric(&values)
+    })
 }
 
 /// Find the index of a column name in headers.
@@ -346,6 +446,7 @@ pub fn column_index(headers: &[String], name: &str) -> Option<usize> {
 
 /// Resolved column indices and labels for chart rendering.
 /// Shared across oneshot, explore, and present modes.
+#[derive(Debug)]
 pub struct ResolvedAxes {
     pub x_idx: usize,
     pub y_idx: usize,
@@ -356,32 +457,33 @@ pub struct ResolvedAxes {
 
 impl ResolvedAxes {
     /// Resolve axes from explicit column names (used by present mode / chart blocks).
+    /// Unknown names are an error with a `Did you mean` hint — never silently
+    /// fall back to the first columns (that mis-charted typos without a word).
     pub fn from_explicit(
         x_col: Option<&str>,
         y_col: Option<&str>,
         color_col: Option<&str>,
         headers: &[String],
-    ) -> Self {
-        let x_idx = x_col
-            .and_then(|name| column_index(headers, name))
-            .unwrap_or(0);
-        let y_idx = y_col
-            .and_then(|name| column_index(headers, name))
+    ) -> anyhow::Result<Self> {
+        let x_idx = resolve_named_column(headers, x_col, "x")?.unwrap_or(0);
+        let y_idx = resolve_named_column(headers, y_col, "y")?
             .unwrap_or(1.min(headers.len().saturating_sub(1)));
-        let color_idx = color_col.and_then(|name| column_index(headers, name));
+        let color_idx = resolve_named_column(headers, color_col, "color")?;
         let x_label = headers.get(x_idx).cloned().unwrap_or_default();
         let y_label = headers.get(y_idx).cloned().unwrap_or_default();
 
-        Self {
+        Ok(Self {
             x_idx,
             y_idx,
             color_idx,
             x_label,
             y_label,
-        }
+        })
     }
 
     /// Resolve axes from a ChartRecommendation (used by oneshot/explore).
+    /// The recommendation comes from [`crate::chart::select_chart`], which already
+    /// validated the names against the same headers, so this cannot fail.
     pub fn from_recommendation(
         x_column: &str,
         y_column: Option<&str>,
@@ -389,23 +491,223 @@ impl ResolvedAxes {
         headers: &[String],
     ) -> Self {
         Self::from_explicit(Some(x_column), y_column, color_column, headers)
+            .expect("selector-validated columns must exist in headers")
     }
 }
 
-/// Build multiple series from multiple Y columns, sharing the same X axis.
+/// Resolve one named column reference: `None` stays unset, an unknown name errors.
+fn resolve_named_column(
+    headers: &[String],
+    name: Option<&str>,
+    role: &str,
+) -> anyhow::Result<Option<usize>> {
+    let Some(name) = name else {
+        return Ok(None);
+    };
+    column_index(headers, name).map(Some).ok_or_else(|| {
+        let suggestion =
+            crate::diagnostics::suggest_column(headers, name).map(|s| s.as_str().to_string());
+        let suffix = crate::diagnostics::format_column_suffix(suggestion.as_deref(), name);
+        anyhow::anyhow!(
+            "Unknown {role} column '{name}'. Available columns: {}{suffix}",
+            headers.join(", "),
+        )
+    })
+}
+
+/// Build a 2-series before/after line overlay config from temporal diff data.
+///
+/// Canonical assembler for temporal diff Line charts (Phase 3). Every
+/// consumer of temporal diff output builds its `ChartConfig` through this
+/// function so axis spans, series names, and label handling cannot diverge
+/// between oneshot-diff, explore-diff, and present-diff paths. Takes plain
+/// slices (never `&DiffTimeSeries`) so the data plane stays free of
+/// app-plane diff types. `x_labels` is the full union label set: the X
+/// span (`max = len - 1`) derives from it. Label fitting to terminal width
+/// stays at the edge (callers overwrite `config.x_labels` afterwards).
+/// Series colors follow the diff convention (before=DarkGray, after=Cyan);
+/// callers supply the title and adjust theme colors afterwards (edge
+/// concerns only).
+pub fn build_diff_line_config(
+    before: &[(f64, f64)],
+    after: &[(f64, f64)],
+    x_labels: &[String],
+    x_col: &str,
+    y_col: &str,
+    title: Option<String>,
+) -> ChartConfig {
+    let all_y: Vec<f64> = before.iter().chain(after.iter()).map(|(_, y)| *y).collect();
+    let y_axis = Axis::from_data(y_col, &all_y);
+    let x_max = if x_labels.is_empty() {
+        1.0
+    } else {
+        (x_labels.len() - 1) as f64
+    };
+    ChartConfig {
+        title,
+        x_axis: Axis {
+            label: x_col.to_string(),
+            min: 0.0,
+            max: x_max,
+        },
+        y_axis,
+        series: vec![
+            Series {
+                name: "before".to_string(),
+                data: before.to_vec(),
+            },
+            Series {
+                name: "after".to_string(),
+                data: after.to_vec(),
+            },
+        ],
+        x_labels: Some(x_labels.to_vec()),
+        series_colors: vec![ratatui::style::Color::DarkGray, ratatui::style::Color::Cyan],
+        axis_color: Some(ratatui::style::Color::DarkGray),
+        label_color: Some(ratatui::style::Color::DarkGray),
+    }
+}
+/// Direction marker for a diff delta: ▲ increase, ▼ decrease, ─ unchanged.
+pub fn diff_direction_marker(delta: f64) -> &'static str {
+    if delta > 0.0 {
+        "▲"
+    } else if delta < 0.0 {
+        "▼"
+    } else {
+        "─"
+    }
+}
+
+/// Formatted change suffix for categorical diff labels: pct when available
+/// (`▲ +20%` / `▼ -10%` / `─ 0%`), else the new-category marker (`▲ new` /
+/// `▼ new`) or plain `─` when nothing moved. Takes plain values (never
+/// `&DiffEntry`) so the data plane stays free of app-plane diff types.
+pub fn format_diff_change(pct_change: Option<f64>, delta: f64) -> String {
+    let direction = diff_direction_marker(delta);
+    match pct_change {
+        Some(pct) if pct > 0.0 => format!("{} +{:.0}%", direction, pct),
+        Some(pct) if pct < 0.0 => format!("{} {:.0}%", direction, pct),
+        Some(_) => format!("{} 0%", direction),
+        None if delta != 0.0 => format!("{} new", direction),
+        None => direction.to_string(),
+    }
+}
+
+/// Build a categorical diff `BarChartData`: values are the after figures,
+/// labels carry the direction annotation (`label ▲ +20%`). Sort/limit follow
+/// the signed-Δ oneshot/present/html contract (`--sort desc` = biggest
+/// increase first); callers keep a copy of the sorted entries when they need
+/// aligned colors (html). Takes plain value tuples (never `&DiffEntry`) so
+/// the data plane stays free of app-plane diff types.
+pub fn build_diff_bar_data(
+    entries: &[(String, f64, Option<f64>, f64)],
+    sort: Option<crate::chart::selector::SortOrder>,
+    limit: Option<usize>,
+    y_label: String,
+    title: Option<String>,
+) -> BarChartData {
+    let mut idx: Vec<usize> = (0..entries.len()).collect();
+    match sort {
+        Some(crate::chart::selector::SortOrder::Desc) => {
+            idx.sort_by(|a, b| {
+                entries[*b]
+                    .3
+                    .partial_cmp(&entries[*a].3)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
+        Some(crate::chart::selector::SortOrder::Asc) => {
+            idx.sort_by(|a, b| {
+                entries[*a]
+                    .3
+                    .partial_cmp(&entries[*b].3)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
+        _ => {}
+    }
+    if let Some(n) = limit {
+        idx.truncate(n);
+    }
+    let labels: Vec<String> = idx
+        .iter()
+        .map(|&i| {
+            let (label, _, pct_change, delta) = &entries[i];
+            format!("{} {}", label, format_diff_change(*pct_change, *delta))
+        })
+        .collect();
+    let values: Vec<f64> = idx.iter().map(|&i| entries[i].1).collect();
+    BarChartData {
+        title,
+        labels,
+        values,
+        y_label,
+        show_labels: false,
+        series_colors: vec![],
+        axis_color: None,
+    }
+}
 /// Each (y_idx, label) pair produces one Series.
+///
+/// `grouped` must mirror the base config: when the base config has a color
+/// column its X coordinates are the unique-category index
+/// ([`build_grouped_series`]), so extra-Y overlays have to use that mapping
+/// too — otherwise the overlay is drawn on a different X scale than the
+/// series it annotates. When `grouped` is false the row-index mapping of
+/// [`build_single_series`] applies.
 pub fn build_multi_y_series(
     rows: &[Vec<String>],
     x_idx: usize,
     y_specs: &[(usize, String)],
     x_is_non_numeric: bool,
+    grouped: bool,
 ) -> Vec<Series> {
+    let categorical_x = if grouped {
+        categorical_x_for(rows, x_idx, x_is_non_numeric)
+    } else {
+        Vec::new()
+    };
     y_specs
         .iter()
         .map(|(y_idx, label)| {
-            build_single_series(rows, x_idx, *y_idx, x_is_non_numeric, label.clone())
+            let data: Vec<(f64, f64)> = rows
+                .iter()
+                .enumerate()
+                .filter_map(|(i, row)| {
+                    // Skip non-finite (NaN/inf): never leak them into axes or series.
+                    let y = row
+                        .get(*y_idx)
+                        .and_then(|v| crate::util::parse_number(v))
+                        .filter(|v| v.is_finite())?;
+                    Some((
+                        x_coordinate(row, i, x_idx, x_is_non_numeric, &categorical_x),
+                        y,
+                    ))
+                })
+                .collect();
+            Series {
+                name: label.clone(),
+                data,
+            }
         })
         .collect()
+}
+
+/// Append extra series (e.g. the `--all-y` overlay) to a config and re-derive
+/// the Y axis span over all series, preserving the Y label. The X span is
+/// intentionally untouched: extra-Y series share the base X coordinates.
+/// Canonical because axis-span derivation must not be duplicated by adapters.
+pub fn append_series_refit_y(config: &mut ChartConfig, extra: Vec<Series>) {
+    if extra.is_empty() {
+        return;
+    }
+    config.series.extend(extra);
+    let all_y: Vec<f64> = config
+        .series
+        .iter()
+        .flat_map(|s| s.data.iter().map(|(_, y)| *y))
+        .collect();
+    config.y_axis = Axis::from_data(&config.y_axis.label, &all_y);
 }
 
 /// Build a heatmap count matrix from two categorical columns.

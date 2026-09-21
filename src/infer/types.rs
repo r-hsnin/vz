@@ -52,3 +52,56 @@ impl Schema {
         self.columns.iter().filter(|c| c.data_type == dt).collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn meta(name: &str, data_type: DataType) -> ColumnMeta {
+        ColumnMeta {
+            name: name.to_string(),
+            data_type,
+            null_count: 0,
+            sample_size: 1,
+        }
+    }
+
+    #[test]
+    fn data_type_display_labels() {
+        let cases = [
+            (DataType::Temporal, "Date/Time"),
+            (DataType::Quantitative, "Numeric"),
+            (DataType::Categorical, "Categorical"),
+            (DataType::Nominal, "Text"),
+        ];
+        for (dt, expected) in cases {
+            assert_eq!(dt.to_string(), expected);
+        }
+    }
+
+    #[test]
+    fn schema_find_column_hit_and_miss() {
+        let schema = Schema::new(vec![meta("a", DataType::Quantitative)]);
+        assert_eq!(
+            schema.find_column("a").unwrap().data_type,
+            DataType::Quantitative
+        );
+        assert!(schema.find_column("missing").is_none());
+    }
+
+    #[test]
+    fn schema_columns_of_type_filters() {
+        let schema = Schema::new(vec![
+            meta("d", DataType::Temporal),
+            meta("q1", DataType::Quantitative),
+            meta("q2", DataType::Quantitative),
+        ]);
+        let quant: Vec<&str> = schema
+            .columns_of_type(DataType::Quantitative)
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect();
+        assert_eq!(quant, vec!["q1", "q2"]);
+        assert!(schema.columns_of_type(DataType::Nominal).is_empty());
+    }
+}

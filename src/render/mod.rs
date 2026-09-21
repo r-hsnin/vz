@@ -151,7 +151,7 @@ pub struct HeatmapData {
 }
 
 /// Format a number concisely for tick labels.
-pub(crate) fn format_number(val: f64) -> String {
+pub fn format_number(val: f64) -> String {
     let abs = val.abs();
     if abs >= 1_000_000_000_000.0 {
         format_with_suffix(val / 1_000_000_000_000.0, "T")
@@ -196,8 +196,16 @@ pub fn gradient_color(t: f64) -> Color {
     Color::Rgb(r, g, b)
 }
 
+/// Maximum accepted histogram bin count. Beyond this a histogram has no
+/// readable resolution while [`compute_bins`] would allocate unbounded memory;
+/// the CLI rejects larger `--bins` values and [`compute_bins`] clamps
+/// defensively so no other caller (present chart blocks, insights) can
+/// trigger a pathological allocation.
+pub const MAX_BINS: usize = 10_000;
+
 /// Compute histogram bins from raw values.
 pub fn compute_bins(values: &[f64], bin_count: usize) -> Vec<(f64, f64, usize)> {
+    let bin_count = bin_count.min(MAX_BINS);
     if values.is_empty() || bin_count == 0 {
         return vec![];
     }
@@ -297,12 +305,14 @@ pub fn split_y_axis(area: Rect, y_ticks: &[String]) -> (Rect, Rect) {
 /// Compute Y-axis ticks, render the axis, and return the remaining chart area.
 /// This encapsulates the shared pattern used by bar and histogram charts:
 /// nice_scale → format ticks → dedup → split → render → return chart_area.
+#[cfg(test)]
 pub fn render_y_axis_frame(max_val: f64, tick_count: usize, area: &Rect, buf: &mut Buffer) -> Rect {
     render_y_axis_frame_inner(max_val, tick_count, area, buf, false, Color::DarkGray)
 }
 
 /// Render Y-axis frame with tight scaling (max stays close to data max).
 /// Used for bar charts where wasted headroom reduces readability.
+#[cfg(test)]
 pub fn render_y_axis_frame_tight(
     max_val: f64,
     tick_count: usize,

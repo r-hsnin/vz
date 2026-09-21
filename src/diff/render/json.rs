@@ -25,6 +25,14 @@ pub(super) fn print_diff_json(
         })
         .collect();
 
+    let insights = crate::insights::diff_insights(
+        &diff
+            .entries
+            .iter()
+            .map(|e| (e.label.clone(), e.before, e.after, e.pct_change))
+            .collect::<Vec<_>>(),
+    );
+
     let output = serde_json::json!({
         "version": 1,
         "mode": "diff",
@@ -40,6 +48,7 @@ pub(super) fn print_diff_json(
         "y_column": diff.y_column,
         "categories": categories,
         "overall_delta_pct": diff.overall_pct,
+        "insights": insights,
     });
 
     println!("{}", serde_json::to_string_pretty(&output)?);

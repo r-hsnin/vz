@@ -1,14 +1,14 @@
 //! Chart data builders for oneshot mode: build bar, histogram, heatmap, and line/scatter data.
 
 use crate::chart::data_builder::{self, ResolvedAxes};
+use crate::chart::selector::AggFunction;
 use crate::chart::selector::{ChartRecommendation, ChartType};
-use crate::cli::{AggFunction, SortOrder};
 use crate::render::{BarChartData, ChartConfig, HistogramData};
 
 use super::RenderOptions;
 
 /// Build ChartConfig for Line/Scatter charts, including extra Y columns.
-pub fn build_line_scatter_config(
+pub(crate) fn build_line_scatter_config(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -35,7 +35,7 @@ pub fn build_line_scatter_config(
 }
 
 /// Build base ChartConfig from recommendation.
-fn build_chart_config(
+pub(crate) fn build_chart_config(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -59,35 +59,12 @@ fn build_chart_config(
     )
 }
 
-/// Sort bar chart data by value. No-op if sort_order is None or SortOrder::None.
-pub fn sort_bar_data(data: &mut BarChartData, sort_order: Option<SortOrder>) {
-    let reverse = match sort_order {
-        Some(SortOrder::Desc) => true,
-        Some(SortOrder::Asc) => false,
-        _ => return,
-    };
-    let mut indices: Vec<usize> = (0..data.values.len()).collect();
-    indices.sort_by(|a, b| {
-        let cmp = data.values[*a]
-            .partial_cmp(&data.values[*b])
-            .unwrap_or(std::cmp::Ordering::Equal);
-        if reverse { cmp.reverse() } else { cmp }
-    });
-    data.labels = indices.iter().map(|&i| data.labels[i].clone()).collect();
-    data.values = indices.iter().map(|&i| data.values[i]).collect();
-}
-
-/// Truncate bar chart to first N categories. No-op if limit is None.
-pub fn truncate_bar_data(data: &mut BarChartData, limit: Option<usize>) {
-    if let Some(n) = limit {
-        data.labels.truncate(n);
-        data.values.truncate(n);
-    }
-}
+// Post-aggregation Bar adapters (`sort_bar_data`, `truncate_bar_data`) live in
+// the canonical assembler `crate::chart::data_builder`; use them from there.
 
 /// Build BarChartData: aggregates values by category.
 /// Returns (data, rows_used).
-pub fn build_bar_data(
+pub(crate) fn build_bar_data(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -105,7 +82,8 @@ pub fn build_bar_data(
 }
 
 /// Build HistogramData for Histogram charts.
-pub fn build_histogram_data(
+#[cfg(test)]
+pub(crate) fn build_histogram_data(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -114,7 +92,7 @@ pub fn build_histogram_data(
 }
 
 /// Build histogram data with an explicit bin count override.
-pub fn build_histogram_data_with_bins(
+pub(crate) fn build_histogram_data_with_bins(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -127,19 +105,9 @@ pub fn build_histogram_data_with_bins(
         headers,
     );
 
-    // For histogram, prefer the quantitative column.
-    let x_numeric_count = rows
-        .iter()
-        .take(5)
-        .filter_map(|r| r.get(axes.x_idx))
-        .filter(|v| v.parse::<f64>().is_ok())
-        .count();
-
-    let use_idx = if x_numeric_count > 0 {
-        axes.x_idx
-    } else {
-        axes.y_idx
-    };
+    // For histogram, bin the quantitative column (canonical choice: X when
+    // numeric, otherwise Y — shared with JSON/present/insights).
+    let use_idx = data_builder::histogram_column(rows, axes.x_idx, axes.y_idx);
     let label = headers.get(use_idx).cloned().unwrap_or_default();
     let title = format!("Distribution of {}", label);
 
@@ -147,7 +115,7 @@ pub fn build_histogram_data_with_bins(
 }
 
 /// Build heatmap data for two categorical columns.
-pub fn build_heatmap(
+pub(crate) fn build_heatmap(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
@@ -170,15 +138,20 @@ fn apply_extra_y_columns(
     rows: &[Vec<String>],
     opts: &RenderOptions<'_>,
 ) {
-    use crate::render::Axis;
-
     let axes = ResolvedAxes::from_recommendation(
         &recommendation.x_column,
         recommendation.y_column.as_deref(),
         recommendation.color_column.as_deref(),
         headers,
     );
-    let raw_x: Vec<String> = rows
+    // Mirror the canonical base sampling exactly: for non-numeric X the
+    // coordinate is the sampled row index, so unsampled extra series would
+    // misalign with the base series and overrun its X span. The sampling
+    // notice is the base config's (`maybe_sample`); stay silent here.
+    let sampled = (rows.len() > data_builder::MAX_CHART_POINTS)
+        .then(|| data_builder::sample_rows(rows, data_builder::MAX_CHART_POINTS));
+    let effective_rows = sampled.as_deref().unwrap_or(rows);
+    let raw_x: Vec<String> = effective_rows
         .iter()
         .filter_map(|r| r.get(axes.x_idx).cloned())
         .collect();
@@ -192,20 +165,24 @@ fn apply_extra_y_columns(
             Some((idx, name))
         })
         .collect();
-    let extra = data_builder::build_multi_y_series(rows, axes.x_idx, &y_specs, x_is_non_numeric);
-    config.series.extend(extra);
-    let all_y: Vec<f64> = config
-        .series
-        .iter()
-        .flat_map(|s| s.data.iter().map(|(_, y)| *y))
-        .collect();
-    config.y_axis = Axis::from_data(&config.y_axis.label, &all_y);
+    // A color column makes the base config's non-numeric X a unique-category
+    // index (`build_grouped_series`); mirror that mapping for the overlay.
+    let grouped = axes.color_idx.is_some();
+    let extra = data_builder::build_multi_y_series(
+        effective_rows,
+        axes.x_idx,
+        &y_specs,
+        x_is_non_numeric,
+        grouped,
+    );
+    data_builder::append_series_refit_y(config, extra);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::chart::selector::ChartRecommendation;
+    use crate::chart::selector::SortOrder;
 
     fn sales_headers() -> Vec<String> {
         vec![
@@ -261,107 +238,15 @@ mod tests {
     }
 
     #[test]
-    fn test_sort_bar_data_desc() {
+    fn test_build_bar_data_sort_contract_lives_in_canonical_assembler() {
         let (mut data, _) = build_bar_data(
             &bar_recommendation(),
             &sales_headers(),
             &sales_rows(),
             AggFunction::Sum,
         );
-        sort_bar_data(&mut data, Some(SortOrder::Desc));
+        data_builder::sort_bar_data(&mut data, Some(SortOrder::Desc));
         assert_eq!(data.labels[0], "Tokyo"); // 3000 > 500
-    }
-
-    #[test]
-    fn test_sort_bar_data_asc() {
-        let (mut data, _) = build_bar_data(
-            &bar_recommendation(),
-            &sales_headers(),
-            &sales_rows(),
-            AggFunction::Sum,
-        );
-        sort_bar_data(&mut data, Some(SortOrder::Asc));
-        assert_eq!(data.labels[0], "Osaka"); // 500 < 3000
-    }
-
-    #[test]
-    fn test_truncate_bar_data_limit() {
-        let (mut data, _) = build_bar_data(
-            &bar_recommendation(),
-            &sales_headers(),
-            &sales_rows(),
-            AggFunction::Sum,
-        );
-        truncate_bar_data(&mut data, Some(1));
-        assert_eq!(data.labels.len(), 1);
-        assert_eq!(data.values.len(), 1);
-    }
-
-    #[test]
-    fn test_sort_bar_data_none_preserves_order() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![10.0, 30.0, 20.0],
-            y_label: String::new(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-            axis_color: None,
-        };
-        sort_bar_data(&mut data, None);
-        assert_eq!(data.labels, vec!["A", "B", "C"]);
-    }
-
-    #[test]
-    fn test_sort_bar_data_with_nan() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![f64::NAN, 30.0, 20.0],
-            y_label: String::new(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-            axis_color: None,
-        };
-        sort_bar_data(&mut data, Some(SortOrder::Desc));
-        let non_nan: Vec<(&str, f64)> = data
-            .labels
-            .iter()
-            .zip(data.values.iter())
-            .filter(|(_, v)| !v.is_nan())
-            .map(|(l, v)| (l.as_str(), *v))
-            .collect();
-        assert_eq!(non_nan, vec![("B", 30.0), ("C", 20.0)]);
-    }
-
-    #[test]
-    fn test_truncate_bar_data_none_noop() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into(), "C".into()],
-            values: vec![100.0, 50.0, 25.0],
-            y_label: "val".into(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-            axis_color: None,
-        };
-        truncate_bar_data(&mut data, None);
-        assert_eq!(data.labels.len(), 3);
-    }
-
-    #[test]
-    fn test_truncate_bar_data_larger_than_data() {
-        let mut data = BarChartData {
-            labels: vec!["A".into(), "B".into()],
-            values: vec![100.0, 50.0],
-            y_label: "val".into(),
-            title: None,
-            show_labels: false,
-            series_colors: vec![],
-            axis_color: None,
-        };
-        truncate_bar_data(&mut data, Some(10));
-        assert_eq!(data.labels.len(), 2);
     }
 
     #[test]
@@ -375,6 +260,210 @@ mod tests {
         let data = build_histogram_data(&rec, &sales_headers(), &sales_rows());
         assert!(!data.values.is_empty());
         assert!(data.title.unwrap_or_default().contains("revenue"));
+    }
+
+    #[test]
+    fn test_build_histogram_data_non_numeric_x_uses_y() {
+        let headers = vec!["month".to_string(), "temperature".to_string()];
+        let rows = vec![
+            vec!["Jan".into(), "5".into()],
+            vec!["Feb".into(), "7".into()],
+        ];
+        let rec = ChartRecommendation {
+            chart_type: ChartType::Histogram,
+            x_column: "month".to_string(),
+            y_column: Some("temperature".to_string()),
+            color_column: None,
+        };
+        let data = build_histogram_data(&rec, &headers, &rows);
+        assert_eq!(data.values, vec![5.0, 7.0]);
+        assert_eq!(data.x_label, "temperature");
+    }
+
+    #[test]
+    fn test_extra_y_series_share_base_sampling() {
+        use ratatui::layout::Rect;
+
+        // >MAX_CHART_POINTS rows with a non-numeric X: the base series is
+        // sampled (X = sampled row index), so the extra-Y series must be
+        // built from the same sampled rows or it misaligns and overruns.
+        let headers = vec![
+            "date".to_string(),
+            "revenue".to_string(),
+            "profit".to_string(),
+        ];
+        let rows: Vec<Vec<String>> = (0..data_builder::MAX_CHART_POINTS + 1)
+            .map(|i| {
+                vec![
+                    format!("2024-01-{:02}", i % 28 + 1),
+                    i.to_string(),
+                    (i * 2).to_string(),
+                ]
+            })
+            .collect();
+        let rec = ChartRecommendation {
+            chart_type: ChartType::Line,
+            x_column: "date".to_string(),
+            y_column: Some("revenue".to_string()),
+            color_column: None,
+        };
+        let opts = RenderOptions {
+            chart_type_override: None,
+            y_label_override: None,
+            width: None,
+            height: None,
+            sort_order: None,
+            extra_y_columns: vec![("profit".to_string(), None)],
+            limit: None,
+            agg: AggFunction::Sum,
+            title: None,
+            labels: false,
+            theme: crate::theme::Theme::dark(),
+            bins: None,
+        };
+        let config = build_line_scatter_config(
+            &rec,
+            &headers,
+            &rows,
+            &opts,
+            Rect::new(0, 0, 80, 24),
+            ChartType::Line,
+        );
+
+        assert_eq!(config.series.len(), 2);
+        let (base, extra) = (&config.series[0].data, &config.series[1].data);
+        assert_eq!(base.len(), data_builder::MAX_CHART_POINTS);
+        assert_eq!(
+            extra.len(),
+            base.len(),
+            "extra-Y must be built from the same sampled rows as the base series"
+        );
+        for (b, e) in base.iter().zip(extra) {
+            assert_eq!(e.0, b.0, "extra-Y X must match the base X coordinate");
+            assert!(
+                (e.1 - b.1 * 2.0).abs() < f64::EPSILON,
+                "extra-Y point must come from the same row as the base point"
+            );
+        }
+    }
+
+    #[test]
+    fn test_extra_y_series_match_grouped_base_x_mapping() {
+        use ratatui::layout::Rect;
+
+        // Color column present: base series are grouped and use unique-category
+        // X indices, so the extra-Y overlay must share those coordinates.
+        let headers = vec![
+            "date".to_string(),
+            "city".to_string(),
+            "revenue".to_string(),
+            "profit".to_string(),
+        ];
+        let rows = vec![
+            vec!["2024-01".into(), "East".into(), "100".into(), "10".into()],
+            vec!["2024-02".into(), "East".into(), "150".into(), "15".into()],
+            vec!["2024-01".into(), "West".into(), "200".into(), "20".into()],
+            vec!["2024-02".into(), "West".into(), "250".into(), "25".into()],
+        ];
+        let rec = ChartRecommendation {
+            chart_type: ChartType::Line,
+            x_column: "date".to_string(),
+            y_column: Some("revenue".to_string()),
+            color_column: Some("city".to_string()),
+        };
+        let opts = RenderOptions {
+            chart_type_override: None,
+            y_label_override: None,
+            width: None,
+            height: None,
+            sort_order: None,
+            extra_y_columns: vec![("profit".to_string(), None)],
+            limit: None,
+            agg: AggFunction::Sum,
+            title: None,
+            labels: false,
+            theme: crate::theme::Theme::dark(),
+            bins: None,
+        };
+        let config = build_line_scatter_config(
+            &rec,
+            &headers,
+            &rows,
+            &opts,
+            Rect::new(0, 0, 80, 24),
+            ChartType::Line,
+        );
+
+        // Two grouped base series (East, West) + one extra-Y overlay.
+        assert_eq!(config.series.len(), 3);
+        let extra = config.series.last().unwrap();
+        assert_eq!(extra.name, "profit");
+        assert_eq!(
+            extra.data,
+            vec![(0.0, 10.0), (1.0, 15.0), (0.0, 20.0), (1.0, 25.0)],
+            "overlay X must be the unique-category index, not the row index"
+        );
+        // Every overlay coordinate resolves onto a base X tick.
+        let base_x: Vec<f64> = config
+            .series
+            .iter()
+            .take(2)
+            .flat_map(|s| s.data.iter().map(|(x, _)| *x))
+            .collect();
+        assert!(
+            extra.data.iter().all(|(x, _)| base_x.contains(x)),
+            "overlay X {extra:?} must lie on the base X scale {base_x:?}"
+        );
+    }
+
+    #[test]
+    fn test_extra_y_series_numeric_x_over_sample_limit_aligned() {
+        use ratatui::layout::Rect;
+
+        // Numeric X above MAX_CHART_POINTS: both base and overlay parse the same
+        // sampled X values, so their coordinates must match exactly.
+        let headers = vec![
+            "time".to_string(),
+            "revenue".to_string(),
+            "profit".to_string(),
+        ];
+        let rows: Vec<Vec<String>> = (0..data_builder::MAX_CHART_POINTS + 1)
+            .map(|i| vec![i.to_string(), (i * 3).to_string(), (i * 7).to_string()])
+            .collect();
+        let rec = ChartRecommendation {
+            chart_type: ChartType::Line,
+            x_column: "time".to_string(),
+            y_column: Some("revenue".to_string()),
+            color_column: None,
+        };
+        let opts = RenderOptions {
+            chart_type_override: None,
+            y_label_override: None,
+            width: None,
+            height: None,
+            sort_order: None,
+            extra_y_columns: vec![("profit".to_string(), None)],
+            limit: None,
+            agg: AggFunction::Sum,
+            title: None,
+            labels: false,
+            theme: crate::theme::Theme::dark(),
+            bins: None,
+        };
+        let config = build_line_scatter_config(
+            &rec,
+            &headers,
+            &rows,
+            &opts,
+            Rect::new(0, 0, 80, 24),
+            ChartType::Line,
+        );
+        let (base, extra) = (&config.series[0].data, &config.series[1].data);
+        assert_eq!(base.len(), data_builder::MAX_CHART_POINTS);
+        assert_eq!(extra.len(), base.len());
+        for (b, e) in base.iter().zip(extra) {
+            assert_eq!(b.0, e.0, "numeric extra-Y X must equal the base X value");
+        }
     }
 
     #[test]

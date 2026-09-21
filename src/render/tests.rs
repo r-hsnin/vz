@@ -62,6 +62,17 @@ fn test_compute_bins_single_value() {
 }
 
 #[test]
+fn test_compute_bins_clamps_above_max() {
+    // Defensive cap: no caller (present chart block, insight) may trigger an
+    // unbounded bin allocation. The CLI rejects the value with a clear error.
+    let values = vec![1.0, 2.0, 3.0, 4.0];
+    let bins = compute_bins(&values, MAX_BINS + 1);
+    assert_eq!(bins.len(), MAX_BINS);
+    let total: usize = bins.iter().map(|b| b.2).sum();
+    assert_eq!(total, values.len());
+}
+
+#[test]
 fn test_series_creation() {
     let series = Series {
         name: "Revenue".to_string(),

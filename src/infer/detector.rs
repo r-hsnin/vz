@@ -3,8 +3,9 @@ use crate::infer::types::DataType;
 /// Maximum unique values for a column to be considered categorical.
 const CATEGORICAL_THRESHOLD: usize = 20;
 
-/// Number of rows to sample for type inference.
-const SAMPLE_SIZE: usize = 100;
+/// Number of rows sampled for type inference.
+/// Shared by [`infer_column_type`] and the loaded-data fast path in `pipeline`.
+pub(crate) const SAMPLE_SIZE: usize = 100;
 
 /// Detect the data type of a single value string.
 pub fn detect_value_type(value: &str) -> DataType {
@@ -27,6 +28,8 @@ pub fn detect_value_type(value: &str) -> DataType {
 
 /// Infer column type from a sample of values.
 /// Returns the majority type among non-null values.
+/// Empty and non-finite (`NaN`/`inf`) values are ignored in the vote,
+/// consistent with downstream aggregation skipping them.
 pub fn infer_column_type(values: &[&str]) -> DataType {
     if values.is_empty() {
         return DataType::Nominal;
@@ -35,7 +38,7 @@ pub fn infer_column_type(values: &[&str]) -> DataType {
     let sample: Vec<&str> = values.iter().take(SAMPLE_SIZE).copied().collect();
     let non_empty: Vec<&str> = sample
         .iter()
-        .filter(|v| !v.trim().is_empty())
+        .filter(|v| !v.trim().is_empty() && !is_non_finite_number(v))
         .copied()
         .collect();
 
@@ -91,7 +94,7 @@ fn unique_values(values: &[&str]) -> usize {
 fn is_temporal(value: &str) -> bool {
     use std::sync::LazyLock;
 
-    static TEMPORAL_PATTERNS: LazyLock<[regex::Regex; 5]> = LazyLock::new(|| {
+    static TEMPORAL_PATTERNS: LazyLock<[regex::Regex; 9]> = LazyLock::new(|| {
         [
             // YYYY-MM-DD (with optional time)
             regex::Regex::new(r"^\d{4}-\d{2}-\d{2}").expect("valid temporal regex"),
@@ -101,6 +104,23 @@ fn is_temporal(value: &str) -> bool {
             regex::Regex::new(r"^\d{2}/\d{2}/\d{4}").expect("valid temporal regex"),
             // DD-Mon-YYYY
             regex::Regex::new(r"^\d{2}-[A-Za-z]{3}-\d{4}").expect("valid temporal regex"),
+            // DD.MM.YYYY (EU dotted)
+            regex::Regex::new(r"^\d{2}\.\d{2}\.\d{4}").expect("valid temporal regex"),
+            // Mon DD, YYYY / Month DD, YYYY ("Jan 15, 2024", "January 15, 2024")
+            regex::Regex::new(
+                r"^(?i)(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]* \d{1,2}, \d{4}",
+            )
+            .expect("valid temporal regex"),
+            // Mon DD YYYY without comma ("Jan 15 2024" — unquoted CSV can't hold the comma form)
+            regex::Regex::new(
+                r"^(?i)(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]* \d{1,2} \d{4}",
+            )
+            .expect("valid temporal regex"),
+            // DD Mon YYYY ("15 Jan 2024")
+            regex::Regex::new(
+                r"^\d{1,2} (?i)(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]* \d{4}",
+            )
+            .expect("valid temporal regex"),
             // YYYY-MM (year-month only)
             regex::Regex::new(r"^\d{4}-\d{2}$").expect("valid temporal regex"),
         ]
@@ -110,9 +130,21 @@ fn is_temporal(value: &str) -> bool {
 }
 
 fn is_quantitative(value: &str) -> bool {
-    // Strip common number formatting
-    let cleaned: String = value.chars().filter(|c| *c != ',' && *c != ' ').collect();
-    cleaned.parse::<f64>().is_ok()
+    // Single numeric parser shared with every chart/filter/stats path:
+    // "1,000", "$100", "45%", "10k", "10GiB" all vote Quantitative.
+    // Non-finite values (NaN/inf) must not vote Quantitative — they are
+    // skipped downstream. `detect_value_type` keeps them Nominal.
+    crate::util::parse_number(value).is_some()
+}
+
+fn is_non_finite_number(value: &str) -> bool {
+    // parse_number already returns None for NaN/inf, so detect them
+    // directly here: strip formatting and check for a non-finite f64.
+    let cleaned: String = value
+        .chars()
+        .filter(|c| *c != ',' && *c != ' ' && *c != '_' && *c != '\'')
+        .collect();
+    cleaned.parse::<f64>().is_ok_and(|v| !v.is_finite())
 }
 
 #[cfg(test)]
@@ -139,6 +171,21 @@ mod tests {
     #[test]
     fn test_detect_us_date() {
         assert_eq!(detect_value_type("01/15/2024"), DataType::Temporal);
+    }
+
+    #[test]
+    fn test_detect_eu_dotted_date() {
+        assert_eq!(detect_value_type("15.01.2024"), DataType::Temporal);
+        assert_eq!(detect_value_type("02.12.2023"), DataType::Temporal);
+    }
+
+    #[test]
+    fn test_detect_month_name_dates() {
+        assert_eq!(detect_value_type("Jan 15, 2024"), DataType::Temporal);
+        assert_eq!(detect_value_type("January 15, 2024"), DataType::Temporal);
+        assert_eq!(detect_value_type("Jan 15 2024"), DataType::Temporal);
+        assert_eq!(detect_value_type("15 Jan 2024"), DataType::Temporal);
+        assert_eq!(detect_value_type("15 January 2024"), DataType::Temporal);
     }
 
     #[test]
@@ -266,18 +313,44 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_percentage_string_is_nominal() {
-        // "45%" contains non-numeric char '%', should NOT be quantitative
-        assert_eq!(detect_value_type("45%"), DataType::Nominal);
-        assert_eq!(detect_value_type("100%"), DataType::Nominal);
-        assert_eq!(detect_value_type("0.5%"), DataType::Nominal);
+    fn test_detect_percentage_string_is_quantitative_fraction() {
+        // "45%" parses to 0.45 via the shared numeric parser — it is data,
+        // not free text. (Breaking change: was Nominal before parse unification.)
+        assert_eq!(detect_value_type("45%"), DataType::Quantitative);
+        assert_eq!(detect_value_type("100%"), DataType::Quantitative);
+        assert_eq!(detect_value_type("0.5%"), DataType::Quantitative);
     }
 
     #[test]
-    fn test_detect_currency_string_is_nominal() {
-        // "$100" and "€50" contain currency symbols, should NOT be quantitative
-        assert_eq!(detect_value_type("$100"), DataType::Nominal);
-        assert_eq!(detect_value_type("€50"), DataType::Nominal);
-        assert_eq!(detect_value_type("¥1000"), DataType::Nominal);
+    fn test_detect_currency_string_is_quantitative() {
+        // "$100" means 100 everywhere now (inference, charts, filters, stats).
+        // (Breaking change: was Nominal before parse unification.)
+        assert_eq!(detect_value_type("$100"), DataType::Quantitative);
+        assert_eq!(detect_value_type("€50"), DataType::Quantitative);
+        assert_eq!(detect_value_type("¥1000"), DataType::Quantitative);
+        assert_eq!(detect_value_type("1,000"), DataType::Quantitative);
+        assert_eq!(detect_value_type("10k"), DataType::Quantitative);
+    }
+
+    #[test]
+    fn test_detect_non_finite_is_nominal() {
+        // NaN/inf parse as f64 but must never vote Quantitative
+        assert_eq!(detect_value_type("NaN"), DataType::Nominal);
+        assert_eq!(detect_value_type("inf"), DataType::Nominal);
+        assert_eq!(detect_value_type("-inf"), DataType::Nominal);
+        assert_eq!(detect_value_type("Infinity"), DataType::Nominal);
+    }
+
+    #[test]
+    fn test_infer_ignores_non_finite_in_vote() {
+        // 2 finite of 2 voting values → Quantitative despite NaN/inf rows
+        let values = vec!["100", "NaN", "inf", "200"];
+        assert_eq!(infer_column_type(&values), DataType::Quantitative);
+    }
+
+    #[test]
+    fn test_infer_all_non_finite_is_nominal() {
+        let values = vec!["NaN", "inf", "-inf"];
+        assert_eq!(infer_column_type(&values), DataType::Nominal);
     }
 }

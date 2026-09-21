@@ -1,12 +1,12 @@
 //! Machine-readable output formats for AI agent integration.
 
-pub mod chart_json;
-pub mod html;
-pub mod markdown;
-pub mod spark;
-pub mod stats_text;
-pub mod svg;
-pub mod table;
+pub(crate) mod chart_json;
+pub(crate) mod html;
+pub(crate) mod markdown;
+pub(crate) mod spark;
+pub(crate) mod stats_text;
+pub(crate) mod svg;
+pub(crate) mod table;
 
 use serde::Serialize;
 
@@ -16,7 +16,7 @@ use crate::loader::LoadedData;
 
 /// Top-level JSON output for `--info --output json`.
 #[derive(Debug, Serialize)]
-pub struct InfoOutput {
+pub(crate) struct InfoOutput {
     pub version: u32,
     pub file: String,
     pub rows: usize,
@@ -25,11 +25,13 @@ pub struct InfoOutput {
     pub recommendation: Option<RecommendationOutput>,
     /// First N rows of data as array of objects (for agent inspection).
     pub data: Vec<serde_json::Value>,
+    /// True when `data` was capped at DATA_SAMPLE_LIMIT (rows > data.len()).
+    pub truncated: bool,
 }
 
 /// Column metadata in JSON output.
 #[derive(Debug, Serialize)]
-pub struct ColumnOutput {
+pub(crate) struct ColumnOutput {
     pub name: String,
     #[serde(rename = "type")]
     pub data_type: String,
@@ -40,7 +42,7 @@ pub struct ColumnOutput {
 /// Per-column statistics (variant depends on data type).
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
-pub enum ColumnStats {
+pub(crate) enum ColumnStats {
     Quantitative { min: f64, max: f64, mean: f64 },
     Categorical { unique: usize, values: Vec<String> },
     Temporal { min: String, max: String },
@@ -49,7 +51,7 @@ pub enum ColumnStats {
 
 /// Chart recommendation in JSON output.
 #[derive(Debug, Serialize)]
-pub struct RecommendationOutput {
+pub(crate) struct RecommendationOutput {
     pub chart_type: String,
     pub x: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -58,8 +60,35 @@ pub struct RecommendationOutput {
     pub color: Option<String>,
 }
 
+/// The resolved query that produced `chart_data`: every knob that changes
+/// the numbers, so agents can reproduce or audit the result.
+#[derive(Debug, Serialize)]
+pub(crate) struct QueryOutput {
+    /// Chart type actually rendered (`-t` override applied).
+    pub chart_type: String,
+    pub x: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub extra_y: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// Aggregation applied to bar charts (sum/mean/count/max/min).
+    pub agg: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bins: Option<usize>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub filters: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sample: Option<usize>,
+}
+
 /// Build JSON info output from schema and data.
-pub fn build_info_output(
+pub(crate) fn build_info_output(
     file: &str,
     data: &LoadedData,
     schema: &Schema,
@@ -93,6 +122,7 @@ pub fn build_info_output(
         rows: data.rows.len(),
         columns,
         recommendation: rec,
+        truncated: data.rows.len() > DATA_SAMPLE_LIMIT,
         data: build_data_sample(&data.headers, &data.rows),
     }
 }
@@ -117,15 +147,18 @@ fn build_data_sample(headers: &[String], rows: &[Vec<String>]) -> Vec<serde_json
             let mut obj = serde_json::Map::new();
             for (i, header) in headers.iter().enumerate() {
                 let val = row.get(i).map(|s| s.as_str()).unwrap_or("");
-                // Try to parse as number for cleaner JSON
-                if let Ok(n) = val.parse::<f64>() {
+                // Shared numeric parser: "1,000"/"$100"/"45%"/"10k" become
+                // numbers. Non-finite values (NaN/inf) become null, never 0.
+                if let Some(n) = crate::util::parse_number(val) {
                     obj.insert(
                         header.clone(),
                         serde_json::Value::Number(
-                            serde_json::Number::from_f64(n)
-                                .unwrap_or_else(|| serde_json::Number::from(0)),
+                            serde_json::Number::from_f64(n).unwrap_or(serde_json::Number::from(0)),
                         ),
                     );
+                } else if val.parse::<f64>().is_ok() {
+                    // Bare f64 that parse_number rejects = non-finite (NaN/inf) → null.
+                    obj.insert(header.clone(), serde_json::Value::Null);
                 } else {
                     obj.insert(header.clone(), serde_json::Value::String(val.to_string()));
                 }
@@ -136,7 +169,7 @@ fn build_data_sample(headers: &[String], rows: &[Vec<String>]) -> Vec<serde_json
 }
 
 /// Compute statistics for a single column based on its inferred type.
-pub fn compute_column_stats(
+pub(crate) fn compute_column_stats(
     col_idx: usize,
     data_type: &DataType,
     data: &LoadedData,
@@ -160,7 +193,10 @@ pub fn compute_column_stats(
 }
 
 fn quantitative_stats(values: &[&str]) -> ColumnStats {
-    let nums: Vec<f64> = values.iter().filter_map(|v| v.parse().ok()).collect();
+    let nums: Vec<f64> = values
+        .iter()
+        .filter_map(|v| crate::util::parse_number(v))
+        .collect();
     if nums.is_empty() {
         return ColumnStats::Empty {};
     }
@@ -382,6 +418,39 @@ mod tests {
         // This must not panic — NaN/Infinity should be handled
         let json = serde_json::to_string_pretty(&output);
         assert!(json.is_ok(), "Serialization failed: {:?}", json.err());
+    }
+
+    #[test]
+    fn test_build_data_sample_non_finite_becomes_null() {
+        let sample = build_data_sample(
+            &["city".into(), "revenue".into()],
+            &[
+                vec!["Tokyo".into(), "NaN".into()],
+                vec!["Osaka".into(), "inf".into()],
+                vec!["Kyoto".into(), "100".into()],
+            ],
+        );
+        assert!(sample[0]["revenue"].is_null(), "NaN must not become 0");
+        assert!(sample[1]["revenue"].is_null(), "inf must not become 0");
+        assert_eq!(sample[2]["revenue"], 100.0);
+    }
+
+    #[test]
+    fn test_info_output_truncated_flag() {
+        let data = LoadedData {
+            headers: vec!["x".into()],
+            rows: (0..150).map(|i| vec![format!("{}", i)]).collect(),
+        };
+        let schema = Schema::new(vec![ColumnMeta {
+            name: "x".into(),
+            data_type: DataType::Quantitative,
+            null_count: 0,
+            sample_size: 150,
+        }]);
+        let output = build_info_output("big.csv", &data, &schema, None);
+        assert!(output.truncated);
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["truncated"], true);
     }
 
     #[test]

@@ -4,23 +4,18 @@ use anyhow::Result;
 use std::io;
 use std::path::Path;
 
-use ratatui::{buffer::Buffer, layout::Rect, style::Color};
+use ratatui::{buffer::Buffer, layout::Rect};
 
-use crate::cli::Cli;
+use crate::cli::DiffParams;
 use crate::diff::DiffTimeSeries;
 use crate::oneshot::{self, fit_labels_to_width};
-use crate::render::{self, Axis, ChartConfig, ChartData, Series};
+use crate::render::{self, ChartData};
+use crate::util::path_label;
 
 /// Print temporal diff summary: `Line │ x=date │ before vs after │ Δ +N% │ 6 rows`
 pub(super) fn print_diff_line_summary(ts: &DiffTimeSeries, before_path: &Path, after_path: &Path) {
-    let before_name = before_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("before");
-    let after_name = after_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("after");
+    let before_name = path_label(before_path);
+    let after_name = path_label(after_path);
 
     let overall = match ts.overall_pct {
         Some(pct) if pct > 0.0 => format!("Δ +{:.0}%", pct),
@@ -38,66 +33,33 @@ pub(super) fn print_diff_line_summary(ts: &DiffTimeSeries, before_path: &Path, a
 
 /// Render the line chart overlay into a buffer and print to stdout.
 pub(super) fn print_diff_line_chart(
-    cli: &Cli,
+    params: &DiffParams,
     ts: &DiffTimeSeries,
     before_path: &Path,
     after_path: &Path,
 ) -> Result<()> {
-    let before_name = before_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("before");
-    let after_name = after_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("after");
+    let before_name = path_label(before_path);
+    let after_name = path_label(after_path);
 
-    // Build Y axis from all values in both series
-    let all_y: Vec<f64> = ts
-        .before
-        .iter()
-        .chain(ts.after.iter())
-        .map(|(_, y)| *y)
-        .collect();
-    let y_axis = Axis::from_data(&ts.y_column, &all_y);
-
-    // Build X axis from index range
-    let x_max = if ts.x_labels.is_empty() {
-        1.0
-    } else {
-        (ts.x_labels.len() - 1) as f64
-    };
-    let x_axis = Axis {
-        label: ts.x_column.clone(),
-        min: 0.0,
-        max: x_max,
-    };
-
-    let width = cli.width.unwrap_or_else(oneshot::terminal_width);
-    let height = cli.height.unwrap_or(24);
-
-    // Fit labels to available width
-    let fitted_labels = fit_labels_to_width(&ts.x_labels, width.saturating_sub(12) as usize);
-
-    let config = ChartConfig {
-        title: Some(format!("{} vs {}", before_name, after_name)),
-        x_axis,
-        y_axis,
-        series: vec![
-            Series {
-                name: before_name.to_string(),
-                data: ts.before.clone(),
-            },
-            Series {
-                name: after_name.to_string(),
-                data: ts.after.clone(),
-            },
-        ],
-        x_labels: Some(fitted_labels),
-        series_colors: vec![Color::DarkGray, Color::Cyan],
-        axis_color: Some(Color::DarkGray),
-        label_color: Some(Color::DarkGray),
-    };
+    // Canonical temporal-diff config (full union labels drive the X
+    // span); fit labels to terminal width at the edge, then swap in the
+    // fitted subset for display.
+    let width = params.width.unwrap_or_else(oneshot::terminal_width);
+    let height = params.height.unwrap_or(oneshot::DEFAULT_HEIGHT);
+    let mut config = crate::chart::data_builder::build_diff_line_config(
+        &ts.before,
+        &ts.after,
+        &ts.x_labels,
+        &ts.x_column,
+        &ts.y_column,
+        Some(format!("{} vs {}", before_name, after_name)),
+    );
+    config.x_labels = Some(fit_labels_to_width(
+        &ts.x_labels,
+        width.saturating_sub(12) as usize,
+    ));
+    config.series[0].name = before_name.to_string();
+    config.series[1].name = after_name.to_string();
 
     let area = Rect::new(0, 0, width, height);
     let mut buf = Buffer::empty(area);

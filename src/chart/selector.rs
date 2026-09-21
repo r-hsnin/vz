@@ -24,6 +24,32 @@ impl std::fmt::Display for ChartType {
     }
 }
 
+/// Sort order for bar chart values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortOrder {
+    /// Sort by value descending (highest first).
+    Desc,
+    /// Sort by value ascending (lowest first).
+    Asc,
+    /// Keep original order.
+    None,
+}
+
+/// Aggregation function for bar charts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AggFunction {
+    /// Sum of values per category (default).
+    Sum,
+    /// Arithmetic mean per category.
+    Mean,
+    /// Count of rows per category.
+    Count,
+    /// Maximum value per category.
+    Max,
+    /// Minimum value per category.
+    Min,
+}
+
 /// Chart recommendation with axis assignments.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChartRecommendation {
@@ -39,16 +65,23 @@ pub fn select_chart(
     x_hint: Option<&str>,
     y_hint: Option<&str>,
 ) -> Result<ChartRecommendation> {
-    // If user specified both axes, use them
+    // If user specified both axes, use them — but normalize reversed pairs
+    // to the canonical orientation so `chart_type_for_pair`'s flip arms
+    // (Q×T → Line, Q×C → Bar) actually render. Without the swap the
+    // recommendation kept the user's literal X/Y, producing an empty chart
+    // (e.g. `-x revenue -y date` plotted dates on the Y axis → all skipped).
     if let (Some(x_name), Some(y_name)) = (x_hint, y_hint) {
         let x_col = validate_column(schema, x_name)?;
         let y_col = validate_column(schema, y_name)?;
         let chart_type = chart_type_for_pair(x_col.data_type, y_col.data_type);
+        let (x_norm, y_norm) =
+            normalize_axis_order(x_name, y_name, x_col.data_type, y_col.data_type);
+        let color_column = find_color_column(schema, &x_norm, &y_norm);
         return Ok(ChartRecommendation {
             chart_type,
-            x_column: x_name.to_string(),
-            y_column: Some(y_name.to_string()),
-            color_column: find_color_column(schema, x_name, y_name),
+            x_column: x_norm,
+            y_column: Some(y_norm),
+            color_column,
         });
     }
 
@@ -69,15 +102,15 @@ pub fn select_chart(
 /// Validate that a column exists in the schema, returning a descriptive error if not.
 fn validate_column<'a>(schema: &'a Schema, name: &str) -> Result<&'a ColumnMeta> {
     schema.find_column(name).ok_or_else(|| {
+        let available: Vec<String> = schema.columns.iter().map(|c| c.name.clone()).collect();
+        let suggestion =
+            crate::diagnostics::suggest_column(&available, name).map(|s| s.as_str().to_string());
+        let suffix = crate::diagnostics::format_column_suffix(suggestion.as_deref(), name);
         anyhow::anyhow!(
-            "Column '{}' not found. Available columns: {}",
+            "Column '{}' not found. Available columns: {}{}",
             name,
-            schema
-                .columns
-                .iter()
-                .map(|c| c.name.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
+            available.join(", "),
+            suffix
         )
     })
 }
@@ -151,7 +184,18 @@ fn select_with_x_hint(schema: &Schema, x_name: &str) -> Result<ChartRecommendati
         });
     }
 
-    // No quantitative Y available — histogram of X if quantitative
+    // No quantitative Y available — count aggregation:
+    // categorical X → Bar of counts (x=g alone draws, honoring the README
+    // claim that "count aggregation is auto-applied"); quantitative X keeps
+    // the old Histogram fallback.
+    if x_col.data_type == DataType::Categorical {
+        return Ok(ChartRecommendation {
+            chart_type: ChartType::Bar,
+            x_column: x_name.to_string(),
+            y_column: Some(x_name.to_string()),
+            color_column: find_color_column(schema, x_name, x_name),
+        });
+    }
     if x_col.data_type == DataType::Quantitative {
         return Ok(ChartRecommendation {
             chart_type: ChartType::Histogram,
@@ -168,6 +212,25 @@ fn select_with_x_hint(schema: &Schema, x_name: &str) -> Result<ChartRecommendati
     )
 }
 
+/// Normalize a user-specified axis pair to the canonical orientation.
+/// Line wants X=Temporal, Bar wants X=Categorical — swap when the user gave
+/// the pair in reverse (e.g. `-x revenue -y date` → x=date, y=revenue).
+/// Non-flippable pairs keep the user's literal order. Returns (x, y) names.
+fn normalize_axis_order(
+    x_name: &str,
+    y_name: &str,
+    x_type: DataType,
+    y_type: DataType,
+) -> (String, String) {
+    match (x_type, y_type) {
+        (DataType::Quantitative, DataType::Temporal)
+        | (DataType::Quantitative, DataType::Categorical) => {
+            (y_name.to_string(), x_name.to_string())
+        }
+        _ => (x_name.to_string(), y_name.to_string()),
+    }
+}
+
 /// Determine chart type from a pair of data types.
 fn chart_type_for_pair(x_type: DataType, y_type: DataType) -> ChartType {
     match (x_type, y_type) {
@@ -179,6 +242,47 @@ fn chart_type_for_pair(x_type: DataType, y_type: DataType) -> ChartType {
         (DataType::Quantitative, DataType::Categorical) => ChartType::Bar, // flip
         _ => ChartType::Bar,                                             // sensible fallback
     }
+}
+
+/// Warning message when the resolved axis pair has no dedicated chart rule
+/// and rendering falls back to Bar (e.g. a `Nominal` column is involved, or
+/// an uncovered pair like Temporal × Temporal).
+/// Returns `None` for first-class pairs, non-Bar charts, or unknown columns.
+/// Batch-mode callers (oneshot, present) print this to stderr; the interactive
+/// explorer stays silent to avoid corrupting the TUI.
+pub fn fallback_warning(
+    schema: &Schema,
+    x_name: &str,
+    y_name: Option<&str>,
+    chart_type: ChartType,
+) -> Option<String> {
+    if chart_type != ChartType::Bar {
+        return None;
+    }
+    let x_meta = schema.find_column(x_name)?;
+    let y_meta = y_name.and_then(|y| schema.find_column(y))?;
+    if has_chart_rule(x_meta.data_type, y_meta.data_type) {
+        return None;
+    }
+    Some(format!(
+        "warning: no chart rule for {} ({}) × {} ({}); falling back to bar. \
+         Hint: use -t to pick a chart type explicitly.",
+        x_meta.name, x_meta.data_type, y_meta.name, y_meta.data_type,
+    ))
+}
+
+/// Whether the axis pair has a dedicated chart rule in [`chart_type_for_pair`].
+/// Must stay in sync with `chart_type_for_pair`: every non-Bar arm is listed.
+fn has_chart_rule(x_type: DataType, y_type: DataType) -> bool {
+    matches!(
+        (x_type, y_type),
+        (DataType::Temporal, DataType::Quantitative)
+            | (DataType::Categorical, DataType::Quantitative)
+            | (DataType::Quantitative, DataType::Quantitative)
+            | (DataType::Categorical, DataType::Categorical)
+            | (DataType::Quantitative, DataType::Temporal)
+            | (DataType::Quantitative, DataType::Categorical)
+    )
 }
 
 /// Auto-select chart based on schema column types.
