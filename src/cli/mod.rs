@@ -1,15 +1,26 @@
 mod args;
+mod resolve;
 mod types;
 
-pub use args::{parse_column_spec, parse_multi_y_specs};
-pub use types::{AggFunction, ChartTypeArg, InputFormatArg, OutputFormat, SortOrder, ThemeArg};
+pub use args::{
+    DiffParams, DirectoryParams, PipelineParams, parse_column_spec, parse_multi_y_specs,
+};
+pub use resolve::{format_override, resolve_input_file, resolve_theme, resolve_theme_arg};
+pub use types::{
+    AggFunctionArg, ChartTypeArg, InputFormatArg, OutputFormat, SortOrderArg, ThemeArg,
+};
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 /// vz — CLI BI tool with smart visualization and terminal presentation.
 #[derive(Parser, Debug, Clone)]
-#[command(name = "vz", version, about)]
+#[command(
+    name = "vz",
+    version,
+    about,
+    after_help = "Examples:\n  vz sales.csv\n  vz sales.csv -x date -y revenue\n  vz sales.csv -x city -y revenue -t bar --sort desc\n\nSummary: `↑/↓ +N%` trend vs first value (`→ stable` within ±5%), `▁▂▃▄▅▆▇█` 8-point sparkline, `+N:` unused columns.\nOutput: summary and warnings go to stderr, chart goes to stdout."
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -56,7 +67,7 @@ pub struct Cli {
 
     /// Sort bar chart values: desc, asc, or none (default: none).
     #[arg(long = "sort", value_enum)]
-    pub sort: Option<SortOrder>,
+    pub sort: Option<SortOrderArg>,
 
     /// Force input format (auto-detected if not specified).
     #[arg(short = 'f', long = "format", value_enum)]
@@ -76,13 +87,13 @@ pub struct Cli {
 
     /// Aggregation function for bar charts: sum (default), mean, count, max, min.
     #[arg(long = "agg", value_enum)]
-    pub agg: Option<AggFunction>,
+    pub agg: Option<AggFunctionArg>,
 
     /// Custom chart title (overrides the auto-generated title).
     #[arg(long = "title")]
     pub title: Option<String>,
 
-    /// Output format: text (default), json, table, spark, svg, markdown.
+    /// Output format: text (default), json, table, spark, svg, markdown, html.
     #[arg(short = 'o', long = "output", value_enum)]
     pub output: Option<OutputFormat>,
 
@@ -126,7 +137,7 @@ pub struct Cli {
     #[arg(long = "theme", value_enum)]
     pub theme: Option<ThemeArg>,
 
-    /// Number of bins for histogram charts (default: 10).
+    /// Number of bins for histogram charts (1-10000, default: 10).
     #[arg(long = "bins", value_name = "N")]
     pub bins: Option<usize>,
 

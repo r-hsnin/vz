@@ -1,8 +1,8 @@
 use crossterm::event::KeyCode;
 
 use crate::chart::data_builder;
+use crate::chart::selector::{AggFunction, SortOrder};
 use crate::chart::selector::{ChartRecommendation, ChartType, select_chart};
-use crate::cli::{AggFunction, SortOrder};
 use crate::infer::types::{DataType, Schema};
 use crate::render::{BarChartData, ChartConfig, HistogramData};
 
@@ -10,7 +10,7 @@ use super::state::initial_axes;
 use super::{ExploreApp, ViewMode};
 
 impl ExploreApp {
-    pub fn new(schema: Schema, data: Vec<Vec<String>>, theme: crate::theme::Theme) -> Self {
+    pub(crate) fn new(schema: Schema, data: Vec<Vec<String>>, theme: crate::theme::Theme) -> Self {
         let (x_idx, y_idx) = initial_axes(&schema);
         Self {
             schema,
@@ -71,6 +71,7 @@ impl ExploreApp {
             KeyCode::Char('2') => self.chart_type_override = Some(ChartType::Bar),
             KeyCode::Char('3') => self.chart_type_override = Some(ChartType::Scatter),
             KeyCode::Char('4') => self.chart_type_override = Some(ChartType::Histogram),
+            KeyCode::Char('5') => self.chart_type_override = Some(ChartType::Heatmap),
             KeyCode::Char('0') => self.chart_type_override = None,
             KeyCode::Char('c') => self.cycle_color_column(),
             KeyCode::Char('y') => self.yank_command(),
@@ -132,7 +133,9 @@ impl ExploreApp {
     }
 
     /// Cycle through categorical columns for color grouping.
-    /// None → first categorical → second categorical → … → None (off)
+    /// None → first categorical → second categorical → … → None (off).
+    /// Has no effect on bar chart data (grouped bars are not implemented);
+    /// the summary legend only — switching while on Bar reports that.
     fn cycle_color_column(&mut self) {
         let categoricals: Vec<usize> = self
             .schema
@@ -163,6 +166,10 @@ impl ExploreApp {
                 }
             }
         };
+        if self.selected_color.is_some() && self.effective_chart_type() == ChartType::Bar {
+            self.status_message =
+                Some("color set (legend only — bar data stays aggregated)".to_string());
+        }
     }
 
     /// Cycle sort order: None → Desc → Asc → None.
@@ -234,12 +241,13 @@ impl ExploreApp {
     }
 
     /// Extract Y column values as f64.
+    #[cfg(test)]
     pub fn y_values(&self) -> Vec<f64> {
         self.data
             .iter()
             .map(|row| {
                 row.get(self.selected_y)
-                    .and_then(|v| v.parse::<f64>().ok())
+                    .and_then(|v| crate::util::parse_number(v))
                     .unwrap_or(0.0)
             })
             .collect()
@@ -302,18 +310,24 @@ impl ExploreApp {
             y_label,
             self.agg_function,
         );
-        crate::oneshot::builders::sort_bar_data(&mut data, self.sort_order);
+        data_builder::sort_bar_data(&mut data, self.sort_order);
         data.axis_color = Some(self.theme.axis_color);
         data
     }
 
-    /// Build histogram data.
+    /// Build histogram data. Bins the same column as every other mode
+    /// (canonical `histogram_column`) and labels the chart with that column.
     pub fn build_histogram_data(&self) -> HistogramData {
-        let x_label = self.x_label();
-        let title = format!("Distribution of {}", x_label);
+        let col_idx = data_builder::histogram_column(&self.data, self.selected_x, self.selected_y);
+        let label = self
+            .schema
+            .columns
+            .get(col_idx)
+            .map(|c| c.name.clone())
+            .unwrap_or_else(|| self.x_label());
+        let title = format!("Distribution of {}", label);
 
-        let mut data =
-            data_builder::build_histogram(&self.data, self.selected_x, Some(title), x_label, None);
+        let mut data = data_builder::build_histogram(&self.data, col_idx, Some(title), label, None);
         data.axis_color = Some(self.theme.axis_color);
         data
     }

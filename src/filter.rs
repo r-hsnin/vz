@@ -24,6 +24,18 @@ pub enum FilterOp {
     Lte,
 }
 
+/// Reject values that start with an operator character, e.g. `revenue>>100`.
+/// An empty value stays valid (`city=` matches empty cells).
+fn reject_operator_led_value(expr: &str, val: &str) -> Result<()> {
+    if val.starts_with(['>', '<', '=', '!']) {
+        anyhow::bail!(
+            "Invalid filter expression: '{expr}'. Value '{val}' starts with an operator. \
+             Hint: use a single operator, e.g. col=value, col!=value, col>value, col<value, col>=value, col<=value."
+        );
+    }
+    Ok(())
+}
+
 /// Parse a filter expression like "city=Tokyo" or "revenue>1000".
 pub fn parse_predicate(expr: &str) -> Result<Predicate> {
     // Try multi-char operators first
@@ -38,6 +50,7 @@ pub fn parse_predicate(expr: &str) -> Result<Predicate> {
             if col.is_empty() {
                 anyhow::bail!("Invalid filter: missing column name in '{expr}'");
             }
+            reject_operator_led_value(expr, &val)?;
             return Ok(Predicate {
                 column: col,
                 op,
@@ -57,6 +70,7 @@ pub fn parse_predicate(expr: &str) -> Result<Predicate> {
             if col.is_empty() {
                 anyhow::bail!("Invalid filter: missing column name in '{expr}'");
             }
+            reject_operator_led_value(expr, &val)?;
             return Ok(Predicate {
                 column: col,
                 op,
@@ -84,10 +98,15 @@ pub fn filter_data(data: LoadedData, predicates: &[Predicate]) -> Result<LoadedD
                 .iter()
                 .position(|h| h == &p.column)
                 .with_context(|| {
+                    let suffix = crate::diagnostics::format_column_suffix(
+                        crate::diagnostics::suggest_column(&data.headers, &p.column).as_deref(),
+                        &p.column,
+                    );
                     format!(
-                        "Filter column '{}' not found. Available columns: {}",
+                        "Filter column '{}' not found. Available columns: {}{}",
                         p.column,
-                        data.headers.join(", ")
+                        data.headers.join(", "),
+                        suffix
                     )
                 })?;
             Ok((idx, &p.op, p.value.as_str()))
@@ -118,11 +137,31 @@ fn matches_row(row: &[String], col_idx: usize, op: &FilterOp, value: &str) -> bo
     };
 
     match op {
-        FilterOp::Eq => cell == value,
-        FilterOp::NotEq => cell != value,
+        FilterOp::Eq | FilterOp::NotEq => {
+            // Numeric-aware equality: when both sides parse as numbers
+            // ("$2,000" vs "2000", "45%" vs "0.45"), compare numerically.
+            // Non-numeric cells keep exact string semantics, and empty
+            // still matches empty.
+            if let (Some(a), Some(b)) = (
+                crate::util::parse_number(cell),
+                crate::util::parse_number(value),
+            ) {
+                let eq = a == b;
+                return if *op == FilterOp::Eq { eq } else { !eq };
+            }
+            if *op == FilterOp::Eq {
+                cell == value
+            } else {
+                cell != value
+            }
+        }
         FilterOp::Gt | FilterOp::Lt | FilterOp::Gte | FilterOp::Lte => {
-            // Try numeric comparison first, fall back to string
-            if let (Ok(a), Ok(b)) = (cell.parse::<f64>(), value.parse::<f64>()) {
+            // Numeric comparison via the shared parser ("1,000", "$100",
+            // "45%", "10k"), else lexicographic string fallback.
+            if let (Some(a), Some(b)) = (
+                crate::util::parse_number(cell),
+                crate::util::parse_number(value),
+            ) {
                 match op {
                     FilterOp::Gt => a > b,
                     FilterOp::Lt => a < b,
@@ -143,9 +182,89 @@ fn matches_row(row: &[String], col_idx: usize, op: &FilterOp, value: &str) -> bo
     }
 }
 
+/// Result of [`apply_filters`]: the filtered data plus the `info:` notice
+/// that used to print inline. Callers print the notice at the edge.
+#[derive(Debug)]
+pub struct FilterOutcome {
+    pub data: LoadedData,
+    pub notice: Option<String>,
+}
+
+/// Parse and apply `--where` filters to loaded data.
+///
+/// Empty filter lists return the data unchanged with no notice. The
+/// `info: filtered N/M rows (...)` notice is returned (not printed).
+pub fn apply_filters(data: LoadedData, filters: &[String]) -> Result<FilterOutcome> {
+    if filters.is_empty() {
+        return Ok(FilterOutcome { data, notice: None });
+    }
+    let original_count = data.rows.len();
+    let predicates: Vec<Predicate> = filters
+        .iter()
+        .map(|expr| parse_predicate(expr))
+        .collect::<Result<Vec<_>>>()?;
+    let filtered = filter_data(data, &predicates)?;
+    let notice = format!(
+        "info: filtered {}/{} rows ({})",
+        filtered.rows.len(),
+        original_count,
+        filters.join(" & ")
+    );
+    Ok(FilterOutcome {
+        data: filtered,
+        notice: Some(notice),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn apply_filters_empty_filters_returns_unchanged() {
+        let data = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "100".into()],
+                vec!["Osaka".into(), "200".into()],
+            ],
+        };
+        let filters: Vec<String> = vec![];
+        let outcome = apply_filters(data, &filters).unwrap();
+        assert_eq!(outcome.data.rows.len(), 2);
+        assert_eq!(outcome.notice, None);
+    }
+
+    #[test]
+    fn apply_filters_single_equality_filter() {
+        let data = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "100".into()],
+                vec!["Osaka".into(), "200".into()],
+                vec!["Tokyo".into(), "300".into()],
+            ],
+        };
+        let filters = vec!["city=Tokyo".to_string()];
+        let outcome = apply_filters(data, &filters).unwrap();
+        assert_eq!(outcome.data.rows.len(), 2);
+        assert!(outcome.data.rows.iter().all(|r| r[0] == "Tokyo"));
+        assert_eq!(
+            outcome.notice.as_deref(),
+            Some("info: filtered 2/3 rows (city=Tokyo)")
+        );
+    }
+
+    #[test]
+    fn apply_filters_invalid_filter_returns_error() {
+        let data = LoadedData {
+            headers: vec!["city".into()],
+            rows: vec![],
+        };
+        let filters = vec!["no_operator_here".to_string()];
+        let result = apply_filters(data, &filters);
+        assert!(result.is_err());
+    }
 
     #[test]
     fn test_parse_predicate_eq() {
@@ -183,6 +302,36 @@ mod tests {
     fn test_parse_predicate_invalid() {
         assert!(parse_predicate("noop").is_err());
         assert!(parse_predicate("=value").is_err());
+    }
+
+    #[test]
+    fn test_parse_predicate_rejects_doubled_operators() {
+        for expr in [
+            "revenue>>100",
+            "revenue<<100",
+            "revenue==100",
+            "city=!Tokyo",
+            "age>==18",
+        ] {
+            let err = parse_predicate(expr).unwrap_err();
+            let msg = format!("{:#}", err);
+            assert!(
+                msg.contains("single operator"),
+                "expr {expr} should bail loudly: {msg}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_predicate_allows_empty_value_and_embedded_equals() {
+        // `city=` matches empty cells (legitimate); `=` inside a value is data.
+        let p = parse_predicate("city=").unwrap();
+        assert_eq!(p.value, "");
+        let p = parse_predicate("note=a=b").unwrap();
+        assert_eq!(p.column, "note");
+        assert_eq!(p.value, "a=b");
+        let p = parse_predicate("note=~foo").unwrap();
+        assert_eq!(p.value, "~foo");
     }
 
     #[test]
@@ -225,6 +374,18 @@ mod tests {
         };
         let pred = parse_predicate("missing=x").unwrap();
         assert!(filter_data(data, &[pred]).is_err());
+    }
+
+    #[test]
+    fn test_filter_data_invalid_column_suggests_close_match() {
+        let data = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![vec!["Tokyo".into(), "1000".into()]],
+        };
+        let pred = parse_predicate("ctiy=Tokyo").unwrap();
+        let err = filter_data(data, &[pred]).unwrap_err();
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("Did you mean 'city'?"), "{msg}");
     }
 
     #[test]
@@ -287,5 +448,64 @@ mod tests {
         assert_eq!(result.rows.len(), 2);
         assert_eq!(result.rows[0][0], "Bob");
         assert_eq!(result.rows[1][0], "Charlie");
+    }
+
+    #[test]
+    fn test_filter_eq_is_numeric_aware() {
+        let data = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "$2,000".into()],
+                vec!["Osaka".into(), "2000".into()],
+                vec!["Kyoto".into(), "500".into()],
+            ],
+        };
+        let pred = parse_predicate("revenue=2000").unwrap();
+        let result = filter_data(data, &[pred]).unwrap();
+        assert_eq!(result.rows.len(), 2);
+        let pred = parse_predicate("revenue!=2000").unwrap();
+        let data2 = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "$2,000".into()],
+                vec!["Kyoto".into(), "500".into()],
+            ],
+        };
+        let result = filter_data(data2, &[pred]).unwrap();
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0][0], "Kyoto");
+    }
+
+    #[test]
+    fn test_filter_eq_keeps_string_semantics_for_text() {
+        // Non-numeric cells still compare as strings; empty still matches empty.
+        let data = LoadedData {
+            headers: vec!["city".into(), "note".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "".into()],
+                vec!["Osaka".into(), "x".into()],
+            ],
+        };
+        let pred = parse_predicate("note=").unwrap();
+        let result = filter_data(data, &[pred]).unwrap();
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0][0], "Tokyo");
+    }
+
+    #[test]
+    fn test_filter_numeric_comparison_parses_formatted() {
+        // Shared numeric parser: comma/currency cells compare numerically.
+        let data = LoadedData {
+            headers: vec!["city".into(), "revenue".into()],
+            rows: vec![
+                vec!["Tokyo".into(), "1,000".into()],
+                vec!["Osaka".into(), "$2,000".into()],
+                vec!["Kyoto".into(), "500".into()],
+            ],
+        };
+        let pred = parse_predicate("revenue>1500").unwrap();
+        let result = filter_data(data, &[pred]).unwrap();
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0][0], "Osaka");
     }
 }

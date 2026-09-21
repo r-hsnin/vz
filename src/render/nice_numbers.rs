@@ -35,6 +35,15 @@ impl NiceScale {
 /// `max_ticks` is the desired maximum number of ticks (typically 5-7).
 /// Returns a NiceScale with rounded min, max, and tick spacing.
 pub fn nice_scale(data_min: f64, data_max: f64, max_ticks: usize) -> NiceScale {
+    // Non-finite input (NaN/inf leak) must never panic or allocate.
+    if !data_min.is_finite() || !data_max.is_finite() {
+        return NiceScale {
+            min: -1.0,
+            max: 1.0,
+            tick_spacing: 1.0,
+            tick_count: 3,
+        };
+    }
     // Handle edge cases
     if data_min >= data_max || max_ticks < 2 {
         // Single value or invalid range
@@ -105,6 +114,21 @@ fn nice_num(x: f64, round: bool) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_nice_scale_non_finite_returns_finite_fallback() {
+        for (lo, hi) in [
+            (f64::NEG_INFINITY, f64::INFINITY),
+            (f64::NAN, 1.0),
+            (0.0, f64::INFINITY),
+        ] {
+            let scale = nice_scale(lo, hi, 5);
+            assert!(scale.min.is_finite() && scale.max.is_finite());
+            assert!(scale.min < scale.max);
+            assert!(scale.tick_spacing.is_finite() && scale.tick_spacing > 0.0);
+            assert!((scale.tick_count >= 2) && (scale.tick_count <= 10));
+        }
+    }
 
     #[test]
     fn test_nice_scale_basic() {

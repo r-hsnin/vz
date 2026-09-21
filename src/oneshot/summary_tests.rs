@@ -258,6 +258,72 @@ assert!(
 }
 
 #[test]
+fn test_build_summary_parts_histogram_reports_binned_column() {
+    // Both x and y quantitative: x wins the bin, so the summary must describe
+    // revenue (range/spark/trend), never the unused -y column.
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Histogram,
+        x_column: "revenue".to_string(),
+        y_column: Some("profit".to_string()),
+        color_column: None,
+    };
+    let headers = vec!["revenue".to_string(), "profit".to_string()];
+    let rows = vec![
+        vec!["800".to_string(), "150".to_string()],
+        vec!["2000".to_string(), "500".to_string()],
+    ];
+    let parts = build_summary_parts(&SummaryContext {
+        recommendation: &rec,
+        chart_type: ChartType::Histogram,
+        headers: &headers,
+        rows: &rows,
+        extra_y_columns: &[],
+        agg: AggFunction::Sum,
+        agg_stats: None,
+        skipped_rows: 0,
+        series_colors: crate::render::SERIES_COLORS,
+    });
+    assert_eq!(parts[0], "Histogram");
+    assert_eq!(parts[1], "x=revenue");
+    assert!(
+        parts.iter().any(|p| p.contains("800") && p.contains("2k")),
+        "range must come from the binned column: {parts:?}"
+    );
+    assert!(
+        !parts.iter().any(|p| p.contains("profit")),
+        "summary must not describe the unused -y column: {parts:?}"
+    );
+}
+
+#[test]
+fn test_build_summary_parts_histogram_falls_back_to_y_label() {
+    // Categorical x: the binned column is y, and it becomes the X label.
+    let rec = ChartRecommendation {
+        chart_type: ChartType::Histogram,
+        x_column: "month".to_string(),
+        y_column: Some("temperature".to_string()),
+        color_column: None,
+    };
+    let headers = vec!["month".to_string(), "temperature".to_string()];
+    let rows = vec![
+        vec!["Jan".to_string(), "5".to_string()],
+        vec!["Feb".to_string(), "7".to_string()],
+    ];
+    let parts = build_summary_parts(&SummaryContext {
+        recommendation: &rec,
+        chart_type: ChartType::Histogram,
+        headers: &headers,
+        rows: &rows,
+        extra_y_columns: &[],
+        agg: AggFunction::Sum,
+        agg_stats: None,
+        skipped_rows: 0,
+        series_colors: crate::render::SERIES_COLORS,
+    });
+    assert_eq!(parts[1], "x=temperature");
+}
+
+#[test]
 fn test_sparkline_basic() {
 let rows = vec![
     vec!["a".to_string(), "1".to_string()],
@@ -339,6 +405,39 @@ assert!(
 fn test_trend_annotation_single_row_returns_none() {
 let rows = vec![vec!["a".to_string(), "100".to_string()]];
 assert!(trend_annotation(&rows, 1).is_none());
+}
+
+#[test]
+fn test_trend_annotation_skips_non_finite() {
+let rows = vec![
+    vec!["a".to_string(), "100".to_string()],
+    vec!["b".to_string(), "NaN".to_string()],
+    vec!["c".to_string(), "inf".to_string()],
+    vec!["d".to_string(), "200".to_string()],
+];
+let trend = trend_annotation(&rows, 1).unwrap();
+assert!(trend.contains('↑'), "Expected ↑, got: {}", trend);
+}
+
+#[test]
+fn test_trend_annotation_negative_start_improves() {
+let rows = vec![
+    vec!["a".to_string(), "-100".to_string()],
+    vec!["b".to_string(), "-50".to_string()],
+];
+let trend = trend_annotation(&rows, 1).unwrap();
+assert!(trend.contains('↑'), "Expected ↑, got: {}", trend);
+}
+
+#[test]
+fn test_compute_y_stats_skips_non_finite() {
+let rows = vec![
+    vec!["a".to_string(), "NaN".to_string()],
+    vec!["b".to_string(), "10".to_string()],
+    vec!["c".to_string(), "inf".to_string()],
+    vec!["d".to_string(), "30".to_string()],
+];
+assert_eq!(compute_y_stats(&rows, 1), Some((10.0, 30.0)));
 }
 
 #[test]

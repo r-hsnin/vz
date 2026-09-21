@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths-ignore: ['docs/**', '*.md']
+    paths-ignore: ['**/*.md']
   pull_request:
     branches: [main]
-    paths-ignore: ['docs/**', '*.md']
+    paths-ignore: ['**/*.md']
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,8 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.97.0"
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
       - name: Check formatting
@@ -27,3 +28,14 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: Run tests
         run: cargo test
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.88.0"
+      - uses: Swatinem/rust-cache@v2
+      - name: Check with MSRV
+        run: cargo +1.88.0 check --locked

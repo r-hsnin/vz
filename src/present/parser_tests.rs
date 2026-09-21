@@ -53,11 +53,44 @@ fn test_chart_block_with_unknown_keys() {
 }
 
 #[test]
-fn test_chart_block_invalid_type() {
+fn test_chart_block_invalid_type_warns_and_falls_back_to_auto() {
     let lines = vec!["source: data.csv".into(), "type: sparkline".into()];
     let chart = parse_chart_block(&lines);
     assert_eq!(chart.source, "data.csv");
-    assert_eq!(chart.chart_type, None); // Unknown type → None
+    assert_eq!(chart.chart_type, None); // Unknown type → None (auto-infer)
+}
+
+#[test]
+fn test_chart_block_invalid_type_typo_falls_back_to_auto() {
+    let lines = vec!["source: data.csv".into(), "type: barr".into()];
+    let chart = parse_chart_block(&lines);
+    assert_eq!(chart.chart_type, None);
+}
+
+#[test]
+fn test_chart_block_invalid_sort_and_agg_ignored() {
+    let lines = vec![
+        "source: data.csv".into(),
+        "sort: dsec".into(),
+        "agg: men".into(),
+    ];
+    let chart = parse_chart_block(&lines);
+    assert_eq!(chart.sort, None);
+    assert_eq!(chart.agg, None);
+}
+
+#[test]
+fn test_chart_block_invalid_numerics_ignored() {
+    let lines = vec![
+        "source: data.csv".into(),
+        "top: abc".into(),
+        "bins: xyz".into(),
+        "height: hh".into(),
+    ];
+    let chart = parse_chart_block(&lines);
+    assert_eq!(chart.top, None);
+    assert_eq!(chart.bins, None);
+    assert_eq!(chart.height, None);
 }
 
 #[test]
@@ -76,6 +109,34 @@ fn test_chart_block_bins_invalid_ignored() {
     let lines = vec!["source: data.csv".into(), "bins: not_a_number".into()];
     let chart = parse_chart_block(&lines);
     assert_eq!(chart.bins, None);
+}
+
+#[test]
+fn test_chart_block_bins_zero_ignored() {
+    // Out-of-range bins must not become an empty histogram with no warning.
+    let lines = vec!["source: data.csv".into(), "bins: 0".into()];
+    let chart = parse_chart_block(&lines);
+    assert_eq!(chart.bins, None);
+}
+
+#[test]
+fn test_chart_block_bins_above_max_ignored() {
+    let lines = vec![
+        "source: data.csv".into(),
+        format!("bins: {}", crate::render::MAX_BINS + 1),
+    ];
+    let chart = parse_chart_block(&lines);
+    assert_eq!(chart.bins, None);
+}
+
+#[test]
+fn test_chart_block_bins_at_max_accepted() {
+    let lines = vec![
+        "source: data.csv".into(),
+        format!("bins: {}", crate::render::MAX_BINS),
+    ];
+    let chart = parse_chart_block(&lines);
+    assert_eq!(chart.bins, Some(crate::render::MAX_BINS));
 }
 
 #[test]

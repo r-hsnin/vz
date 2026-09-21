@@ -3,12 +3,9 @@
 use anyhow::Result;
 use std::path::Path;
 
-use crate::chart::ChartRecommendation;
-use crate::cli::{self, Cli};
-use crate::helpers::{
-    YOptions, apply_filters, build_recommendation, build_render_options, effective_agg,
-    parse_y_options,
-};
+use crate::chart::{ChartRecommendation, recommend};
+use crate::cli::{self, Cli, PipelineParams};
+use crate::filter::apply_filters;
 use crate::infer;
 use crate::infer::types::Schema;
 use crate::loader::{self, LoadedData};
@@ -17,25 +14,48 @@ use crate::output;
 
 /// Infer schema from loaded data (eliminates boilerplate in multiple call sites).
 ///
-/// Only passes the first 100 rows to inference, matching SAMPLE_SIZE in detector.rs.
-/// This avoids allocating a full `Vec<Vec<&str>>` for large datasets.
+/// Samples rows evenly across the whole dataset (head + tail) instead of only
+/// the first [`SAMPLE_SIZE`](crate::infer::detector::SAMPLE_SIZE) rows, so a
+/// file whose leading rows are all one type (e.g. 100 dates followed by 100
+/// garbage strings) infers the same as the reversed file. Avoids allocating
+/// a full `Vec<Vec<&str>>` for large datasets by capping sampled rows.
 pub fn infer_from_data(data: &LoadedData) -> Schema {
-    const SAMPLE_SIZE: usize = 100;
+    use crate::infer::detector::SAMPLE_SIZE;
     let headers: Vec<&str> = data.headers.iter().map(|s| s.as_str()).collect();
-    let row_limit = data.rows.len().min(SAMPLE_SIZE);
-    let rows: Vec<Vec<&str>> = data.rows[..row_limit]
-        .iter()
-        .map(|r| r.iter().map(|s| s.as_str()).collect())
-        .collect();
+    let rows: Vec<Vec<&str>> = if data.rows.len() <= SAMPLE_SIZE {
+        data.rows
+            .iter()
+            .map(|r| r.iter().map(|s| s.as_str()).collect())
+            .collect()
+    } else {
+        // Evenly spaced indices covering head→tail (first and last always kept).
+        let step = (data.rows.len() - 1) as f64 / (SAMPLE_SIZE - 1) as f64;
+        (0..SAMPLE_SIZE)
+            .map(|i| {
+                let idx = (step * i as f64).round() as usize;
+                data.rows[idx.min(data.rows.len() - 1)]
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect()
+            })
+            .collect()
+    };
     infer::infer_schema(&headers, &rows)
 }
 
 /// Shared post-load pipeline: filter → sample → validate → infer → render.
 /// Used by both single-file and directory modes.
-pub fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
+///
+/// Takes the resolved [`PipelineParams`] (app plane builds it once via
+/// `Cli::to_pipeline_params`); pure per-output resolution happens inside.
+pub fn render_data(params: &PipelineParams, data: LoadedData, file: &Path) -> Result<()> {
     let pre_filter_count = data.rows.len();
-    let data = apply_filters(data, &cli.filter)?;
-    let data = if let Some(max_rows) = cli.sample {
+    let outcome = apply_filters(data, &params.filters)?;
+    if let Some(notice) = outcome.notice {
+        eprintln!("{notice}");
+    }
+    let data = outcome.data;
+    let data = if let Some(max_rows) = params.sample {
         if max_rows == 0 {
             anyhow::bail!("--sample must be at least 1");
         }
@@ -44,23 +64,15 @@ pub fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
         data
     };
 
-    validate_loaded_data(&data, file, &cli.filter, pre_filter_count)?;
+    validate_loaded_data(&data, file, &params.filters, pre_filter_count)?;
 
     // Validate -c column exists in the loaded data
-    if let Some(ref color_col) = cli.color_col {
-        if !data.headers.iter().any(|h| h == color_col) {
-            anyhow::bail!(
-                "Color column '{}' not found. Available columns: {}",
-                color_col,
-                data.headers.join(", ")
-            );
-        }
-    }
+    validate_color_column(&data.headers, params.query.color_col.as_deref())?;
 
     let schema = infer_from_data(&data);
 
-    if cli.info {
-        if cli.output == Some(cli::OutputFormat::Json) {
+    if params.info {
+        if params.output == Some(cli::OutputFormat::Json) {
             crate::info::print_info_json(file, &data, &schema)?;
         } else {
             crate::info::print_info(file, &data, &schema);
@@ -68,25 +80,34 @@ pub fn render_data(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
         return Ok(());
     }
 
-    let mut y_opts = parse_y_options(cli);
-    let recommendation = build_recommendation(cli, &schema, &y_opts)?;
-    if cli.all_y {
+    let query = &params.query;
+    let mut y_opts = recommend::parse_y_options(query.y_col.as_deref());
+    let (recommendation, warnings) = recommend::build_recommendation(query, &schema, &y_opts)?;
+    for w in warnings.0 {
+        eprintln!("{w}");
+    }
+    if params.all_y {
         expand_all_y(&recommendation, &schema, &mut y_opts);
     }
 
-    if cli.output == Some(cli::OutputFormat::Json) {
-        print_chart_json(file, &data, &schema, &recommendation, cli, &y_opts)?;
+    if params.output == Some(cli::OutputFormat::Json) {
+        print_chart_json(file, &data, &schema, &recommendation, params, &y_opts)?;
         return Ok(());
     }
 
     dispatch_output(
-        cli,
+        params,
         &recommendation,
         &data.headers,
         &data.rows,
         &y_opts,
         &schema,
     )
+}
+
+/// Cli adapter for [`render_data`]: converts once, then delegates.
+pub fn render_data_from_cli(cli: &Cli, data: LoadedData, file: &Path) -> Result<()> {
+    render_data(&cli.to_pipeline_params(), data, file)
 }
 
 /// Validate that loaded data is non-empty and produce clear error messages.
@@ -117,35 +138,69 @@ fn validate_loaded_data(
     Ok(())
 }
 
-/// Dispatch to the appropriate output renderer based on CLI flags.
+/// Validate the `-c` color column against loaded headers, with typo hints.
+pub(crate) fn validate_color_column(headers: &[String], color_col: Option<&str>) -> Result<()> {
+    if let Some(color_col) = color_col
+        && !headers.iter().any(|h| h == color_col)
+    {
+        let suffix = crate::diagnostics::format_column_suffix(
+            crate::diagnostics::suggest_column(headers, color_col).as_deref(),
+            color_col,
+        );
+        anyhow::bail!(
+            "Color column '{}' not found. Available columns: {}{}",
+            color_col,
+            headers.join(", "),
+            suffix
+        );
+    }
+    Ok(())
+}
+
+/// Dispatch to the appropriate output renderer based on resolved params.
 fn dispatch_output(
-    cli: &Cli,
+    params: &PipelineParams,
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
-    y_opts: &YOptions,
+    y_opts: &recommend::YOptions,
     schema: &Schema,
 ) -> Result<()> {
-    match cli.output {
+    let query = &params.query;
+    match params.output {
         Some(cli::OutputFormat::Table) => {
-            output::table::print_table(recommendation, headers, rows, cli)?;
+            let out_params = output::table::TableParams {
+                chart_type_override: query.chart_type,
+                agg: recommend::effective_agg(query, recommendation, schema),
+                sort: params.sort,
+                limit: params.limit,
+                sort_flag: params.sort_flag,
+            };
+            output::table::print_table(recommendation, headers, rows, &out_params, schema)?;
         }
         Some(cli::OutputFormat::Spark) => {
-            print_spark(recommendation, headers, rows, cli, schema);
+            print_spark(recommendation, headers, rows, params, schema, y_opts);
         }
         Some(cli::OutputFormat::Svg) => {
-            let opts = build_render_options(cli, y_opts, recommendation, schema);
-            print_svg(recommendation, headers, rows, &opts)?;
+            let opts = oneshot::RenderOptions::from_params(params, y_opts, recommendation, schema);
+            output::svg::print_svg(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Html) => {
-            let opts = build_render_options(cli, y_opts, recommendation, schema);
-            print_html(recommendation, headers, rows, &opts)?;
+            let opts = oneshot::RenderOptions::from_params(params, y_opts, recommendation, schema);
+            output::html::print_html(recommendation, headers, rows, &opts)?;
         }
         Some(cli::OutputFormat::Markdown) => {
-            output::markdown::print_markdown(recommendation, headers, rows, cli, schema)?;
+            let out_params = output::table::TableParams {
+                chart_type_override: query.chart_type,
+                agg: recommend::effective_agg(query, recommendation, schema),
+                sort: params.sort,
+                limit: params.limit,
+                sort_flag: params.sort_flag,
+            };
+            output::markdown::print_markdown(recommendation, headers, rows, &out_params, schema)?;
         }
         _ => {
-            let opts = build_render_options(cli, y_opts, recommendation, schema);
+            let opts = oneshot::RenderOptions::from_params(params, y_opts, recommendation, schema);
             oneshot::render_oneshot(recommendation, headers, rows, &opts)?;
         }
     }
@@ -157,22 +212,32 @@ fn print_spark(
     recommendation: &ChartRecommendation,
     headers: &[String],
     rows: &[Vec<String>],
-    cli: &Cli,
+    params: &PipelineParams,
     schema: &Schema,
+    y_opts: &recommend::YOptions,
 ) {
-    let params = output::spark::SparkParams {
-        chart_type_override: cli.chart_type,
-        agg: effective_agg(cli, recommendation, schema),
-        sort: cli.effective_sort(),
-        limit: cli.top.or(cli.tail),
-        color_col: cli.color_col.clone(),
-        bins: cli.bins,
+    let out_params = output::spark::SparkParams {
+        chart_type_override: params.query.chart_type,
+        agg: recommend::effective_agg(&params.query, recommendation, schema),
+        sort: params.sort,
+        limit: params.limit,
+        color_col: params.query.color_col.clone(),
+        bins: params.bins,
+        extra_y_columns: y_opts
+            .extra_columns
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect(),
     };
-    output::spark::print_spark(recommendation, headers, rows, &params);
+    output::spark::print_spark(recommendation, headers, rows, &out_params);
 }
 
 /// Expand `--all-y`: add all remaining quantitative columns to extra_y.
-fn expand_all_y(recommendation: &ChartRecommendation, schema: &Schema, y_opts: &mut YOptions) {
+fn expand_all_y(
+    recommendation: &ChartRecommendation,
+    schema: &Schema,
+    y_opts: &mut recommend::YOptions,
+) {
     let x_col = &recommendation.x_column;
     let primary_y = recommendation.y_column.as_deref().unwrap_or("");
     let extra: Vec<(String, Option<String>)> = schema
@@ -192,20 +257,23 @@ fn print_chart_json(
     data: &LoadedData,
     schema: &Schema,
     recommendation: &ChartRecommendation,
-    cli: &Cli,
-    y_opts: &YOptions,
+    params: &PipelineParams,
+    y_opts: &recommend::YOptions,
 ) -> anyhow::Result<()> {
-    let params = output::chart_json::ChartJsonParams {
-        chart_type: cli
+    let out_params = output::chart_json::ChartJsonParams {
+        chart_type: params
+            .query
             .chart_type
             .map(|ct| ct.to_chart_type())
             .unwrap_or(recommendation.chart_type),
-        sort: cli.effective_sort(),
-        agg: effective_agg(cli, recommendation, schema),
-        limit: cli.top.or(cli.tail),
+        sort: params.sort,
+        agg: recommend::effective_agg(&params.query, recommendation, schema),
+        limit: params.limit,
         extra_y_columns: y_opts.extra_columns.clone(),
-        color_column: cli.color_col.clone(),
-        bins: cli.bins,
+        color_column: params.query.color_col.clone(),
+        bins: params.bins,
+        filters: params.filters.clone(),
+        sample: params.sample,
     };
     output::chart_json::print_chart_json(
         file,
@@ -214,70 +282,128 @@ fn print_chart_json(
         recommendation,
         &data.headers,
         &data.rows,
-        &params,
+        &out_params,
     )
 }
 
-/// Render the chart to SVG and print to stdout.
-fn print_svg(
-    recommendation: &ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-    opts: &oneshot::RenderOptions<'_>,
-) -> anyhow::Result<()> {
-    use ratatui::{buffer::Buffer, layout::Rect};
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
 
-    let width = opts.width.unwrap_or_else(oneshot::terminal_width);
-    let chart_type = oneshot::resolve_chart_type(recommendation, opts.chart_type_override);
-    let height = opts.height.unwrap_or(24);
+    fn loaded(headers: &[&str], rows: &[&[&str]]) -> LoadedData {
+        LoadedData {
+            headers: headers.iter().map(|s| s.to_string()).collect(),
+            rows: rows
+                .iter()
+                .map(|r| r.iter().map(|s| s.to_string()).collect())
+                .collect(),
+        }
+    }
 
-    let area = Rect::new(0, 0, width, height);
-    let mut buf = Buffer::empty(area);
-    oneshot::render_chart_to_buffer(
-        chart_type,
-        recommendation,
-        headers,
-        rows,
-        opts,
-        area,
-        &mut buf,
-    );
+    #[test]
+    fn render_data_params_take_query_not_cli() {
+        use clap::Parser as _;
+        // RED: pipeline must accept resolved params (no &Cli) and honor them.
+        let cli =
+            crate::cli::Cli::try_parse_from(["vz", "data.csv", "-x", "city", "-t", "bar"]).unwrap();
+        let params = cli.to_pipeline_params();
+        assert_eq!(params.query.x_col.as_deref(), Some("city"));
+        let data = loaded(
+            &["city", "revenue"],
+            &[&["Tokyo", "100"], &["Osaka", "200"]],
+        );
+        let dir = std::env::temp_dir();
+        assert!(render_data(&params, data, &dir.join("probe.csv")).is_ok());
+    }
 
-    println!(
-        "{}",
-        output::svg::buffer_to_svg(&buf, opts.theme.svg_background())
-    );
-    Ok(())
-}
+    #[test]
+    fn validate_loaded_data_empty() {
+        let data = loaded(&[], &[]);
+        let err = validate_loaded_data(&data, &PathBuf::from("in.csv"), &[], 0).unwrap_err();
+        assert!(err.to_string().contains("is empty"), "{err}");
+    }
 
-/// Render the chart as a self-contained HTML page with embedded SVG and print to stdout.
-fn print_html(
-    recommendation: &ChartRecommendation,
-    headers: &[String],
-    rows: &[Vec<String>],
-    opts: &oneshot::RenderOptions<'_>,
-) -> anyhow::Result<()> {
-    use ratatui::{buffer::Buffer, layout::Rect};
+    #[test]
+    fn validate_loaded_data_all_filtered_out() {
+        let data = loaded(&["a"], &[]);
+        let err = validate_loaded_data(&data, &PathBuf::from("in.csv"), &["a>1".to_string()], 5)
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("No rows remain after filtering"),
+            "{err}"
+        );
+    }
 
-    let width = opts.width.unwrap_or_else(oneshot::terminal_width);
-    let chart_type = oneshot::resolve_chart_type(recommendation, opts.chart_type_override);
-    let height = opts.height.unwrap_or(24);
+    #[test]
+    fn validate_loaded_data_headers_only() {
+        let data = loaded(&["a", "b"], &[]);
+        let err = validate_loaded_data(&data, &PathBuf::from("in.csv"), &[], 0).unwrap_err();
+        assert!(err.to_string().contains("only headers"), "{err}");
+    }
 
-    let area = Rect::new(0, 0, width, height);
-    let mut buf = Buffer::empty(area);
-    oneshot::render_chart_to_buffer(
-        chart_type,
-        recommendation,
-        headers,
-        rows,
-        opts,
-        area,
-        &mut buf,
-    );
+    #[test]
+    fn validate_loaded_data_blank_headers_treated_as_empty() {
+        let data = loaded(&["", ""], &[]);
+        let err = validate_loaded_data(&data, &PathBuf::from("in.csv"), &[], 0).unwrap_err();
+        assert!(err.to_string().contains("is empty"), "{err}");
+    }
 
-    let bg = opts.theme.svg_background();
-    let svg = output::svg::buffer_to_svg(&buf, bg);
-    let title = opts.title.as_deref().unwrap_or("vz chart");
-    println!("{}", output::html::wrap_svg_in_html(&svg, title, bg));
-    Ok(())
+    #[test]
+    fn validate_loaded_data_ok_with_rows() {
+        let data = loaded(&["a"], &[&["1"]]);
+        assert!(validate_loaded_data(&data, &PathBuf::from("in.csv"), &[], 1).is_ok());
+    }
+
+    #[test]
+    fn validate_color_column_ok_for_known_column() {
+        let headers = vec!["city".to_string(), "revenue".to_string()];
+        assert!(validate_color_column(&headers, Some("city")).is_ok());
+        assert!(validate_color_column(&headers, None).is_ok());
+    }
+
+    #[test]
+    fn validate_color_column_suggests_close_match() {
+        let headers = vec!["city".to_string(), "revenue".to_string()];
+        let err = validate_color_column(&headers, Some("ctiy")).unwrap_err();
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("Did you mean 'city'?"), "{msg}");
+        let err = validate_color_column(&headers, Some("City")).unwrap_err();
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("case-sensitive"), "{msg}");
+    }
+
+    fn big_loaded(first_type_dates: bool) -> LoadedData {
+        // 200 rows: half dates, half garbage — order decides which half the
+        // old head-only sampler saw. Even sampling must infer identically.
+        let mut rows: Vec<Vec<String>> = Vec::new();
+        let mut date_rows: Vec<Vec<String>> = (0..100)
+            .map(|i| vec!["2024-01-01".to_string(), i.to_string()])
+            .collect();
+        let mut junk_rows: Vec<Vec<String>> = (0..100)
+            .map(|i| vec![format!("not-a-date-{i}"), i.to_string()])
+            .collect();
+        if first_type_dates {
+            rows.append(&mut date_rows);
+            rows.append(&mut junk_rows);
+        } else {
+            rows.append(&mut junk_rows);
+            rows.append(&mut date_rows);
+        }
+        LoadedData {
+            headers: vec!["d".to_string(), "v".to_string()],
+            rows,
+        }
+    }
+
+    #[test]
+    fn infer_from_data_is_order_independent() {
+        let fwd = infer_from_data(&big_loaded(true));
+        let rev = infer_from_data(&big_loaded(false));
+        assert_eq!(
+            fwd.columns[0].data_type, rev.columns[0].data_type,
+            "head ({:?}) vs tail ({:?}) order must not change inference",
+            fwd.columns[0].data_type, rev.columns[0].data_type
+        );
+    }
 }

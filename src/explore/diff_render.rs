@@ -36,93 +36,56 @@ pub fn draw_diff_ui(frame: &mut Frame, app: &DiffExploreApp) {
 }
 
 fn render_diff_chart(frame: &mut Frame, app: &DiffExploreApp, area: ratatui::layout::Rect) {
-    use crate::render::{Axis, BarChartData, ChartConfig, ChartData, ChartWidget, Series};
+    use crate::render::{ChartData, ChartWidget};
 
     match &app.diff_data {
         DiffData::Categorical(result) => {
-            let entries = app.sorted_entries();
-            let labels: Vec<String> = entries
+            // Canonical categorical-diff bars; interactive sort state stays
+            // at the edge (explore sorts by |Δ|, not signed-Δ).
+            let mut entries = app.sorted_entries();
+            if entries.is_empty() {
+                entries = result.entries.iter().collect();
+            }
+            let tuples: Vec<(String, f64, Option<f64>, f64)> = entries
                 .iter()
-                .map(|e| {
-                    let dir = if e.delta > 0.0 {
-                        "▲"
-                    } else if e.delta < 0.0 {
-                        "▼"
-                    } else {
-                        "─"
-                    };
-                    let pct = e
-                        .pct_change
-                        .map(|p| format!("{:+.0}%", p))
-                        .unwrap_or_else(|| "new".to_string());
-                    format!("{} {} {}", e.label, dir, pct)
-                })
+                .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
                 .collect();
-            let values: Vec<f64> = entries.iter().map(|e| e.after).collect();
-
             let title = format!(
                 "Diff: {} by {} ({} vs {})",
                 result.y_column, result.x_column, app.before_name, app.after_name
             );
-
-            let bar_data = BarChartData {
-                labels,
-                values,
-                title: Some(title),
-                y_label: result.y_column.clone(),
-                show_labels: true,
-                series_colors: vec![],
-                axis_color: Some(app.theme.axis_color),
-            };
+            let mut bar_data = crate::chart::data_builder::build_diff_bar_data(
+                &tuples,
+                None,
+                None,
+                result.y_column.clone(),
+                Some(title),
+            );
+            bar_data.axis_color = Some(app.theme.axis_color);
+            bar_data.show_labels = true;
             let chart_data = ChartData::Bar(bar_data);
             frame.render_widget(ChartWidget(&chart_data), area);
         }
         DiffData::Temporal(ts) => {
+            use crate::render::ChartWidget;
             let title = format!(
                 "Diff: {} over {} ({} vs {})",
                 ts.y_column, ts.x_column, app.before_name, app.after_name
             );
-
-            // Compute Y axis from combined data
-            let all_y: Vec<f64> = ts
-                .before
-                .iter()
-                .chain(ts.after.iter())
-                .map(|(_, y)| *y)
-                .collect();
-            let y_axis = Axis::from_data(&ts.y_column, &all_y);
-
-            // X axis spans the label indices
-            let x_max = if ts.x_labels.is_empty() {
-                1.0
-            } else {
-                (ts.x_labels.len() - 1) as f64
-            };
-            let x_axis = Axis {
-                label: ts.x_column.clone(),
-                min: 0.0,
-                max: x_max,
-            };
-
-            let config = ChartConfig {
-                series: vec![
-                    Series {
-                        name: app.before_name.clone(),
-                        data: ts.before.clone(),
-                    },
-                    Series {
-                        name: app.after_name.clone(),
-                        data: ts.after.clone(),
-                    },
-                ],
-                x_labels: Some(ts.x_labels.clone()),
-                title: Some(title),
-                x_axis,
-                y_axis,
-                series_colors: vec![Color::DarkGray, Color::Cyan],
-                axis_color: Some(app.theme.axis_color),
-                label_color: Some(app.theme.label_color),
-            };
+            // Canonical temporal-diff config; interactive TUI keeps full
+            // union labels (no terminal-width fitting here).
+            let mut config = crate::chart::data_builder::build_diff_line_config(
+                &ts.before,
+                &ts.after,
+                &ts.x_labels,
+                &ts.x_column,
+                &ts.y_column,
+                Some(title),
+            );
+            config.series[0].name = app.before_name.clone();
+            config.series[1].name = app.after_name.clone();
+            config.axis_color = Some(app.theme.axis_color);
+            config.label_color = Some(app.theme.label_color);
             let chart_data = ChartData::Line(config);
             frame.render_widget(ChartWidget(&chart_data), area);
         }
@@ -252,9 +215,9 @@ fn build_diff_header(app: &DiffExploreApp) -> Paragraph<'static> {
 
 fn build_diff_status_bar(app: &DiffExploreApp) -> Paragraph<'static> {
     let sort_label = match app.sort_order {
-        None | Some(crate::cli::SortOrder::None) => "off",
-        Some(crate::cli::SortOrder::Desc) => "desc",
-        Some(crate::cli::SortOrder::Asc) => "asc",
+        None | Some(crate::chart::selector::SortOrder::None) => "off",
+        Some(crate::chart::selector::SortOrder::Desc) => "desc",
+        Some(crate::chart::selector::SortOrder::Asc) => "asc",
     };
 
     let bindings: Vec<(&str, &str)> = vec![
@@ -328,4 +291,82 @@ fn render_diff_help_overlay(frame: &mut Frame) {
     );
 
     frame.render_widget(paragraph, popup);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::diff::{DiffEntry, DiffResult};
+    use ratatui::{Terminal, backend::TestBackend};
+
+    fn categorical_app() -> DiffExploreApp {
+        let result = DiffResult {
+            entries: vec![
+                DiffEntry {
+                    label: "Tokyo".to_string(),
+                    before: 100.0,
+                    after: 150.0,
+                    delta: 50.0,
+                    pct_change: Some(50.0),
+                },
+                DiffEntry {
+                    label: "Osaka".to_string(),
+                    before: 200.0,
+                    after: 180.0,
+                    delta: -20.0,
+                    pct_change: Some(-10.0),
+                },
+                DiffEntry {
+                    label: "Nagoya".to_string(),
+                    before: 80.0,
+                    after: 80.0,
+                    delta: 0.0,
+                    pct_change: Some(0.0),
+                },
+            ],
+            x_column: "city".to_string(),
+            y_column: "revenue".to_string(),
+            before_rows: 3,
+            after_rows: 3,
+            overall_pct: Some(7.9),
+        };
+        DiffExploreApp::new(
+            DiffData::Categorical(result),
+            "before.csv".to_string(),
+            "after.csv".to_string(),
+            crate::theme::Theme::dark(),
+        )
+    }
+
+    #[test]
+    fn test_categorical_chart_shows_share_percent_labels() {
+        let app = categorical_app();
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                render_diff_chart(frame, &app, area);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer().clone();
+        let mut content = String::new();
+        for y in 0..buffer.area.height {
+            for x in 0..buffer.area.width {
+                content.push_str(buffer[(x, y)].symbol());
+            }
+            content.push('\n');
+        }
+
+        // After values 150/180/80 (total 410): Tokyo 37%, Osaka 44%.
+        assert!(
+            content.contains("37%"),
+            "Tokyo share text missing from chart: {content}"
+        );
+        assert!(
+            content.contains("44%"),
+            "Osaka share text missing from chart: {content}"
+        );
+    }
 }

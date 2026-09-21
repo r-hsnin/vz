@@ -1,16 +1,16 @@
 [package]
 name = "vz"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.88"
 description = "CLI BI tool with smart visualization and terminal presentation"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/r-hsnin/vz"
-homepage = "https://r-hsnin.github.io/vz/"
+homepage = "https://github.com/r-hsnin/vz"
 keywords = ["cli", "visualization", "csv", "chart", "terminal"]
 categories = ["command-line-utilities", "visualization"]
-exclude = ["fixtures/", "tests/", "docs/", ".github/", "demo/", "scripts/", "release-manifest.txt"]
+exclude = ["fixtures/", "tests/", ".github/", "demo/", "docs/", "scripts/", "site/"]
 
 [dependencies]
 # CLI
@@ -18,8 +18,8 @@ clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 
 # TUI
-ratatui = { version = "0.30", features = ["crossterm_0_28"] }
-crossterm = "0.28"
+ratatui = "0.30"
+crossterm = "0.29"
 
 # Data processing
 csv = "1"
@@ -27,16 +27,15 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # Type inference
-chrono = "0.4"
 regex = "1"
 
 # Error handling
 anyhow = "1"
-notify = "7"
+notify = "8"
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
-insta = "1.48.0"
+criterion = { version = "0.8", features = ["html_reports"] }
+insta = "1"
 pretty_assertions = "1"
 serde_json = "1"
 tempfile = "3"

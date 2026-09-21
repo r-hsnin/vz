@@ -1,10 +1,38 @@
-use super::{Cli, SortOrder};
+use super::Cli;
+use crate::chart::selector::SortOrder;
+
+use super::OutputFormat;
+
+/// Resolved, Cli-free inputs for the single-file render pipeline.
+///
+/// Built once in the app plane (`Cli::to_pipeline_params`); downstream
+/// pipeline/output code takes this instead of `&Cli`. The `query` field is
+/// the Phase 2 `Query` seam (`to_query`); the rest are the other `Cli`
+/// resolutions the pipeline needs (sort/limit/output/flags/theme/…).
+#[derive(Debug, Clone)]
+pub struct PipelineParams {
+    pub query: crate::chart::Query,
+    pub filters: Vec<String>,
+    pub sample: Option<usize>,
+    pub info: bool,
+    pub all_y: bool,
+    pub output: Option<OutputFormat>,
+    pub sort: Option<SortOrder>,
+    pub sort_flag: Option<SortOrder>,
+    pub limit: Option<usize>,
+    pub bins: Option<usize>,
+    pub title: Option<String>,
+    pub labels: bool,
+    pub width: Option<u16>,
+    pub height: Option<u16>,
+    pub theme: Option<super::ThemeArg>,
+}
 
 impl Cli {
     /// Compute the effective sort order, considering --top (implies desc) and --tail (implies asc).
     pub fn effective_sort(&self) -> Option<SortOrder> {
-        if self.sort.is_some() {
-            return self.sort;
+        if let Some(s) = self.sort {
+            return Some(s.to_sort_order());
         }
         if self.top.is_some() {
             return Some(SortOrder::Desc);
@@ -32,9 +60,110 @@ impl Cli {
     pub fn primary_file(&self) -> Option<&std::path::Path> {
         self.file.first().map(|p| p.as_path())
     }
+
+    /// Convert CLI flags into the Cli-free [`Query`](crate::chart::Query).
+    /// Single conversion point for the recommendation seam (app plane only).
+    pub fn to_query(&self) -> crate::chart::Query {
+        crate::chart::Query {
+            x_col: self.x_col.clone(),
+            y_col: self.y_col.clone(),
+            chart_type: self.chart_type,
+            color_col: self.color_col.clone(),
+            agg: self.agg.map(|a| a.to_agg_function()),
+        }
+    }
+
+    /// Convert CLI flags into [`PipelineParams`]: the `Query` seam plus the
+    /// other resolved render inputs. Sole funnel for `Cli → pipeline`.
+    pub fn to_pipeline_params(&self) -> PipelineParams {
+        let query = self.to_query();
+        PipelineParams {
+            query,
+            filters: self.filter.clone(),
+            sample: self.sample,
+            info: self.info,
+            all_y: self.all_y,
+            output: self.output,
+            sort: self.effective_sort(),
+            sort_flag: self.sort.map(|s| s.to_sort_order()),
+            limit: self.top.or(self.tail),
+            bins: self.bins,
+            title: self.title.clone(),
+            labels: self.labels,
+            width: self.width,
+            height: self.height,
+            theme: self.theme,
+        }
+    }
+
+    /// Convert CLI flags into [`DirectoryParams`]: the `PipelineParams`
+    /// seam plus the directory scan/combine/catalog inputs. Sole funnel
+    /// for `Cli → directory`.
+    pub fn to_directory_params(&self) -> DirectoryParams {
+        DirectoryParams {
+            pipeline: self.to_pipeline_params(),
+            glob_pattern: self.glob.clone(),
+            recurse: self.recurse,
+            catalog: self.catalog,
+            no_header: self.no_header,
+            no_limit: self.no_limit,
+        }
+    }
+
+    /// Convert CLI flags into [`DiffParams`]: the `Query` seam plus the
+    /// other resolved diff inputs. Sole funnel for `Cli → diff`.
+    pub fn to_diff_params(&self) -> DiffParams {
+        DiffParams {
+            query: self.to_query(),
+            no_header: self.no_header,
+            format: super::format_override(self),
+            output: self.output,
+            sort: self.effective_sort(),
+            limit: self.top.or(self.tail),
+            width: self.width,
+            height: self.height,
+            title: self.title.clone(),
+            theme: self.theme,
+        }
+    }
 }
 
-/// Parse a column spec that may include a label override.
+/// Resolved, Cli-free inputs for directory mode (multi-file combine).
+///
+/// Built once in the app plane (`Cli::to_directory_params`); downstream
+/// directory code takes this instead of `&Cli`. The `pipeline` field is
+/// the Phase 2-4 seam (`to_pipeline_params`); the rest are the directory
+/// resolutions (scan/combine/catalog flags).
+#[derive(Debug, Clone)]
+pub struct DirectoryParams {
+    pub pipeline: PipelineParams,
+    pub glob_pattern: Option<String>,
+    pub recurse: bool,
+    pub catalog: bool,
+    pub no_header: bool,
+    pub no_limit: bool,
+}
+
+/// Resolved, Cli-free inputs for diff mode (two-file comparison).
+///
+/// Built once in the app plane (`Cli::to_diff_params`); downstream
+/// diff/schema/render code takes this instead of `&Cli`. The `query` field
+/// is the Phase 2 `Query` seam (`to_query`); `--where`/`--agg`/`--color`
+/// have no effect in diff mode, so their warnings stay in the
+/// `run_diff_from_cli` adapter and never reach this struct.
+#[derive(Debug, Clone)]
+pub struct DiffParams {
+    pub query: crate::chart::Query,
+    pub no_header: bool,
+    pub format: Option<crate::loader::InputFormat>,
+    pub output: Option<OutputFormat>,
+    pub sort: Option<SortOrder>,
+    pub limit: Option<usize>,
+    pub width: Option<u16>,
+    pub height: Option<u16>,
+    pub title: Option<String>,
+    pub theme: Option<super::ThemeArg>,
+}
 /// "revenue" → ("revenue", None)
 /// "revenue:Revenue (USD)" → ("revenue", Some("Revenue (USD)"))
 pub fn parse_column_spec(spec: &str) -> (&str, Option<&str>) {
@@ -57,8 +186,60 @@ pub fn parse_multi_y_specs(spec: &str) -> Vec<(&str, Option<&str>)> {
 mod tests {
     use super::*;
     use crate::cli::Cli;
-    use clap::Parser;
+    use clap::{CommandFactory, Parser};
     use std::path::PathBuf;
+
+    #[test]
+    fn test_after_help_shows_examples_legend_and_stream_split() {
+        let after = Cli::command().get_after_help().unwrap().to_string();
+        assert!(after.contains("Examples:"), "{after}");
+        assert!(after.contains("vz sales.csv -x city"), "{after}");
+        assert!(after.contains("→ stable"), "{after}");
+        assert!(
+            after.contains("summary and warnings go to stderr"),
+            "{after}"
+        );
+    }
+
+    #[test]
+    fn test_to_pipeline_params_resolves_render_inputs() {
+        let cli = Cli::try_parse_from(["vz", "data.csv", "--top", "3", "--agg", "mean"]).unwrap();
+        let params = cli.to_pipeline_params();
+        assert_eq!(params.query.x_col, None);
+        assert_eq!(
+            params.query.agg,
+            Some(crate::chart::selector::AggFunction::Mean)
+        );
+        assert_eq!(params.sort, Some(SortOrder::Desc));
+        assert_eq!(params.limit, Some(3));
+        assert_eq!(params.sample, None);
+        assert!(!params.info);
+    }
+
+    #[test]
+    fn test_to_directory_params_resolves_scan_inputs() {
+        let cli =
+            Cli::try_parse_from(["vz", "dir/", "--glob", "sales_*", "--recurse", "--no-limit"])
+                .unwrap();
+        let params = cli.to_directory_params();
+        assert_eq!(params.glob_pattern.as_deref(), Some("sales_*"));
+        assert!(params.recurse);
+        assert!(params.no_limit);
+        assert!(!params.catalog);
+        assert!(!params.no_header);
+        assert_eq!(params.pipeline.query.x_col, None);
+    }
+
+    #[test]
+    fn test_to_diff_params_resolves_render_inputs() {
+        let cli =
+            Cli::try_parse_from(["vz", "a.csv", "b.csv", "--top", "2", "-x", "city"]).unwrap();
+        let params = cli.to_diff_params();
+        assert_eq!(params.query.x_col.as_deref(), Some("city"));
+        assert_eq!(params.sort, Some(SortOrder::Desc));
+        assert_eq!(params.limit, Some(2));
+        assert!(!params.no_header);
+    }
 
     #[test]
     fn test_effective_sort_explicit_sort_takes_priority() {

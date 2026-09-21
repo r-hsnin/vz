@@ -5,7 +5,7 @@
 
 #[cfg(test)]
 mod auto_sample_tests;
-pub mod catalog;
+mod catalog;
 #[cfg(test)]
 mod catalog_tests;
 pub mod combiner;
@@ -20,7 +20,7 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::cli::Cli;
+use crate::cli::{Cli, DirectoryParams};
 
 use self::combiner::combine_files;
 use self::scanner::{ScanOptions, scan_directory};
@@ -75,30 +75,30 @@ pub fn auto_sample_combined(
 }
 
 /// Run directory mode: scan, combine, and render data from a directory.
-pub fn run_directory(cli: &Cli, dir: &Path) -> Result<()> {
+pub fn run_directory(params: &DirectoryParams, dir: &Path) -> Result<()> {
     let opts = ScanOptions {
-        glob_pattern: cli.glob.clone(),
-        recurse: cli.recurse,
+        glob_pattern: params.glob_pattern.clone(),
+        recurse: params.recurse,
     };
 
     let entries = scan_directory(dir, &opts)?;
 
     // Catalog mode: show schema inventory without combining
-    if cli.catalog {
-        return catalog::run_catalog(cli, &entries);
+    if params.catalog {
+        return catalog::run_catalog(params, &entries);
     }
 
-    let result = combine_files(&entries, cli.no_header)?;
+    let result = combine_files(&entries, params.no_header)?;
 
     // Auto-sample if row count exceeds limit (unless --no-limit)
     let (data, auto_sample_warning) =
-        auto_sample_combined(result.data, MAX_COMBINED_ROWS, cli.no_limit);
+        auto_sample_combined(result.data, MAX_COMBINED_ROWS, params.no_limit);
 
     // Emit large dataset warning only if auto-sampling did NOT fire
-    if auto_sample_warning.is_none() {
-        if let Some(warning) = large_dataset_warning(data.rows.len()) {
-            eprintln!("{warning}");
-        }
+    if auto_sample_warning.is_none()
+        && let Some(warning) = large_dataset_warning(data.rows.len())
+    {
+        eprintln!("{warning}");
     }
 
     // Print summary to stderr
@@ -125,5 +125,10 @@ pub fn run_directory(cli: &Cli, dir: &Path) -> Result<()> {
     }
 
     // Feed combined data into the standard render pipeline
-    crate::pipeline::render_data(cli, data, dir)
+    crate::pipeline::render_data(&params.pipeline, data, dir)
+}
+
+/// Cli adapter for [`run_directory`]: converts once, then delegates.
+pub fn run_directory_from_cli(cli: &Cli, dir: &Path) -> Result<()> {
+    run_directory(&cli.to_directory_params(), dir)
 }

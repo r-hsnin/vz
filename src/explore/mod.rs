@@ -7,18 +7,18 @@ use crossterm::event::KeyCode;
 use std::io::IsTerminal;
 
 use crate::chart::selector::ChartType;
-use crate::cli::{AggFunction, SortOrder};
+use crate::chart::selector::{AggFunction, SortOrder};
 use crate::infer::types::Schema;
 
 /// View mode for the Explore TUI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ViewMode {
+pub(crate) enum ViewMode {
     Chart,
     Table,
 }
 
 /// Application state for Explore mode.
-pub struct ExploreApp {
+pub(crate) struct ExploreApp {
     pub schema: Schema,
     pub data: Vec<Vec<String>>,
     pub selected_x: usize,
@@ -41,7 +41,7 @@ pub struct ExploreApp {
 }
 
 /// Run the Explore TUI app.
-pub fn run_explore(
+pub(crate) fn run_explore(
     schema: Schema,
     data: Vec<Vec<String>>,
     theme: crate::theme::Theme,
@@ -86,7 +86,7 @@ pub fn run_explore(
 }
 
 /// Run the Diff Explore TUI app.
-pub fn run_explore_diff(
+pub(crate) fn run_explore_diff(
     diff_data: DiffData,
     before_name: String,
     after_name: String,
@@ -130,10 +130,10 @@ mod app;
 mod render;
 mod state;
 
-pub mod diff;
+pub(crate) mod diff;
 mod diff_render;
 
-pub use diff::DiffData;
+pub(crate) use diff::DiffData;
 
 #[cfg(test)]
 mod tests;

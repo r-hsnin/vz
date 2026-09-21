@@ -9,7 +9,7 @@ use ratatui::{
 
 /// Determine whether to output ANSI color codes (for stdout).
 /// Respects NO_COLOR env var (<https://no-color.org/>) and TTY detection.
-pub fn should_colorize() -> bool {
+pub(crate) fn should_colorize() -> bool {
     // NO_COLOR takes precedence (any non-empty value disables color)
     if std::env::var("NO_COLOR").is_ok_and(|v| !v.is_empty()) {
         return false;
@@ -24,7 +24,7 @@ pub fn should_colorize() -> bool {
 
 /// Determine whether to output ANSI color codes to stderr.
 /// Used by the summary line which is always printed to stderr.
-pub fn should_colorize_stderr() -> bool {
+pub(crate) fn should_colorize_stderr() -> bool {
     if std::env::var("NO_COLOR").is_ok_and(|v| !v.is_empty()) {
         return false;
     }
@@ -35,7 +35,7 @@ pub fn should_colorize_stderr() -> bool {
 }
 
 /// Convert a ratatui Buffer to ANSI-colored text and write to the given writer.
-pub fn print_buffer<W: Write>(buf: &Buffer, writer: &mut W) -> anyhow::Result<()> {
+pub(crate) fn print_buffer<W: Write>(buf: &Buffer, writer: &mut W) -> anyhow::Result<()> {
     let colorize = should_colorize();
     let area = buf.area;
 
@@ -77,7 +77,7 @@ pub fn print_buffer<W: Write>(buf: &Buffer, writer: &mut W) -> anyhow::Result<()
 }
 
 /// Convert a ratatui Style to ANSI escape sequence.
-pub fn style_to_ansi(style: Style) -> String {
+pub(crate) fn style_to_ansi(style: Style) -> String {
     let mut codes: Vec<String> = Vec::new();
 
     if let Some(fg) = style.fg

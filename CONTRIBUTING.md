@@ -1,276 +1,206 @@
 # Contributing to vz
 
+Everything needed to build, test, lint, bench, and submit changes. For module structure see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); for design rationale see
+[docs/DESIGN.md](docs/DESIGN.md). User-facing
+CLI behavior is documented in [README.md](README.md); do not duplicate it here.
+
 ## Prerequisites
 
-- Rust 1.85+ (install via [rustup](https://rustup.rs/))
-- Cargo (comes with rustup)
+- [rustup](https://rustup.rs/) with the pinned toolchain from `rust-toolchain.toml`
+  (channel `1.97.0`, components `rustfmt`, `clippy`). Running `cargo` inside the repo selects it
+  automatically.
+- Minimum supported Rust version (MSRV): **1.88**. This is **only** verified in CI by
+  `cargo +1.88.0 check --locked` (the `msrv` job). A bare `cargo check` uses the pinned 1.97.0
+  toolchain and does not validate MSRV — install 1.88.0 via rustup if you want to check locally.
 
-## Development Setup
+## Setup, build, run
 
 ```bash
-# Clone the repository
-git clone <repo-url>
-cd vz
+git clone <repo-url> && cd vz   # fork on GitHub, or clone your fork
 
-# Build the project
-cargo build
+cargo build                     # debug build
+cargo build --release           # optimized binary at target/release/vz
 
-# Run the binary
 cargo run -- fixtures/sales.csv
-
-# Run in release mode
-cargo run --release -- fixtures/sales.csv
+cargo run -- fixtures/sales.csv -o json
+cargo run -- fixtures/diff/sales_before.csv fixtures/diff/sales_after.csv
 ```
 
-## Project Structure
+Example datasets live in `fixtures/`. `demo/` contains larger showcase assets.
 
-<!-- AUTO-GENERATED: from src/ directory structure -->
+## Pre-commit verification
 
-```
-src/
-├── main.rs              — Entry point, CLI dispatch (thin wrapper over lib.rs)
-├── lib.rs               — Library crate: re-exports all modules for benchmarks
-├── cli/                 — CLI argument definitions (clap derive)
-│   ├── mod.rs           — Cli struct, Command enum, re-exports
-│   ├── types.rs         — ValueEnum enums (SortOrder, OutputFormat, ThemeArg, etc.)
-│   └── args.rs          — Cli impl methods (effective_sort, diff_pair, parse helpers)
-├── loader/              — CSV/TSV/JSON/NDJSON/Space unified loader
-│   ├── mod.rs           — Format dispatch, load_from_file, load_from_content
-│   ├── tests.rs         — Loader unit tests
-│   └── space/           — Fixed-width / space-aligned format parser
-│       ├── mod.rs       — Public API re-exports, Column struct
-│       ├── detect.rs    — looks_like_space_format, detect_columns
-│       ├── parse.rs     — load_space, extract_row, find_gap_near
-│       └── tests.rs     — Space parser unit tests
-├── infer/               — Type inference engine
-│   ├── mod.rs           — Schema inference entrypoint
-│   ├── types.rs         — DataType enum, ColumnMeta, Schema
-│   └── detector.rs      — Value-level type detection
-├── pipeline.rs          — Render pipeline: infer → select → render → output
-├── info.rs              — --info column metadata display
-├── helpers/             — Shared helper functions
-│   ├── mod.rs           — Re-exports
-│   ├── args.rs          — CLI argument processing (build_render_options, resolve_theme)
-│   ├── format.rs        — Format detection helpers (format_override)
-│   └── data.rs          — Data transformation (apply_filters, build_recommendation)
-├── chart/               — Chart selection & data building
-│   ├── mod.rs           — Module re-exports
-│   ├── selector.rs      — Type combination → chart type mapping
-│   └── data_builder.rs  — Schema+rows → rendering data structures
-├── filter.rs            — Row filtering engine (--where predicates)
-├── render/              — Terminal chart rendering (ratatui widgets)
-│   ├── mod.rs           — ChartData enum, ChartWidget, dispatch
-│   ├── line.rs          — Line/Scatter unified widget (XYChart)
-│   ├── bar.rs           — Bar chart widget
-│   ├── scatter.rs       — Scatter re-export (thin wrapper)
-│   ├── histogram.rs     — Histogram widget
-│   ├── heatmap.rs       — Heatmap widget (Cat×Cat count matrix)
-│   └── nice_numbers.rs  — Axis tick calculation
-├── oneshot/             — One-shot stdout rendering (Buffer → ANSI)
-│   ├── mod.rs           — Render orchestration
-│   ├── builders.rs      — Chart data builders (bar/histogram/line)
-│   ├── summary.rs       — Summary line & color legend
-│   ├── ansi.rs          — ANSI escape sequence output
-│   └── tests.rs         — Unit tests (separated for file size)
-├── output/              — Machine-readable output formats
-│   ├── mod.rs           — InfoOutput struct, build_info_output
-│   ├── chart_json.rs    — --output json chart data generation
-│   ├── markdown.rs      — --output markdown (GFM tables)
-│   ├── spark.rs         — --output spark (Unicode sparklines)
-│   ├── stats_text.rs    — Column statistics text formatter
-│   ├── svg.rs           — --output svg (monospace SVG image)
-│   ├── html.rs          — --output html (self-contained interactive HTML)
-│   └── table.rs         — --output table (formatted text)
-├── diff/                — Diff mode: compare two data files
-│   ├── mod.rs           — Public API, DiffEntry/DiffResult/DiffTimeSeries structs
-│   ├── schema.rs        — Schema validation, column resolution
-│   ├── compute.rs       — compute_diff, compute_diff_temporal, aggregate_by_category
-│   ├── tests.rs         — Diff computation unit tests
-│   └── render/          — Diff output rendering
-│       ├── mod.rs       — render_diff / render_diff_line dispatch
-│       ├── bar.rs       — Categorical bar chart (▲/▼ annotations)
-│       ├── line.rs      — Temporal line overlay (before=gray, after=cyan)
-│       ├── spark.rs     — Sparkline diff output
-│       ├── json.rs      — JSON diff output
-│       ├── markdown.rs  — Markdown table diff output
-│       ├── html.rs      — HTML/SVG diff output
-│       └── tests.rs     — Diff render unit tests
-├── directory/           — Directory mode: auto-combine matching files
-│   ├── mod.rs           — Entry point, run_directory
-│   ├── scanner.rs       — File discovery & schema matching
-│   ├── combiner.rs      — Multi-file row merging with _source column
-│   ├── catalog.rs       — --catalog schema display
-│   ├── date_extract.rs  — Date extraction from filenames
-│   └── tests.rs         — Directory mode unit tests
-├── explore/             — Interactive TUI mode
-│   ├── mod.rs           — ExploreApp state & key handling
-│   ├── render.rs        — TUI rendering (chart, table, status bar)
-│   ├── diff.rs          — DiffExploreApp: diff exploration state & keys
-│   ├── diff_render.rs   — Diff TUI rendering (bar/line chart, table)
-│   ├── diff/tests.rs    — Diff explore unit tests
-│   └── tests.rs         — Explore mode unit tests
-├── present/             — Slide presentation mode
-│   ├── mod.rs           — PresentApp state & key handling
-│   ├── parser.rs        — Markdown slide parser
-│   ├── render.rs        — Slide rendering (elements, charts)
-│   ├── chart_loader.rs  — Chart data loading & type inference
-│   └── tests.rs         — Unit tests (separated for file size)
-├── diagnostics.rs       — Error hints & file suggestions
-├── sparkline.rs         — Shared sparkline generation utility
-├── theme.rs             — Color theme definitions (dark/light/high-contrast)
-├── util.rs              — Numeric utilities (min_max)
-└── watch.rs             — File watch & auto-redraw (--watch)
-```
-
-<!-- /AUTO-GENERATED -->
-
-## Available Commands
-
-| Command | Description |
-|---------|-------------|
-| `cargo build` | Build the project |
-| `cargo run -- <args>` | Run with arguments |
-| `cargo test` | Run all tests (unit + integration) |
-| `cargo clippy --all-targets -- -D warnings` | Lint with zero warnings |
-| `cargo fmt` | Format code |
-| `cargo doc --open` | Generate and open API docs |
-
-## Testing
-
-### Run all tests
+Run these before every commit. `cargo fmt --check`, `cargo clippy`, and `cargo test` are the
+repo's verification commands and run in the local hooks and CI; `git diff --check` is an
+additional local whitespace sanity check (not run by hooks or CI):
 
 ```bash
+cargo fmt                                              # or: cargo fmt --check
+cargo clippy --all-targets -- -D warnings              # zero warnings required
 cargo test
+git diff --check                                       # whitespace sanity check, local only
 ```
 
-This runs:
-- **~708 unit tests** — inline `#[cfg(test)]` modules in each source file
-- **~221 integration tests** — `tests/integration_test.rs`, end-to-end binary tests
-- **4 snapshot tests** — `tests/snapshot_test.rs`, visual regression tests
+Never bypass a failing hook with `--no-verify` (emergency only).
 
-### Run specific tests
+## Test layout
 
-```bash
-# Run a single test by name
-cargo test test_basic_csv
+`vz` uses unit tests, integration tests, and `insta` snapshots.
 
-# Run all tests in a module
-cargo test oneshot::tests
+### Unit tests
 
-# Run integration tests only
-cargo test --test integration_test
-
-# Run snapshot tests only
-cargo test --test snapshot_test
-
-# Run with output shown
-cargo test -- --nocapture
-```
-
-### Writing tests
-
-- Unit tests go in the same file as the code, inside a `#[cfg(test)]` module
-- Integration tests go in `tests/integration_test.rs`
-- Use `pretty_assertions` for readable diffs
-- Use `tempfile` for temporary file creation in tests
-
-Example integration test:
+Unit tests live beside the code they exercise, pulled in by one of:
 
 ```rust
-#[test]
-fn test_my_feature() {
-    let output = vz_binary()
-        .arg("fixtures/sales.csv")
-        .output()
-        .expect("Failed to run vz");
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(output.status.success());
-    assert!(stdout.contains("expected output"));
-}
+#[cfg(test)] mod tests;                       // e.g. src/render/tests.rs
+#[cfg(test)] #[path = "data_builder_tests.rs"] mod tests;   // sibling *_tests.rs
 ```
 
-### Test fixtures
+The aggregate `tests.rs` form exists for legacy modules only; new modules must use per-module
+sibling files. Shared test fixtures `make_schema` / `make_recommendation` live in
+`src/test_helpers.rs` (test builds only). Use `pretty_assertions` for readable diffs.
 
-Test data lives in `fixtures/`:
-- `sales.csv` — Sample sales data (date, city, revenue, profit)
-- `departments.csv` — Categorical×Categorical data (department, status)
-- `stock.csv` — Time-series stock data
-- `temperature.csv` — Multi-point temperature measurements
-- `exam_scores.csv` — Numeric exam scores
-- `body_measurements.csv` — Quantitative×Quantitative data
-- `access_log.csv` — Large-ish log-style data (2000 rows)
-- `messy_data.csv` — Edge case: missing values, mixed types
-- `mixed_values.csv` — Edge case: mixed parseable/non-parseable Y values
-- `scores.json` — JSON array format test data
-- `demo.md` — Sample presentation file with chart blocks
-- `code_demo.md` — Presentation with code blocks
+### Integration tests
+
+Integration tests live in `tests/`, one target per feature area:
+
+| Target | Area |
+|---|---|
+| `tests/oneshot.rs` | Default one-shot rendering |
+| `tests/flags.rs` | Flag parsing and interactions |
+| `tests/inputs.rs` | Loaders and input formats |
+| `tests/output.rs` | Output formats (JSON/table/markdown/spark/svg/html) |
+| `tests/directory.rs` | Directory combine and catalog modes |
+| `tests/diff.rs` | Two-file diff mode |
+| `tests/modes.rs` | Watch, explore, present, completions |
+| `tests/snapshot_test.rs` | `insta` snapshot tests |
+
+Shared helpers live **only** in `tests/common/mod.rs`. Reuse them; do not copy helpers into a
+target. Available helpers:
+
+| Helper | Purpose |
+|---|---|
+| `vz_binary()` | Command with `TERM=dumb` for stable widths |
+| `vz_command()` | Command with no environment overrides |
+| `vz_no_color()` | Command with `NO_COLOR=1`, `FORCE_COLOR` removed |
+| `run_vz_stdout(args)` | Deterministic run (`NO_COLOR=1`, `COLUMNS=80`), returns stdout |
+| `temp_csv(rows)` | Temp file with the given rows |
+| `temp_csv_with_suffix(suffix, rows)` | Same, with an extension for format detection |
+| `MIN_CHART_LINES` | Minimum chart height for smoke assertions |
+
+Use `tempfile` for temporary files.
+
+### Snapshots
+
+Rendered-output snapshots use [`insta`](https://insta.rs/), stored under `tests/snapshots/`. A
+changed rendering writes a pending `*.snap.new` and fails the test (expected Red):
+
+1. Run `cargo test --test snapshot_test`.
+2. Review each `tests/snapshots/*.snap.new` and confirm the rendering is correct, not merely
+   different.
+3. Accept with `cargo insta accept` (if `cargo-insta` is installed) or by renaming `.snap.new`
+   to `.snap`.
+4. Re-run to confirm green.
+
+Keep snapshots deterministic: helpers must pin `NO_COLOR=1` and `COLUMNS=80` (as `run_vz_stdout`
+does). Verify a new snapshot is byte-identical across two runs before accepting.
+
+### Fixtures
+
+| Path | Contents |
+|---|---|
+| `fixtures/` | `sales`, `departments`, `stock`, `temperature`, `exam_scores`, `body_measurements`, `access_log`, `bom_sales`, `messy_data`, `mixed_values` (CSV); `scores.json`; `demo.md`, `code_demo.md` |
+| `fixtures/diff/` | before/after pairs: `sales_before`/`sales_after`, `timeseries_before`/`timeseries_after`, `ts_daily_before`/`ts_daily_after`, plus `identical`, `schema_mismatch` |
+| `fixtures/dir_test/` | 13 directory-mode cases: `case_insensitive`, `dated`, `empty`, `header_only`, `mixed_extensions`, `mixed_format`, `mixed_schema`, `nested` (includes `empty_sub` and `.hidden_dir`), `ragged`, `reordered`, `same_schema`, `single_file`, `with_hidden` |
+| `fixtures/fixed_width/` | Space-aligned samples: `kubectl_get_pods`, `kubectl_top_pods`, `df_h`, `ps_aux`, `lsblk`, `separator_lines`, `empty_values`, `single_row` |
+
+## Running specific tests
+
+```bash
+cargo test                              # all unit + integration + snapshot tests
+cargo test --test diff                  # one integration target (area)
+cargo test --test directory             # another target
+cargo test snapshot_test                # snapshot target
+cargo test oneshot::tests               # all tests in a unit module
+cargo test test_basic_csv               # a single test by name
+cargo test -- --nocapture               # show stdout/stderr from tests
+```
 
 ## Benchmarking
 
-Performance benchmarks use [Criterion.rs](https://github.com/bheisler/criterion.rs):
+Benchmarks use [Criterion](https://github.com/bheisler/criterion.rs), declared as
+`[[bench]] name = "loading"` with `harness = false` in `Cargo.toml`, source in
+`benches/loading.rs`:
 
 ```bash
-# Run all benchmarks
-cargo bench
-
-# Run a specific benchmark
-cargo bench -- csv_parse
-
-# Run with filtering
-cargo bench -- "pipeline"
+cargo bench                             # all benchmarks
+cargo bench -- csv_parse                # filter by name
+cargo bench -- --save-baseline before   # save a baseline
+cargo bench -- --baseline before        # compare after changes
 ```
-
-Benchmark suite (`benches/loading.rs`) covers:
 
 | Benchmark | What it measures |
-|-----------|-----------------|
-| `csv_parse_1000` | CSV parsing (1000 rows) |
-| `json_parse_1000` | JSON array parsing (1000 rows) |
-| `space_parse_1000` | Space-aligned format parsing (1000 rows) |
-| `infer_1000` | Type inference (1000 rows) |
-| `infer_10000_rows` | Type inference scaling (10000 rows, sampled) |
-| `pipeline_csv_1000` | Full render pipeline (CSV → chart selection) |
-| `full_pipeline/json_load_infer_1000` | End-to-end JSON load + infer |
+|---|---|
+| `csv_parse_1000` | CSV parsing of 1000 rows |
+| `json_parse_1000` | JSON array parsing of 1000 rows |
+| `space_parse_1000` | Fixed-width/space parsing of 1000 rows |
+| `infer_1000` | `infer_from_data` on 1000 rows |
+| `infer_10000_rows` | `infer_from_data` scaling (sampled) |
+| `pipeline_csv_1000` | CSV load **plus** `infer_from_data` only — **no chart selection** |
+| `full_pipeline/csv_load_infer_1000` | End-to-end CSV load + infer (group) |
+| `full_pipeline/json_load_infer_1000` | End-to-end JSON load + infer (group) |
 
-Results are stored in `target/criterion/` with HTML reports. After running benchmarks, open `target/criterion/report/index.html` for a visual comparison.
+Results and HTML reports are written under `target/criterion/`; open
+`target/criterion/report/index.html` for comparisons.
 
-When optimizing hot paths, run benchmarks before and after to verify improvement:
+## Dependency hygiene
+
+The dependency list lives in `Cargo.toml` (`[dependencies]` / `[dev-dependencies]`). Check for
+unused dependencies with:
 
 ```bash
-# Save baseline
-cargo bench -- --save-baseline before
-
-# Make changes, then compare
-cargo bench -- --baseline before
+cargo machete    # manual; requires: cargo install cargo-machete
 ```
 
-## Code Style
+Ask a maintainer before adding a new dependency — binary size is a first-class concern, and the
+core stays deliberately dependency-light (no external data engine).
 
-- **Formatter**: `cargo fmt` (rustfmt with default settings)
-- **Linter**: `cargo clippy --all-targets -- -D warnings` (zero warnings policy)
-- Keep functions under 50 lines where possible
-- Keep files focused and under 800 lines
-- Use descriptive names; no abbreviations in public APIs
+## Local hooks
 
-## Pull Request Checklist
+Maintainers wire the verification commands into local Git hooks. Hooks only run when installed in a
+clone, so do not assume they are active — run the commands in
+[Pre-commit verification](#pre-commit-verification) manually if unsure.
 
-Before submitting a PR:
+## Continuous integration
 
-- [ ] `cargo fmt` — code is formatted
-- [ ] `cargo clippy --all-targets -- -D warnings` — zero warnings
-- [ ] `cargo test` — all tests pass
-- [ ] New functionality has tests
-- [ ] README.md updated if CLI interface changed (update AUTO-GENERATED section)
-- [ ] DESIGN.md updated if architecture changed
+`.github/workflows/ci.yml` runs on pushes and pull requests targeting `main` (ignoring `**/*.md`)
+and on manual dispatch:
 
-## Architecture Notes
+| Job | Steps |
+|---|---|
+| `test` (ubuntu, toolchain 1.97.0) | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` |
+| `msrv` (ubuntu, toolchain 1.88.0) | `cargo +1.88.0 check --locked` |
 
-See [DESIGN.md](DESIGN.md) for the full architecture document.
+There is no release job; releases are handled manually by the maintainers.
 
-Key pipeline: **CLI → Data Loader → Type Inference → Chart Selection → Rendering**
+## Commit and pull request conventions
 
-Three output modes:
-1. **One-shot** (default) — Renders chart to stdout via in-memory buffer
-2. **Explore** — Interactive TUI with ratatui
-3. **Present** — Slide presentation from Markdown with embedded charts
+- Commit format: `<type>: <description>`. Allowed types: `feat`, `fix`, `refactor`, `docs`,
+  `test`, `chore`, `perf`, `ci`.
+- Keep commits logical and focused — do not mix unrelated concerns.
+- Stage files explicitly (`git add <paths>`); do not blanket-add.
+- Do **not** change the `version` in `Cargo.toml` except as part of a release.
+- External contributors: fork the repository and open a pull request against `main`.
+- Documentation is part of the change: update `README.md` for CLI changes,
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for structure, [docs/DESIGN.md](docs/DESIGN.md) for
+  design decisions, and [docs/GOTCHAS.md](docs/GOTCHAS.md) for non-obvious pitfalls.
+- New functionality requires tests: add or update both unit and integration tests.
+
+Before opening a PR:
+
+- [ ] `cargo fmt` applied
+- [ ] `cargo clippy --all-targets -- -D warnings` is clean
+- [ ] `cargo test` passes
+- [ ] Tests added or updated for the change
+- [ ] Relevant docs updated

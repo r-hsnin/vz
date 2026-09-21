@@ -52,6 +52,13 @@ fn test_chart_type_override() {
 }
 
 #[test]
+fn test_chart_type_heatmap_key() {
+    let mut app = make_test_app();
+    app.handle_key(KeyCode::Char('5'));
+    assert_eq!(app.effective_chart_type(), ChartType::Heatmap);
+}
+
+#[test]
 fn test_chart_type_reset_to_auto() {
     let mut app = make_test_app();
     app.handle_key(KeyCode::Char('3'));
@@ -126,6 +133,16 @@ fn test_build_histogram_data() {
     let hist_data = app.build_histogram_data();
     assert_eq!(hist_data.values.len(), 4);
     assert_eq!(hist_data.bin_count, 10);
+}
+
+#[test]
+fn test_build_histogram_data_bins_quantitative_column() {
+    let mut app = make_test_app();
+    app.selected_x = 1; // city (categorical)
+    app.selected_y = 2; // revenue (quantitative)
+    let hist_data = app.build_histogram_data();
+    assert_eq!(hist_data.x_label, "revenue");
+    assert_eq!(hist_data.values.len(), 4);
 }
 
 #[test]

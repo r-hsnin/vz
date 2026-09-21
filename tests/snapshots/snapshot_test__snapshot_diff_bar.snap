@@ -1,0 +1,10 @@
+---
+source: tests/snapshot_test.rs
+assertion_line: 62
+expression: output
+---
+Diff │ x=city │ y=revenue │ sales_before vs sales_after │ Δ net +5% │ 4 entries
+  Tokyo    ████████████  1k → 1.2k  ▲ +20%
+  Osaka    █████████████  1.5k → 1.4k  ▼ -10%
+  Nagoya   █████████  800 → 950  ▲ +19%
+  Fukuoka  ██████  600 → 600  ─ 0%

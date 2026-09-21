@@ -4,8 +4,8 @@ use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
 use crate::chart::data_builder;
+use crate::chart::selector::AggFunction;
 use crate::chart::selector::ChartType;
-use crate::cli::AggFunction;
 
 use super::ChartBlock;
 
@@ -31,8 +31,7 @@ fn load_diff_chart_data(
     theme: &crate::theme::Theme,
 ) -> Result<crate::render::ChartData> {
     use crate::diff::{compute_diff, compute_diff_temporal, validate_schema};
-    use crate::infer::types::DataType;
-    use crate::render::{Axis, ChartConfig, ChartData, Series};
+    use crate::render::ChartData;
 
     let before_path = resolve_chart_source_path(&block.source, base_dir);
     let after_path = resolve_chart_source_path(diff_source, base_dir);
@@ -61,11 +60,7 @@ fn load_diff_chart_data(
     let x_col = if let Some(ref x) = block.x_col {
         x.clone()
     } else {
-        schema
-            .columns
-            .iter()
-            .find(|c| c.data_type == DataType::Categorical || c.data_type == DataType::Temporal)
-            .map(|c| c.name.clone())
+        crate::diff::auto_x_column(&schema, &before.headers)
             .unwrap_or_else(|| before.headers.first().cloned().unwrap_or_default())
     };
 
@@ -73,132 +68,56 @@ fn load_diff_chart_data(
     let y_col = if let Some(ref y) = block.y_col {
         y.clone()
     } else {
-        schema
-            .columns
-            .iter()
-            .find(|c| c.data_type == DataType::Quantitative && c.name != x_col)
-            .map(|c| c.name.clone())
+        crate::diff::auto_y_column(&schema, &x_col)
             .ok_or_else(|| anyhow::anyhow!("No quantitative column found for Y axis"))?
     };
 
     // Determine if X is temporal.
-    let x_is_temporal = schema
-        .find_column(&x_col)
-        .map(|c| c.data_type == DataType::Temporal)
-        .unwrap_or(false);
+    let x_is_temporal = crate::diff::is_temporal_column(&schema, &x_col);
 
     if x_is_temporal {
-        // Temporal diff → 2-series line chart overlay.
+        // Temporal diff → 2-series line chart overlay (canonical assembler;
+        // title defaults to the Diff pair, theme comes from the slide).
         let ts = compute_diff_temporal(&before, &after, &x_col, &y_col)?;
-
-        let all_y: Vec<f64> = ts
-            .before
-            .iter()
-            .chain(ts.after.iter())
-            .map(|(_, y)| *y)
-            .collect();
-        let x_axis = Axis {
-            label: x_col,
-            min: 0.0,
-            max: (ts.x_labels.len().saturating_sub(1)) as f64,
-        };
-        let y_axis = Axis::from_data(&y_col, &all_y);
-
-        let mut config = ChartConfig {
-            title: block
+        let mut config = data_builder::build_diff_line_config(
+            &ts.before,
+            &ts.after,
+            &ts.x_labels,
+            &ts.x_column,
+            &ts.y_column,
+            block
                 .title
                 .clone()
                 .or_else(|| Some(format!("Diff: {} vs {}", block.source, diff_source))),
-            x_axis,
-            y_axis,
-            series: vec![
-                Series {
-                    name: "before".to_string(),
-                    data: ts.before,
-                },
-                Series {
-                    name: "after".to_string(),
-                    data: ts.after,
-                },
-            ],
-            x_labels: Some(ts.x_labels),
-            series_colors: vec![ratatui::style::Color::DarkGray, ratatui::style::Color::Cyan],
-            axis_color: Some(theme.axis_color),
-            label_color: Some(theme.label_color),
-        };
-        config
-            .series_colors
-            .extend(theme.series_colors.iter().skip(2));
+        );
+        config.axis_color = Some(theme.axis_color);
+        config.label_color = Some(theme.label_color);
         Ok(ChartData::Line(config))
     } else {
-        // Categorical diff → bar chart with after values and annotated labels.
-        let mut diff = compute_diff(&before, &after, &x_col, &y_col)?;
-
-        // Apply sort/top from chart block.
-        if let Some(sort) = block.sort {
-            match sort {
-                crate::cli::SortOrder::Desc => {
-                    diff.entries.sort_by(|a, b| {
-                        b.delta
-                            .partial_cmp(&a.delta)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    });
-                }
-                crate::cli::SortOrder::Asc => {
-                    diff.entries.sort_by(|a, b| {
-                        a.delta
-                            .partial_cmp(&b.delta)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    });
-                }
-                _ => {}
-            }
-        } else if block.top.is_some() {
-            // Imply desc sort when top is specified.
-            diff.entries.sort_by(|a, b| {
-                b.delta
-                    .abs()
-                    .partial_cmp(&a.delta.abs())
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-        }
-        if let Some(n) = block.top {
-            diff.entries.truncate(n);
-        }
-
-        // Build bar chart: labels annotated with direction, values = after.
-        let labels: Vec<String> = diff
+        // Categorical diff → bar chart with after values and annotated
+        // labels (canonical assembler; sort/limit + theme stay at the edge).
+        let diff = compute_diff(&before, &after, &x_col, &y_col)?;
+        // `top:` implies desc sort (same funnel as `Cli::effective_sort`).
+        let sort = block
+            .sort
+            .or(block.top.map(|_| crate::chart::selector::SortOrder::Desc));
+        let tuples: Vec<(String, f64, Option<f64>, f64)> = diff
             .entries
             .iter()
-            .map(|e| {
-                let arrow = if e.delta > 0.0 {
-                    "▲"
-                } else if e.delta < 0.0 {
-                    "▼"
-                } else {
-                    "="
-                };
-                let pct = e
-                    .pct_change
-                    .map(|p| format!("{:+.0}%", p))
-                    .unwrap_or_default();
-                format!("{} {}{}", e.label, arrow, pct)
-            })
+            .map(|e| (e.label.clone(), e.after, e.pct_change, e.delta))
             .collect();
-        let values: Vec<f64> = diff.entries.iter().map(|e| e.after).collect();
-
-        let bar_data = crate::render::BarChartData {
-            title: block
+        let mut bar_data = data_builder::build_diff_bar_data(
+            &tuples,
+            sort,
+            block.top,
+            y_col,
+            block
                 .title
                 .clone()
                 .or_else(|| Some(format!("Diff: {} vs {}", block.source, diff_source))),
-            labels,
-            values,
-            y_label: y_col,
-            show_labels: false,
-            series_colors: theme.series_colors.clone(),
-            axis_color: Some(theme.axis_color),
-        };
+        );
+        bar_data.series_colors = theme.series_colors.clone();
+        bar_data.axis_color = Some(theme.axis_color);
         Ok(ChartData::Bar(bar_data))
     }
 }
@@ -241,12 +160,24 @@ pub fn load_chart_data(
         .chart_type
         .unwrap_or_else(|| infer_chart_type_from_data(headers, rows, block));
 
+    // A histogram block naming only X must bin the first quantitative column,
+    // matching oneshot's auto-Y: the default Y slot (column 1) may be
+    // categorical and would otherwise produce an empty histogram.
+    let y_col = match (block.y_col.as_deref(), chart_type) {
+        (Some(y), _) => Some(y.to_string()),
+        (None, ChartType::Histogram) => {
+            data_builder::first_quantitative_column(headers, rows).map(|i| headers[i].clone())
+        }
+        _ => None,
+    };
+
     let axes = data_builder::ResolvedAxes::from_explicit(
         block.x_col.as_deref(),
-        block.y_col.as_deref(),
+        y_col.as_deref(),
         block.color_col.as_deref(),
         headers,
-    );
+    )
+    .with_context(|| format!("Invalid chart block (source: {})", block.source))?;
     build_chart_data_for_type(chart_type, block, rows, &axes, theme)
 }
 
@@ -264,7 +195,18 @@ fn infer_chart_type_from_data(
     let schema = crate::infer::infer_schema(&h_refs, &row_refs);
     let x_hint = block.x_col.as_deref();
     let y_hint = block.y_col.as_deref();
-    crate::chart::select_chart(&schema, x_hint, y_hint)
+    let recommendation = crate::chart::select_chart(&schema, x_hint, y_hint);
+    if let Ok(ref rec) = recommendation
+        && let Some(warning) = crate::chart::selector::fallback_warning(
+            &schema,
+            &rec.x_column,
+            rec.y_column.as_deref(),
+            rec.chart_type,
+        )
+    {
+        eprintln!("{warning}");
+    }
+    recommendation
         .map(|rec| rec.chart_type)
         .unwrap_or(ChartType::Line)
 }
@@ -299,21 +241,27 @@ fn build_chart_data_for_type(
                 agg_fn,
             );
             let sort = block
-                .top
-                .map(|_| crate::cli::SortOrder::Desc)
-                .or(block.sort);
-            crate::oneshot::builders::sort_bar_data(&mut data, sort);
-            crate::oneshot::builders::truncate_bar_data(&mut data, block.top);
+                .sort
+                .or(block.top.map(|_| crate::chart::selector::SortOrder::Desc));
+            data_builder::sort_bar_data(&mut data, sort);
+            data_builder::truncate_bar_data(&mut data, block.top);
             data.series_colors = theme.series_colors.clone();
             data.axis_color = Some(theme.axis_color);
             Ok(ChartData::Bar(data))
         }
         ChartType::Histogram => {
+            // Same bin-column choice as oneshot/JSON (canonical).
+            let col_idx = data_builder::histogram_column(rows, cols.x_idx, cols.y_idx);
+            let label = if col_idx == cols.y_idx {
+                cols.y_label.clone()
+            } else {
+                cols.x_label.clone()
+            };
             let mut data = data_builder::build_histogram(
                 rows,
-                cols.x_idx,
+                col_idx,
                 block.title.clone(),
-                cols.x_label.clone(),
+                label,
                 block.bins,
             );
             data.axis_color = Some(theme.axis_color);

@@ -7,10 +7,9 @@ use serde_json::json;
 
 use crate::chart::data_builder;
 use crate::chart::selector::ChartType;
-use crate::cli::{AggFunction, SortOrder};
+use crate::chart::selector::{AggFunction, SortOrder};
 use crate::infer::types::Schema;
 use crate::loader::LoadedData;
-use crate::oneshot;
 use crate::render;
 
 use super::build_info_output;
@@ -24,6 +23,8 @@ pub struct ChartJsonParams {
     pub extra_y_columns: Vec<(String, Option<String>)>,
     pub color_column: Option<String>,
     pub bins: Option<usize>,
+    pub filters: Vec<String>,
+    pub sample: Option<usize>,
 }
 
 /// Print chart data as JSON (metadata + chart_data field).
@@ -43,22 +44,72 @@ pub fn print_chart_json(
         Some(recommendation),
     );
 
-    let x_idx = data_builder::column_index(headers, &recommendation.x_column).unwrap_or(0);
-    let y_idx = recommendation
-        .y_column
-        .as_ref()
-        .and_then(|y| data_builder::column_index(headers, y))
-        .unwrap_or(x_idx);
+    let axes = data_builder::ResolvedAxes::from_explicit(
+        Some(&recommendation.x_column),
+        recommendation.y_column.as_deref(),
+        recommendation.color_column.as_deref(),
+        headers,
+    )?;
+    let x_idx = axes.x_idx;
+    let y_idx = axes.y_idx;
 
     let chart_data = build_chart_data(headers, rows, x_idx, y_idx, params);
+    let query = super::QueryOutput {
+        chart_type: params.chart_type.to_string().to_lowercase(),
+        x: recommendation.x_column.clone(),
+        y: recommendation.y_column.clone(),
+        extra_y: params
+            .extra_y_columns
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect(),
+        color: params.color_column.clone(),
+        agg: agg_name(params.agg).to_string(),
+        sort: params.sort.map(|s| match s {
+            SortOrder::Desc => "desc".to_string(),
+            SortOrder::Asc => "asc".to_string(),
+            SortOrder::None => "none".to_string(),
+        }),
+        limit: params.limit,
+        bins: params.bins,
+        filters: params.filters.clone(),
+        sample: params.sample,
+    };
 
     let mut output_value = serde_json::to_value(&output)?;
     if let serde_json::Value::Object(ref mut map) = output_value {
         map.insert("chart_data".to_string(), chart_data);
+        map.insert("query".to_string(), serde_json::to_value(&query)?);
+        map.insert(
+            "insights".to_string(),
+            serde_json::to_value(crate::insights::insights_json(
+                &crate::insights::InsightRequest {
+                    chart_type: params.chart_type,
+                    x_column: &recommendation.x_column,
+                    y_column: recommendation.y_column.as_deref(),
+                    color_column: params.color_column.as_deref(),
+                    headers,
+                    rows,
+                    agg: params.agg,
+                    bins: params.bins,
+                },
+            ))?,
+        );
     }
 
     println!("{}", serde_json::to_string_pretty(&output_value)?);
     Ok(())
+}
+
+/// Lowercase aggregation name for the query record.
+fn agg_name(agg: AggFunction) -> &'static str {
+    match agg {
+        AggFunction::Sum => "sum",
+        AggFunction::Mean => "mean",
+        AggFunction::Count => "count",
+        AggFunction::Max => "max",
+        AggFunction::Min => "min",
+    }
 }
 
 /// Build the chart_data JSON value based on chart type.
@@ -71,7 +122,11 @@ fn build_chart_data(
 ) -> serde_json::Value {
     match params.chart_type {
         ChartType::Bar => build_bar_json(rows, x_idx, y_idx, params),
-        ChartType::Histogram => build_histogram_json(rows, y_idx, params.bins),
+        ChartType::Histogram => {
+            // Same bin-column choice as oneshot text/present (canonical).
+            let col_idx = data_builder::histogram_column(rows, x_idx, y_idx);
+            build_histogram_json(rows, col_idx, params.bins)
+        }
         _ => build_series_json(headers, rows, x_idx, y_idx, params),
     }
 }
@@ -85,11 +140,8 @@ fn build_bar_json(
 ) -> serde_json::Value {
     let (mut bar_data, _) =
         data_builder::aggregate_bar(rows, x_idx, y_idx, None, String::new(), params.agg);
-    oneshot::builders::sort_bar_data(&mut bar_data, params.sort);
-    if let Some(n) = params.limit {
-        bar_data.labels.truncate(n);
-        bar_data.values.truncate(n);
-    }
+    data_builder::sort_bar_data(&mut bar_data, params.sort);
+    data_builder::truncate_bar_data(&mut bar_data, params.limit);
     json!({ "type": "bar", "categories": bar_data.labels, "values": bar_data.values })
 }
 
@@ -132,11 +184,12 @@ fn build_series_json(
 
     let mut series: Vec<serde_json::Value> = Vec::new();
     let y_name = headers.get(y_idx).cloned().unwrap_or_default();
+    // Non-finite values are skipped: serde_json cannot represent NaN/inf.
     let points: Vec<serde_json::Value> = rows
         .iter()
         .filter_map(|r| {
             let x = r.get(x_idx)?.clone();
-            let y: f64 = r.get(y_idx)?.replace(',', "").parse().ok()?;
+            let y: f64 = r.get(y_idx).and_then(|v| crate::util::parse_number(v))?;
             Some(json!({"x": x, "y": y}))
         })
         .collect();
@@ -148,7 +201,7 @@ fn build_series_json(
             .iter()
             .filter_map(|r| {
                 let x = r.get(x_idx)?.clone();
-                let y: f64 = r.get(ey)?.replace(',', "").parse().ok()?;
+                let y: f64 = r.get(ey).and_then(|v| crate::util::parse_number(v))?;
                 Some(json!({"x": x, "y": y}))
             })
             .collect();
@@ -173,7 +226,7 @@ fn build_grouped_series_json(
         let group = row.get(color_idx).cloned().unwrap_or_default();
         let point = (|| {
             let x = row.get(x_idx)?.clone();
-            let y: f64 = row.get(y_idx)?.replace(',', "").parse().ok()?;
+            let y: f64 = row.get(y_idx).and_then(|v| crate::util::parse_number(v))?;
             Some(json!({"x": x, "y": y}))
         })();
         if let Some(pt) = point {
@@ -203,6 +256,8 @@ mod tests {
             extra_y_columns: vec![],
             color_column: None,
             bins: None,
+            filters: vec![],
+            sample: None,
         }
     }
 
@@ -240,6 +295,8 @@ mod tests {
             extra_y_columns: vec![],
             color_column: None,
             bins: None,
+            filters: vec![],
+            sample: None,
         };
         let result = build_bar_json(&rows, 0, 1, &params);
         let categories = result["categories"].as_array().unwrap();
@@ -302,6 +359,8 @@ mod tests {
             extra_y_columns: vec![("profit".into(), None)],
             color_column: None,
             bins: None,
+            filters: vec![],
+            sample: None,
         };
         let result = build_series_json(&headers, &rows, 0, 1, &params);
         let series = result["series"].as_array().unwrap();
@@ -344,6 +403,8 @@ mod tests {
             extra_y_columns: vec![],
             color_column: Some("city".into()),
             bins: None,
+            filters: vec![],
+            sample: None,
         };
         let result = build_series_json(&headers, &rows, 0, 1, &params);
         assert_eq!(result["type"], "scatter");
@@ -351,6 +412,23 @@ mod tests {
         assert_eq!(series.len(), 2);
         assert_eq!(series[0]["name"], "A");
         assert_eq!(series[1]["name"], "B");
+    }
+
+    #[test]
+    fn test_build_series_json_skips_non_finite() {
+        let headers = vec!["date".into(), "value".into()];
+        let rows = vec![
+            vec!["2024-01".into(), "100".into()],
+            vec!["2024-02".into(), "NaN".into()],
+            vec!["2024-03".into(), "inf".into()],
+            vec!["2024-04".into(), "200".into()],
+        ];
+        let params = make_params(ChartType::Line);
+        let result = build_series_json(&headers, &rows, 0, 1, &params);
+        let series = result["series"].as_array().unwrap();
+        let data = series[0]["data"].as_array().unwrap();
+        assert_eq!(data.len(), 2);
+        assert!(data.iter().all(|p| p["y"].is_number()));
     }
 
     #[test]

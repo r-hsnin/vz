@@ -4,19 +4,18 @@
 //! and renders diff-aware visualizations.
 
 mod compute;
-pub mod render;
+mod render;
 mod schema;
 #[cfg(test)]
 mod tests;
 
 pub use compute::{compute_diff, compute_diff_temporal};
-pub use schema::validate_schema;
+pub use schema::{auto_x_column, auto_y_column, is_temporal_column, validate_schema};
 
 use anyhow::Result;
 use std::path::Path;
 
-use crate::cli::Cli;
-use crate::helpers::format_override;
+use crate::cli::{Cli, DiffParams};
 use crate::loader;
 
 /// Per-category diff entry for bar-style comparison.
@@ -59,27 +58,39 @@ pub struct DiffTimeSeries {
 }
 
 /// Run diff mode: load both files, validate schemas, compute and render diff.
-pub fn run_diff(cli: &Cli, before_path: &Path, after_path: &Path) -> Result<()> {
-    let before = loader::load_data_full(before_path, cli.no_header, format_override(cli))?;
-    let after = loader::load_data_full(after_path, cli.no_header, format_override(cli))?;
+pub(crate) fn run_diff(params: &DiffParams, before_path: &Path, after_path: &Path) -> Result<()> {
+    let before = loader::load_data_full(before_path, params.no_header, params.format)?;
+    let after = loader::load_data_full(after_path, params.no_header, params.format)?;
 
     schema::validate_schema(&before, &after, before_path, after_path)?;
 
     let inferred = crate::pipeline::infer_from_data(&before);
-    let x_col = schema::resolve_x_column(cli, &before, &inferred)?;
-    let y_col = schema::resolve_y_column(cli, &before, &inferred, &x_col)?;
+    let x_col = schema::resolve_x_column(&params.query, &before, &inferred)?;
+    let y_col = schema::resolve_y_column(&params.query, &before, &inferred, &x_col)?;
 
     // Check if X column is temporal → use line chart overlay
-    let x_is_temporal = inferred
-        .find_column(&x_col)
-        .map(|c| c.data_type == crate::infer::types::DataType::Temporal)
-        .unwrap_or(false);
+    let x_is_temporal = schema::is_temporal_column(&inferred, &x_col);
 
     if x_is_temporal {
         let ts = compute::compute_diff_temporal(&before, &after, &x_col, &y_col)?;
-        render::render_diff_line(cli, &ts, before_path, after_path)
+        render::render_diff_line(params, &ts, before_path, after_path)
     } else {
         let diff = compute::compute_diff(&before, &after, &x_col, &y_col)?;
-        render::render_diff(cli, &diff, before_path, after_path)
+        render::render_diff(params, &diff, before_path, after_path)
     }
+}
+
+/// Cli adapter for [`run_diff`]: prints `--where`/`--agg`/`--color`
+/// no-effect warnings, converts once, then delegates.
+pub(crate) fn run_diff_from_cli(cli: &Cli, before_path: &Path, after_path: &Path) -> Result<()> {
+    if !cli.filter.is_empty() {
+        eprintln!("warning: --where has no effect in diff mode");
+    }
+    if cli.agg.is_some() {
+        eprintln!("warning: --agg has no effect in diff mode");
+    }
+    if cli.color_col.is_some() {
+        eprintln!("warning: --color has no effect in diff mode");
+    }
+    run_diff(&cli.to_diff_params(), before_path, after_path)
 }

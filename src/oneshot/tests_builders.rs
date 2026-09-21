@@ -88,11 +88,10 @@ fn test_fit_labels_narrow_width() {
         "2024-05-01".to_string(),
         "2024-06-01".to_string(),
     ];
-    // Small datasets (≤10) always show all labels regardless of width
+    // Narrow width: labels are thinned to what fits (first kept, no overlap)
     let result = fit_labels_to_width(&labels, 28);
-    assert_eq!(result.len(), 6);
+    assert_eq!(result.len(), 1);
     assert_eq!(result[0], "2024-01-01");
-    assert_eq!(result[5], "2024-06-01");
 }
 
 #[test]
@@ -112,21 +111,37 @@ fn test_fit_labels_wide_width() {
 #[test]
 fn test_fit_labels_large_dataset_reduces() {
     let labels: Vec<String> = (1..=20).map(|i| format!("2024-{:02}-01", i)).collect();
-    // 20 labels > 10, so width-based reduction kicks in
+    // 20 labels exceed the width budget, so reduction kicks in;
+    // first is always kept, last only when it fits without clipping.
     let result = fit_labels_to_width(&labels, 40);
     assert!(
         result.len() < 20,
         "Expected labels to be reduced for large dataset"
     );
-    assert!(result.len() >= 2, "Should keep at least 2 labels");
+    assert!(!result.is_empty(), "Should keep at least 1 label");
     assert_eq!(result[0], "2024-01-01");
-    assert_eq!(*result.last().unwrap(), "2024-20-01");
 }
 
 #[test]
 fn test_fit_labels_empty() {
     let result = fit_labels_to_width(&[], 80);
     assert!(result.is_empty());
+}
+
+#[test]
+fn test_fit_labels_narrow_daily_picks_first_only() {
+    let labels: Vec<String> = (1..=30).map(|d| format!("2024-01-{d:02}")).collect();
+    // -W 30 leaves ~18 columns for labels; a 10-char date fits once with the
+    // reserved gutter, so only the first label survives rather than two
+    // overlapping/clipped ones.
+    let result = fit_labels_to_width(&labels, 18);
+    assert_eq!(result, vec!["2024-01-01".to_string()]);
+}
+
+#[test]
+fn test_fit_labels_tiny_width_floors_at_one() {
+    let labels: Vec<String> = (1..=30).map(|d| format!("2024-01-{d:02}")).collect();
+    assert_eq!(fit_labels_to_width(&labels, 5).len(), 1);
 }
 
 #[test]
