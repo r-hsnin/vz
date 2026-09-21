@@ -112,5 +112,20 @@ else
 fi
 run_check "$d" 1 "T6 dirty worktree fails without --tag"
 
+# --- T7: 明示列挙した .github ファイルのみ公開 / site/ の相対リンクは公開集合内で解決 ---
+d="$(new_repo)"
+seed "$d"
+mkdir -p "$d/.github/workflows" "$d/site/guide"
+cat >>"$d/release-manifest.txt" <<'EOF'
+site/
+.github/workflows/site.yml
+EOF
+printf 'name: site\n' >"$d/.github/workflows/site.yml"
+printf 'name: internal\n# lefthook guard-origin\n' >"$d/.github/workflows/internal.yml"
+printf '# Site\n\n[guide](./guide/a.md)\n' >"$d/site/index.md"
+printf '# A\n\n[home](../index.md)\n' >"$d/site/guide/a.md"
+git -C "$d" add -A
+run_check "$d" 0 "T7 site links resolve and unlisted .github files stay private"
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]

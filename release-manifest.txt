@@ -7,7 +7,8 @@
 #   - ファイルはそのまま記載
 #   - # で始まる行と空行は無視
 
-.github/
+.github/workflows/ci.yml
+.github/workflows/site.yml
 .gitignore
 benches/
 CONTRIBUTING.md
@@ -19,6 +20,7 @@ demo/
 docs/
 fixtures/
 rust-toolchain.toml
+site/
 skills/
 src/
 tests/
