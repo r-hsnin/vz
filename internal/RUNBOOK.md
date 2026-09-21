@@ -29,17 +29,9 @@ any path not covered by the manifest is excluded.
 - Blank lines and lines starting with `#` are ignored.
 
 **Changing the manifest is a publication-scope change; it must be explicit and approved, never
-expanded silently.** Current allowlist:
-
-```
-.github/  .gitignore  benches/  CONTRIBUTING.md  Cargo.lock  Cargo.toml
-LICENSE   README.md   demo/     docs/            fixtures/   rust-toolchain.toml
-skills/   src/        tests/
-```
-
-Notably **not** published: `AGENTS.md`, `lefthook.yml`, `internal/`, `release-manifest.txt`,
-`scripts/`, and `target/`. The public/private boundary and its enforcement are owned by
-[PUBLICATION.md](PUBLICATION.md).
+expanded silently.** The current allowlist is not copied here: read `release-manifest.txt`
+directly so this runbook cannot drift from it. The public/private boundary and its enforcement
+are owned by [PUBLICATION.md](PUBLICATION.md).
 
 ## 3. Preconditions
 

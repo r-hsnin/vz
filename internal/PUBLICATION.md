@@ -5,8 +5,10 @@
 [RUNBOOK.md](RUNBOOK.md)、文書の所有権表は `AGENTS.md` が持つ。ここには境界の意図と
 規則を置き、手順の逐条は重複させない。
 
-リリース先は **公開 GitHub リポジトリ（`origin`）のみ**。crates.io・バイナリ配布・
-ドキュメントサイトは対象外（将来の検討事項は §8）。
+リリース先は **公開 GitHub リポジトリ（`origin`）のみ**。crates.io・バイナリ配布は
+対象外（将来の検討事項は §8）。利用者向けサイトは `site/` から GitHub Pages
+（`https://r-hsnin.github.io/vz/`）へ配信する。設計は
+[specs/2026-09-21-public-site-design.md](specs/2026-09-21-public-site-design.md) が持つ。
 
 > **凍結中:** 現在 `origin` へのリリースは行わない。`scripts/release.sh` は実行しない。
 > この文書の存在をリリースが有効である根拠としない。日常作業は `dev` への push のみ。
@@ -20,14 +22,22 @@
 |---|---|
 | `README.md` / `LICENSE` / `CONTRIBUTING.md` | `AGENTS.md`（root 維持） |
 | `Cargo.toml` / `Cargo.lock` / `rust-toolchain.toml` | `release-manifest.txt` / `lefthook.yml` / `scripts/` |
-| `.github/` / `.gitignore` | `internal/` |
+| `.github/workflows/ci.yml` / `.github/workflows/site.yml` / `.gitignore` | `internal/` |
 | `src/` / `tests/` / `benches/` / `fixtures/` / `demo/` | `target/`（git 管理外） |
-| `docs/`（公開専用）/ `skills/` | |
+| `docs/`（公開専用）/ `site/`（公開専用）/ `skills/` | |
 
 - `docs/` は丸ごと許可のまま**公開専用ディレクトリ**とする。内部文書は `internal/` に置く。
 - `internal/` は default-private のため manifest への追記は不要（追記しないこと）。
 - `rust-toolchain.toml` は公開する。toolchain 固定は公開コードの再現性に資し、
   `CONTRIBUTING.md` が前提としている。
+- `site/` も**公開専用ディレクトリ**とし、利用者向けの VitePress サイト（landing +
+  guide 5本、en/ja）を置く。旧 `docs/` サイトからのコンテンツ移行は行わない。
+- `.github/` は丸ごと許可とせず、`workflows/ci.yml` と `workflows/site.yml` を明示列挙
+  する。Pages 設定や今後追加され得る内部ワークフローを公開集合に入れないため。
+
+公開面の役割分担: `README.md` = CLI の単一の真実、`docs/` = contributor 文書、
+`site/` = 利用者向けサイト、`skills/` = エージェント向け。個別文書の所有権と更新条件は
+`AGENTS.md` の文書表が持つ。
 
 ### なぜ `AGENTS.md` は root に残すか
 
@@ -112,9 +122,12 @@ origin/main   origin remote
 
 ## 8. 将来の検討（未決）
 
-- crates.io 公開・バイナリ配布・ドキュメントサイトは対象外。必要になった時点で
-  `Cargo.toml` の metadata と `exclude` を公開契約として再設計する。
+- crates.io 公開・バイナリ配布は対象外。必要になった時点で `Cargo.toml` の metadata と
+  `exclude` を公開契約として再設計する。
 - `Cargo.toml` の `exclude` は現状 crates.io 非公開のため実質 `cargo package` 専用。
-  非公開名の除去のみ行い、それ以外は据え置く。
+  `site/` のみを追加する。`internal/`・`AGENTS.md`・`release-manifest.txt`・
+  `lefthook.yml` を列挙すると `scripts/check-public-surface.sh` の禁止トークン検査に
+  Cargo.toml 自身が一致して FAIL するため、内部混入防止の抜本化は `include` allowlist
+  化を含め将来の検討事項とする。
 - L3（`vz-core` / `vz` 二分割）実施時は manifest を `src/` から `crates/*/src` へ変更する
   必要がある（公開範囲の変更として承認を要する）。計画は `internal/ROADMAP.md`。

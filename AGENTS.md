@@ -62,7 +62,7 @@ lefthook install       # 既存 clone に core.hooksPath が残っていれば -
 
 各文書を内容の単一の真実とし、他文書へは参照を置く。重複を見つけたら所有者へ寄せる。
 
-`docs/` と `skills/` は公開専用。リリース手順・公開範囲・ロードマップ等の内部文書は `internal/` に置く（境界規則は `internal/PUBLICATION.md`）。
+`docs/`・`site/`・`skills/` は公開専用。リリース手順・公開範囲・ロードマップ等の内部文書は `internal/` に置く（境界規則は `internal/PUBLICATION.md`）。
 
 | 文書 | 役割（単一の真実） | 読む・更新する条件 |
 |---|---|---|
@@ -71,6 +71,7 @@ lefthook install       # 既存 clone に core.hooksPath が残っていれば -
 | `docs/DESIGN.md` | 設計意図: 理念・推論ルール・スコープ・設計判断 | 設計判断を変えた時 |
 | `docs/GOTCHAS.md` | 非自明な挙動と既知の不具合 | 新たな罠を発見・解消した時 |
 | `CONTRIBUTING.md` | 開発手順: setup・コマンド・テスト・ベンチ・PR | 開発参加・テスト追加時 |
+| `site/` | 利用者向け VitePress サイト（landing/guide） | CLI・UI の挙動を変えた時に `README.md` と同一コミットで同期 |
 | `skills/vz/SKILL.md` | エージェントから vz を使う手順（本文＋`references/`） | スキルの提供内容を変えた時。`references/` は README の CLI/選択規則と `docs/GOTCHAS.md` を写すため、それらを変えた時は同じコミットで同期する |
 | `internal/RUNBOOK.md` | リリース手順と復旧 | リリース・障害対応時 |
 | `internal/PUBLICATION.md` | 公開/非公開の境界と検査 | 公開範囲を変えた時 |
