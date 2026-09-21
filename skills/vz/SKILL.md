@@ -1,12 +1,11 @@
 ---
 name: vz
 description: >
-  Zero-config terminal BI CLI that charts tabular data in one command. Use when
-  the task is to plot, chart, aggregate, inspect, compare, or export a
-  CSV/TSV/JSON/NDJSON/fixed-width file or piped stdin with the `vz` command:
-  "plot this CSV", "chart revenue by month", "aggregate sales by region",
-  "compare two files", "CSVを可視化して", "グラフにして", "比較して".
-  Do NOT use for pandas/matplotlib/plotly code, notebooks, or web dashboards.
+  Charts tabular data in the terminal with the vz CLI. Use when the user wants
+  a chart, summary, or export from a CSV/TSV/JSON/NDJSON/fixed-width file or
+  piped data — "plot this CSV", "chart revenue by month", "compare two files",
+  "CSVを可視化して". Do NOT use for pandas/matplotlib/plotly code, notebooks,
+  or web dashboards.
 ---
 
 # vz — Terminal Data Visualization
