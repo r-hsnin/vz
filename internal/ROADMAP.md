@@ -54,6 +54,9 @@
   exporter を触る時に除去する。公開 ARCHITECTURE の `Cli` boundary 表からも参照が消えて
   いるのはこのため。
 - **`file:line` 参照は脆い。** コード移動で drift するため、モジュール名/関数名を優先する。
+- **スキル参照の同期。** `skills/vz/references/{cli,selection}.md` は README の CLI/選択規則、
+  `troubleshooting.md` は `docs/GOTCHAS.md` の写しで、自己完結（`.agents/skills` 等へ
+  コピーしても動く）を優先した重複。原本を変更したら同じコミットで同期する。
 
 ## 凍結メモ
 

@@ -71,7 +71,7 @@ lefthook install       # 既存 clone に core.hooksPath が残っていれば -
 | `docs/DESIGN.md` | 設計意図: 理念・推論ルール・スコープ・設計判断 | 設計判断を変えた時 |
 | `docs/GOTCHAS.md` | 非自明な挙動と既知の不具合 | 新たな罠を発見・解消した時 |
 | `CONTRIBUTING.md` | 開発手順: setup・コマンド・テスト・ベンチ・PR | 開発参加・テスト追加時 |
-| `skills/vz/SKILL.md` | エージェントから vz を使う手順 | スキルの提供内容を変えた時 |
+| `skills/vz/SKILL.md` | エージェントから vz を使う手順（本文＋`references/`） | スキルの提供内容を変えた時。`references/` は README の CLI/選択規則と `docs/GOTCHAS.md` を写すため、それらを変えた時は同じコミットで同期する |
 | `internal/RUNBOOK.md` | リリース手順と復旧 | リリース・障害対応時 |
 | `internal/PUBLICATION.md` | 公開/非公開の境界と検査 | 公開範囲を変えた時 |
 | `internal/ROADMAP.md` | 内部ロードマップ・負債・決定ステータス | 計画や負債を更新した時 |
