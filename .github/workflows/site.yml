@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
         working-directory: site
       - name: Build
         run: bun run build
